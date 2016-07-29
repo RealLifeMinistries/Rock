@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,14 +31,15 @@ namespace Rock.Web.UI.Controls
     /// <summary>
     /// Displays a bootstrap badge
     /// </summary>
-    public class NewFamilyContactInfoRow : CompositeControl
+    public class NewGroupContactInfoRow : CompositeControl
     {
         /// <summary>
-        /// The Family role key
+        /// The Group role key
         /// </summary>
         /// 
         private PhoneNumberBox _pnbHomePhone;
         private PhoneNumberBox _pnbCellPhone;
+        private RockCheckBox _cbIsMessagingEnabled;
         private EmailBox _ebEmail;
 
         /// <summary>
@@ -176,6 +177,26 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the Is Messaging Enabled bool.
+        /// </summary>
+        /// <value>
+        /// True/False.
+        /// </value>
+        public bool IsMessagingEnabled
+        {
+            get
+            {
+                EnsureChildControls();
+                return _cbIsMessagingEnabled.Checked;
+            }
+            set
+            {
+                EnsureChildControls();
+                _cbIsMessagingEnabled.Checked = value;
+            }
+        }
+
+        /// <summary>
         /// Gets or sets the validation group.
         /// </summary>
         /// <value>
@@ -193,18 +214,20 @@ namespace Rock.Web.UI.Controls
                 EnsureChildControls();
                 _pnbHomePhone.ValidationGroup = value;
                 _pnbCellPhone.ValidationGroup = value;
+                _cbIsMessagingEnabled.ValidationGroup = value;
                 _ebEmail.ValidationGroup = value;
             }
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="NewFamilyContactInfoRow" /> class.
+        /// Initializes a new instance of the <see cref="NewGroupContactInfoRow" /> class.
         /// </summary>
-        public NewFamilyContactInfoRow()
+        public NewGroupContactInfoRow()
             : base()
         {
             _pnbHomePhone = new PhoneNumberBox();
             _pnbCellPhone = new PhoneNumberBox();
+            _cbIsMessagingEnabled = new RockCheckBox();
             _ebEmail = new EmailBox();
         }
 
@@ -243,18 +266,23 @@ namespace Rock.Web.UI.Controls
 
             _pnbHomePhone.ID = "_pnbHomePhone";
             _pnbCellPhone.ID = "_pnbCellPhone";
+            _cbIsMessagingEnabled.ID = "_cbIsMessagingEnabled";
             _ebEmail.ID = "_ebEmail";
+            
 
             Controls.Add( _pnbHomePhone );
             Controls.Add( _pnbCellPhone );
-            Controls.Add( _ebEmail );
+            Controls.Add(_cbIsMessagingEnabled);
+            Controls.Add(_ebEmail);
 
-            _pnbHomePhone.Placeholder = "Home Phone";
+            var homePhone = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME );
+            _pnbHomePhone.Placeholder = homePhone != null ? homePhone.Value.EndsWith("Phone") ? homePhone.Value : homePhone.Value + " Phone" : "Home Phone";
             _pnbHomePhone.Required = false;
 
-            _pnbCellPhone.Placeholder = "Cell Phone";
+            var cellPhone = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE );
+            _pnbCellPhone.Placeholder = cellPhone != null ? cellPhone.Value.EndsWith( "Phone" ) ? cellPhone.Value : cellPhone.Value + " Phone" : "Cell Phone";
             _pnbCellPhone.Required = false;
-
+           
             _ebEmail.Placeholder = "Email";
             _ebEmail.Required = false;
         }
@@ -285,6 +313,13 @@ namespace Rock.Web.UI.Controls
                 writer.AddAttribute( "class", "form-group" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
                 _pnbCellPhone.RenderControl( writer );
+                writer.RenderEndTag();
+                writer.RenderEndTag();
+
+                writer.RenderBeginTag(HtmlTextWriterTag.Td);
+                writer.AddAttribute("class", "text-center");
+                writer.RenderBeginTag(HtmlTextWriterTag.Div);
+                _cbIsMessagingEnabled.RenderControl(writer);
                 writer.RenderEndTag();
                 writer.RenderEndTag();
 

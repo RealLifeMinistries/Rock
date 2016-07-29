@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,6 +26,7 @@ using System.Runtime.Serialization;
 using System.Text;
 
 using Rock.Data;
+using Rock.Web.Cache;
 
 namespace Rock.Model
 {
@@ -144,6 +145,16 @@ namespace Rock.Model
         public string City { get; set; }
 
         /// <summary>
+        /// Gets or sets the county.
+        /// </summary>
+        /// <value>
+        /// The county.
+        /// </value>
+        [MaxLength( 50 )]
+        [DataMember]
+        public string County { get; set; }
+
+        /// <summary>
         /// Gets or sets the State component of the Location's Street/Mailing Address.
         /// </summary>
         /// <value>
@@ -175,6 +186,16 @@ namespace Rock.Model
         [MaxLength( 50 )]
         [DataMember]
         public string PostalCode { get; set; }
+
+        /// <summary>
+        /// Gets or sets the barcode.
+        /// </summary>
+        /// <value>
+        /// The barcode.
+        /// </value>
+        [MaxLength( 40 )]
+        [DataMember]
+        public string Barcode { get; set; }
 
         /// <summary>
         /// Gets or sets the Local Assessor's parcel identification value that is linked to the location.
@@ -215,7 +236,7 @@ namespace Rock.Model
         /// A <see cref="System.String"/> representing the result code that was returned by the address standardization service. If an address standardization has not been attempted for this location, 
         /// this value will be null.
         /// </value>
-        [MaxLength( 50 )]
+        [MaxLength( 200 )]
         [DataMember]
         public string StandardizeAttemptedResult { get; set; }
 
@@ -257,7 +278,7 @@ namespace Rock.Model
         /// A <see cref="System.String"/> representing the result code returned by the geocoding service from the most recent geocoding attempt. If geocoding has not been attempted for this location,
         /// the value will be null.
         /// </value>
-        [MaxLength( 50 )]
+        [MaxLength( 200 )]
         [DataMember]
         public string GeocodeAttemptedResult { get; set; }
 
@@ -297,6 +318,24 @@ namespace Rock.Model
         /// </value>
         [DataMember]
         public int? ImageId { get; set; }
+
+        /// <summary>
+        /// Gets or sets a threshold that will prevent checkin unless a manager overrides
+        /// </summary>
+        /// <value>
+        /// The soft room threshold.
+        /// </value>
+        [DataMember]
+        public int? SoftRoomThreshold { get; set; }
+
+        /// <summary>
+        /// Gets or sets threshold that will prevent checkin (no option to override)
+        /// </summary>
+        /// <value>
+        /// The firm room threshold.
+        /// </value>
+        [DataMember]
+        public int? FirmRoomThreshold { get; set; }
 
         #endregion
 
@@ -458,6 +497,95 @@ namespace Rock.Model
             }
         }
 
+        /// <summary>
+        /// Gets the campus that is at this location, or one of this location's parent location
+        /// </summary>
+        /// <value>
+        /// The campus identifier.
+        /// </value>
+        [LavaInclude]
+        public virtual int? CampusId
+        {
+            get
+            {
+                var campuses = CampusCache.All();
+
+                int? campusId = null;
+                Location loc = this;
+
+                while ( !campusId.HasValue && loc != null )
+                {
+                    var campus = campuses.Where( c => c.LocationId != null && c.LocationId == loc.Id ).FirstOrDefault();
+                    if ( campus != null )
+                    {
+                        campusId = campus.Id;
+                    }
+                    else
+                    {
+                        loc = loc.ParentLocation;
+                    }
+                }
+
+                return campusId;
+            }
+        }
+
+        /// <summary>
+        /// Gets the distance (in miles). 
+        /// Note, this just stores whatever value was passed into SetDistance
+        /// Some of the REST apis, such as Groups/ByLocation, will set this for you
+        /// </summary>
+        /// <value>
+        /// The distance.
+        /// </value>
+        [DataMember]
+        [RockClientInclude( "If returned from an endpoint that calculates distance, this will be the result distance (in miles)" )]
+        public virtual double Distance
+        {
+            get { return _distance; }
+        }
+        private double _distance = 0.0D;
+
+        #endregion
+
+        #region overrides
+
+        /// <summary>
+        /// Gets a value indicating whether this instance is valid.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance is valid; otherwise, <c>false</c>.
+        /// </value>
+        public override bool IsValid
+        {
+            get
+            {
+                var result = base.IsValid;
+                if ( result )
+                {
+                    // make sure it isn't getting saved with a recursive parent hierarchy
+                    var parentIds = new List<int>();
+                    parentIds.Add( this.Id );
+                    var parent = this.ParentLocationId.HasValue ? ( this.ParentLocation ?? new LocationService( new RockContext() ).Get( this.ParentLocationId.Value ) ) : null;
+                    while ( parent != null )
+                    {
+                        if ( parentIds.Contains( parent.Id ) )
+                        {
+                            this.ValidationResults.Add( new ValidationResult( "Parent Location cannot be a child of this Location (recursion)" ) );
+                            return false;
+                        }
+                        else
+                        {
+                            parentIds.Add( parent.Id );
+                            parent = parent.ParentLocation;
+                        }
+                    }
+                }
+
+                return result;
+            }
+        }
+
         #endregion
 
         #region Public Methods
@@ -479,7 +607,7 @@ namespace Rock.Model
         /// <returns>A <see cref="System.String"/> containing the link to Google Maps for this location.</returns>
         public virtual string GoogleMapLink( string title )
         {
-            string qParm = this.ToString();
+            string qParm = this.GetFullStreetAddress();
             if ( !string.IsNullOrWhiteSpace( title ) )
             {
                 qParm += " (" + title + ")";
@@ -515,11 +643,11 @@ namespace Rock.Model
         /// </returns>
         public override string ToString()
         {
-            string result = this.Name;
+            string result = GetFullStreetAddress();
 
             if ( string.IsNullOrEmpty( result ) )
             {
-                result = GetFullStreetAddress();
+                result = this.Name;
             }
 
             if ( string.IsNullOrWhiteSpace( result ) )
@@ -590,6 +718,7 @@ namespace Rock.Model
 
         /// <summary>
         /// Encodes the polygon for Google maps
+        /// from http://stackoverflow.com/a/3852420
         /// </summary>
         /// <returns></returns>
         public virtual string EncodeGooglePolygon()
@@ -615,23 +744,31 @@ namespace Rock.Model
                 int lastLat = 0;
                 int lastLng = 0;
 
-                // AsText() returns coordinates as Well-Known-Text format (WKT).  Strip leading and closing text
-                string coordinates = this.GeoFence.AsText().Replace( "POLYGON ((", "" ).Replace( "))", "" );
-                string[] longSpaceLat = coordinates.Split( ',' );
-
-                for ( int i = 0; i < longSpaceLat.Length; i++ )
+                foreach ( var coordinate in this.GeoFence.Coordinates() )
                 {
-                    string[] longLat = longSpaceLat[i].Trim().Split( ' ' );
-                    int lat = (int)Math.Round( double.Parse( longLat[1] ) * 1E5 );
-                    int lng = (int)Math.Round( double.Parse( longLat[0] ) * 1E5 );
-                    encodeDiff( lat - lastLat );
-                    encodeDiff( lng - lastLng );
-                    lastLat = lat;
-                    lastLng = lng;
+                    if ( coordinate.Longitude.HasValue && coordinate.Latitude.HasValue )
+                    {
+                        int lat = (int)Math.Round( coordinate.Latitude.Value * 1E5 );
+                        int lng = (int)Math.Round( coordinate.Longitude.Value * 1E5 );
+                        encodeDiff( lat - lastLat );
+                        encodeDiff( lng - lastLng );
+                        lastLat = lat;
+                        lastLng = lng;
+                    }
                 }
             }
 
             return str.ToString();
+        }
+
+        /// <summary>
+        /// Sets the distance (in miles)
+        /// Use this if you have calculated the distance from a particular point and want to store the result in the Distance variable (not stored in database)
+        /// </summary>
+        /// <param name="distance">The distance.</param>
+        public void SetDistance( double distance )
+        {
+            _distance = distance;
         }
 
         /// <summary>
@@ -677,7 +814,26 @@ namespace Rock.Model
                 return string.Empty;
             }
         }
+        
         #endregion
+
+        #region constants
+
+        /// <summary>
+        /// Meters per mile (1609.344)
+        /// NOTE: Geo Spatial distances are in meters
+        /// </summary>
+        public const double MetersPerMile = 1609.344;
+
+
+        /// <summary>
+        /// Miles per meter 1/1609.344 (0.00062137505)
+        /// NOTE: Geo Spatial distances are in meters
+        /// </summary>
+        public const double MilesPerMeter = 1 / MetersPerMile;
+
+        #endregion
+
 
     }
 

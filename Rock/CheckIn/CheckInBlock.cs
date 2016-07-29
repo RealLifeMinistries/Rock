@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,17 +28,77 @@ namespace Rock.CheckIn
     /// <summary>
     /// A RockBlock specific to check-in
     /// </summary>
-    [LinkedPage( "Home Page" )]
-    [LinkedPage( "Next Page" )]
-    [LinkedPage( "Previous Page" )]
-    [WorkflowTypeField( "Workflow Type", "The workflow type to activate for check-in" )]
-    [TextField( "Workflow Activity", "The name of the workflow activity to run on selection.", false, "" )]
+    [WorkflowTypeField( "Workflow Type", "The workflow type to activate for check-in", false, false, "", "", 0 )]
+    [TextField( "Workflow Activity", "The name of the workflow activity to run on selection.", false, "", "", 1 )]
+    [LinkedPage( "Home Page", "", false, "", "", 2 )]
+    [LinkedPage( "Previous Page", "", false, "", "", 3 )]
+    [LinkedPage( "Next Page", "", false, "", "", 4 )]
     public abstract class CheckInBlock : RockBlock
     {
+
+        /// <summary>
+        /// The current theme.
+        /// </summary>
+        protected string CurrentTheme { get; set; }
+
         /// <summary>
         /// The current kiosk id
         /// </summary>
         protected int? CurrentKioskId { get; set; }
+
+        /// <summary>
+        /// The current primary checkin-type id
+        /// </summary>
+        protected int? CurrentCheckinTypeId
+        {
+            get { return _currentCheckinTypeId; }
+            set
+            {
+                _currentCheckinTypeId = value;
+                _currentCheckinType = null;
+            }
+        }
+        private int? _currentCheckinTypeId;
+
+        /// <summary>
+        /// Gets the type of the current check in.
+        /// </summary>
+        /// <value>
+        /// The type of the current check in.
+        /// </value>
+        protected CheckinType CurrentCheckInType
+        {
+            get
+            {
+                if ( _currentCheckinType != null )
+                {
+                    return _currentCheckinType;
+                }
+
+                if ( CurrentCheckinTypeId.HasValue )
+                {
+                    _currentCheckinType = new CheckinType( CurrentCheckinTypeId.Value );
+                    return _currentCheckinType;
+                }
+
+                return null;
+            }
+        }
+        private CheckinType _currentCheckinType;
+
+        /// <summary>
+        /// Gets a value indicating whether check-in is currently in override mode
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is override; otherwise, <c>false</c>.
+        /// </value>
+        protected bool IsOverride
+        {
+            get
+            {
+                return Request["Override"] != null && Request["Override"].AsBoolean();
+            }
+        }
 
         /// <summary>
         /// The current group type ids
@@ -98,6 +158,70 @@ namespace Rock.CheckIn
         }
 
         /// <summary>
+        /// Gets or sets a value indicating whether [manager logged in].
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [manager logged in]; otherwise, <c>false</c>.
+        /// </value>
+        protected bool ManagerLoggedIn
+        {
+            get
+            {
+                return this.CurrentCheckInState != null && this.CurrentCheckInState.ManagerLoggedIn;
+            }
+
+            set
+            {
+                if (this.CurrentCheckInState != null)
+                {
+                    this.CurrentCheckInState.ManagerLoggedIn = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the person schedule sub title.
+        /// </summary>
+        /// <returns></returns>
+        protected string GetPersonScheduleSubTitle()
+        {
+            if ( CurrentCheckInState != null )
+            {
+                var person = CurrentCheckInState.CheckIn.CurrentPerson;
+                if ( person != null )
+                {
+                    var schedule = person.CurrentSchedule;
+                    if ( schedule != null )
+                    {
+                        // If check-in is not configured to automatically select same options for each service
+                        // or option was not available (i.e. not first service ) then show name/service
+                        if ( !CurrentCheckInState.CheckInType.UseSameOptions ||
+                            ( schedule.Schedule.Id != person.SelectedSchedules.First().Schedule.Id ) )
+                        {
+                            string.Format( "{0} @ {1}", person, schedule );
+                        }
+                    }
+
+                    return person.ToString();
+
+                }
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Returns the locations for this Kiosk for the configured group types
+        /// </summary>
+        /// <value>
+        /// The locations.
+        /// </value>
+        protected IEnumerable<Location> GetGroupTypesLocations( RockContext rockContext )
+        {
+            return CurrentCheckInState.Kiosk.Locations( CurrentGroupTypeIds, rockContext );
+        }
+
+        /// <summary>
         /// Gets a value indicating whether page was navigated to by user selecting Back.
         /// </summary>
         /// <value>
@@ -141,6 +265,8 @@ namespace Rock.CheckIn
                 using ( var rockContext = new RockContext() )
                 {
                     var workflowTypeService = new WorkflowTypeService( rockContext );
+                    var workflowService = new WorkflowService( rockContext );
+
                     var workflowType = workflowTypeService.Queryable( "ActivityTypes" )
                         .Where( w => w.Guid.Equals( guid.Value ) )
                         .FirstOrDefault();
@@ -150,13 +276,18 @@ namespace Rock.CheckIn
                         if ( CurrentWorkflow == null )
                         {
                             CurrentWorkflow = Rock.Model.Workflow.Activate( workflowType, CurrentCheckInState.Kiosk.Device.Name, rockContext );
+                            
+                            if ( IsOverride )
+                            {
+                                CurrentWorkflow.SetAttributeValue( "Override", "True" );
+                            }
                         }
 
                         var activityType = workflowType.ActivityTypes.Where( a => a.Name == activityName ).FirstOrDefault();
                         if ( activityType != null )
                         {
                             WorkflowActivity.Activate( activityType, CurrentWorkflow, rockContext );
-                            if ( CurrentWorkflow.Process( rockContext, CurrentCheckInState, out errorMessages ) )
+                            if ( workflowService.Process( CurrentWorkflow, CurrentCheckInState, out errorMessages ) )
                             {
                                 // Keep workflow active for continued processing
                                 CurrentWorkflow.CompletedDateTime = null;
@@ -184,6 +315,11 @@ namespace Rock.CheckIn
         /// </summary>
         protected void SaveState()
         {
+            if ( !string.IsNullOrWhiteSpace( CurrentTheme))
+            {
+                Session["CheckInTheme"] = CurrentTheme;
+            }
+
             if ( CurrentKioskId.HasValue )
             {
                 Session["CheckInKioskId"] = CurrentKioskId.Value;
@@ -191,6 +327,15 @@ namespace Rock.CheckIn
             else
             {
                 Session.Remove( "CheckInKioskId" );
+            }
+
+            if ( CurrentCheckinTypeId.HasValue )
+            {
+                Session["CheckinTypeId"] = CurrentCheckinTypeId.Value;
+            }
+            else
+            {
+                Session.Remove( "CheckinTypeId" );
             }
 
             if ( CurrentGroupTypeIds != null )
@@ -294,7 +439,7 @@ namespace Rock.CheckIn
         /// <summary>
         /// Cancels the check-in.
         /// </summary>
-        protected void CancelCheckin()
+        protected virtual void CancelCheckin()
         {
             NavigateToHomePage();
         }
@@ -302,7 +447,7 @@ namespace Rock.CheckIn
         /// <summary>
         /// Navigates to the check-in home page.
         /// </summary>
-        protected void NavigateToHomePage()
+        protected virtual void NavigateToHomePage()
         {
             NavigateToLinkedPage( "HomePage" );
         }
@@ -310,26 +455,75 @@ namespace Rock.CheckIn
         /// <summary>
         /// Navigates to next page.
         /// </summary>
-        protected void NavigateToNextPage()
+        protected virtual void NavigateToNextPage()
         {
-            NavigateToLinkedPage( "NextPage" );
+            NavigateToNextPage( null );
+        }
+
+        /// <summary>
+        /// Navigates to next page.
+        /// </summary>
+        /// <param name="queryParams">The query parameters.</param>
+        protected virtual void NavigateToNextPage( Dictionary<string, string> queryParams )
+        {
+            queryParams = CheckForOverride( queryParams );
+            NavigateToLinkedPage( "NextPage", queryParams );
         }
 
         /// <summary>
         /// Navigates to previous page.
         /// </summary>
-        protected void NavigateToPreviousPage()
+        protected virtual void NavigateToPreviousPage()
         {
             var queryParams = new Dictionary<string, string>();
             queryParams.Add( "back", "true" );
+
+            queryParams = CheckForOverride( queryParams );
+
+            NavigateToPreviousPage( queryParams );
+        }
+
+        /// <summary>
+        /// Checks the override.
+        /// </summary>
+        /// <param name="queryParams">The query parameters.</param>
+        protected Dictionary<string, string> CheckForOverride( Dictionary<string, string> queryParams = null )
+        {
+            if ( IsOverride )
+            {
+                if ( queryParams == null )
+                {
+                    queryParams = new Dictionary<string, string>();
+                }
+                queryParams.AddOrReplace( "Override", "True" );
+            }
+            return queryParams;
+        }
+
+        /// <summary>
+        /// Navigates to previous page.
+        /// </summary>
+        /// <param name="queryParams">The query parameters.</param>
+        protected virtual void NavigateToPreviousPage( Dictionary<string, string> queryParams )
+        {
             NavigateToLinkedPage( "PreviousPage", queryParams );
         }
 
         private void GetState()
         {
+            if ( Session["CurrentTheme"] != null )
+            {
+                CurrentTheme = Session["CurrentTheme"].ToString();
+            }
+
             if ( Session["CheckInKioskId"] != null )
             {
                 CurrentKioskId = (int)Session["CheckInKioskId"];
+            }
+
+            if ( Session["CheckinTypeId"] != null )
+            {
+                CurrentCheckinTypeId = (int)Session["CheckinTypeId"];
             }
 
             if ( Session["CheckInGroupTypeIds"] != null )
@@ -349,8 +543,9 @@ namespace Rock.CheckIn
 
             if ( CurrentCheckInState == null && CurrentKioskId.HasValue )
             {
-                CurrentCheckInState = new CheckInState( CurrentKioskId.Value, CurrentGroupTypeIds );
+                CurrentCheckInState = new CheckInState( CurrentKioskId.Value, CurrentCheckinTypeId, CurrentGroupTypeIds );
             }
         }
+
     }
 }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,7 +39,7 @@ namespace RockWeb.Blocks.Finance
     [DisplayName( "Scheduled Transaction Summary" )]
     [Category( "Finance" )]
     [Description( "Block that shows a summary of the scheduled transactions for the currently logged in user." )]
-    [CodeEditorField( "Template", "Liquid template for the content to be placed on the page.", CodeEditorMode.Liquid, CodeEditorTheme.Rock, 400, true, @"{% include '~~/Assets/Lava/ScheduledTransactionSummary.lava'  %}", "", 1 )]
+    [CodeEditorField( "Template", "Liquid template for the content to be placed on the page.", CodeEditorMode.Lava, CodeEditorTheme.Rock, 400, true, @"{% include '~~/Assets/Lava/ScheduledTransactionSummary.lava'  %}", "", 1 )]
     [BooleanField("Enable Debug", "Displays a list of available merge fields using the current person's scheduled transactions.", false, "", 2)]
     [LinkedPage("Manage Scheduled Transactions Page", "Link to be used for managing an individual's scheduled transactions.", false, "", "", 3)]
     [LinkedPage( "Transaction History Page", "Link to use for viewing an individual's transaction history.", false, "", "", 4 )]
@@ -109,20 +109,22 @@ namespace RockWeb.Blocks.Finance
         // helper functional methods (like BindGrid(), etc.)
         private void ShowContent()
         {
+            List<Dictionary<string, object>> scheduleSummaries = new List<Dictionary<string, object>>();
 
-            // get pledges for current user
+            // get scheduled transactions for current user
             if ( CurrentPerson != null )
             {
                 var rockContext = new RockContext();
                 FinancialScheduledTransactionService transactionService = new FinancialScheduledTransactionService( rockContext );
 
                 var schedules = transactionService.Queryable( "ScheduledTransactionDetails.Account" )
-                                .Where( s => s.AuthorizedPersonAlias.PersonId == CurrentPerson.Id && s.IsActive == true );
-
-                List<Dictionary<string, object>> scheduleSummaries = new List<Dictionary<string, object>>();
+                                .Where( s => s.AuthorizedPersonAlias.Person.GivingId == CurrentPerson.GivingId && s.IsActive == true );
 
                 foreach ( FinancialScheduledTransaction schedule in schedules )
                 {
+                    string errorMsgs = string.Empty;
+                    transactionService.GetStatus( schedule, out errorMsgs );
+
                     decimal totalAmount = 0;
                     
                     Dictionary<string, object> scheduleSummary = new Dictionary<string, object>();
@@ -153,8 +155,8 @@ namespace RockWeb.Blocks.Finance
                         scheduleSummary.Add( "DaysSinceLastPayment", null );
                     }
 
-                    scheduleSummary.Add("CurrencyType", schedule.CurrencyTypeValue.Value);
-                    scheduleSummary.Add( "CreditCardType", (schedule.CreditCardTypeValue == null) ? "" : schedule.CreditCardTypeValue.Value );
+                    scheduleSummary.Add("CurrencyType", ( schedule.FinancialPaymentDetail != null && schedule.FinancialPaymentDetail.CurrencyTypeValue != null ) ? schedule.FinancialPaymentDetail.CurrencyTypeValue.Value : "" );
+                    scheduleSummary.Add( "CreditCardType", ( schedule.FinancialPaymentDetail != null && schedule.FinancialPaymentDetail.CreditCardTypeValue != null) ? schedule.FinancialPaymentDetail.CreditCardTypeValue.Value : "" );
                     scheduleSummary.Add("UrlEncryptedKey", schedule.UrlEncodedKey);
                     scheduleSummary.Add("Frequency",  schedule.TransactionFrequencyValue.Value);
                     scheduleSummary.Add("FrequencyDescription", schedule.TransactionFrequencyValue.Description);
@@ -179,34 +181,36 @@ namespace RockWeb.Blocks.Finance
 
                     scheduleSummaries.Add( scheduleSummary );
                 }
-                
-                // added linked pages to mergefields
-                Dictionary<string, object> linkedPages = new Dictionary<string, object>();
-                linkedPages.Add( "ManageScheduledTransactionsPage", LinkedPageUrl( "ManageScheduledTransactionsPage", null ));
-                linkedPages.Add( "TransactionHistoryPage", LinkedPageUrl( "TransactionHistoryPage", null ) );
-                linkedPages.Add( "TransactionEntryPage", LinkedPageUrl( "TransactionEntryPage", null ) );
-                
 
-
-                var scheduleValues = new Dictionary<string, object>();
-                scheduleValues.Add( "ScheduledTransactions", scheduleSummaries.ToList() );
-                scheduleValues.Add( "LinkedPages", linkedPages );
-                // TODO: When support for "Person" is not supported anymore (should use "CurrentPerson" instead), remove this line
-                scheduleValues.Add( "Person", CurrentPerson );
-                scheduleValues.Add( "CurrentPerson", CurrentPerson );  
-
-                string content = GetAttributeValue( "Template" ).ResolveMergeFields( scheduleValues );
-
-                // show merge fields if needed
-                if ( GetAttributeValue( "EnableDebug" ).AsBoolean() && IsUserAuthorized( Authorization.EDIT ) )
-                {
-                    // TODO: When support for "Person" is not supported anymore (should use "CurrentPerson" instead), remove this line
-                    scheduleValues.Remove( "Person" );
-                    content += scheduleValues.lavaDebugInfo();
-                }
-
-                lContent.Text = content;
+                rockContext.SaveChanges();
             }
+
+            // added linked pages to mergefields
+            Dictionary<string, object> linkedPages = new Dictionary<string, object>();
+            linkedPages.Add( "ManageScheduledTransactionsPage", LinkedPageRoute( "ManageScheduledTransactionsPage" ) );
+            linkedPages.Add( "TransactionHistoryPage", LinkedPageRoute( "TransactionHistoryPage" ) );
+            linkedPages.Add( "TransactionEntryPage", LinkedPageRoute( "TransactionEntryPage" ) );
+
+
+
+            var scheduleValues = new Dictionary<string, object>();
+            scheduleValues.Add( "ScheduledTransactions", scheduleSummaries.ToList() );
+            scheduleValues.Add( "LinkedPages", linkedPages );
+            // TODO: When support for "Person" is not supported anymore (should use "CurrentPerson" instead), remove this line
+            scheduleValues.Add( "Person", CurrentPerson );
+            scheduleValues.Add( "CurrentPerson", CurrentPerson );
+
+            string content = GetAttributeValue( "Template" ).ResolveMergeFields( scheduleValues );
+
+            // show merge fields if needed
+            if ( GetAttributeValue( "EnableDebug" ).AsBoolean() && IsUserAuthorized( Authorization.EDIT ) )
+            {
+                // TODO: When support for "Person" is not supported anymore (should use "CurrentPerson" instead), remove this line
+                scheduleValues.Remove( "Person" );
+                content += scheduleValues.lavaDebugInfo();
+            }
+
+            lContent.Text = content;
             
         }
 

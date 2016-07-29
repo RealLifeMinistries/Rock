@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,8 +18,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Web.UI;
-using Rock.Data;
-using Rock.Model;
+
+using Rock.Reporting;
 
 namespace Rock.Field
 {
@@ -28,7 +28,6 @@ namespace Rock.Field
     /// </summary>
     public interface IFieldType
     {
-
         #region Configuration
 
         /// <summary>
@@ -86,9 +85,27 @@ namespace Rock.Field
         /// <returns></returns>
         string FormatValueAsHtml( Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues, bool condensed = false );
 
+        /// <summary>
+        /// Returns the value using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        object ValueAsFieldType( Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues );
+
+        /// <summary>
+        /// Returns the value that should be used for sorting, using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        object SortValue( Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues );
+
         #endregion
 
-        #region Edit Control 
+        #region Edit Control
 
         /// <summary>
         /// Creates an HTML control.
@@ -127,24 +144,32 @@ namespace Rock.Field
 
         #endregion
 
-        #region Filter Control 
+        #region Filter Control
 
         /// <summary>
-        /// Creates the control needed to filter (query) values using this field type.
+        /// Creates the control needed to filter (query) values using this field type using the specified FilterMode
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
         /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        Control FilterControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required );
+        Control FilterControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode );
+
+        /// <summary>
+        /// Determines whether this filter type has a FilterControl
+        /// </summary>
+        /// <returns></returns>
+        bool HasFilterControl();
 
         /// <summary>
         /// Gets the filter values.
         /// </summary>
         /// <param name="filterControl">The filter control.</param>
         /// <param name="configurationValues">The configuration values.</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        List<string> GetFilterValues( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues );
+        List<string> GetFilterValues( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues, FilterMode filterMode );
 
         /// <summary>
         /// Sets the filter value.
@@ -182,7 +207,7 @@ namespace Rock.Field
         Expression PropertyFilterExpression( Dictionary<string, ConfigurationValue> configurationValues, List<string> filterValues, Expression parameterExpression, string propertyName, Type propertyType );
 
         /// <summary>
-        /// Geta a filter expression for an attribute value.
+        /// Gets a filter expression for an attribute value.
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="filterValues">The filter values.</param>
@@ -190,9 +215,25 @@ namespace Rock.Field
         /// <returns></returns>
         Expression AttributeFilterExpression( Dictionary<string, ConfigurationValue> configurationValues, List<string> filterValues, ParameterExpression parameterExpression );
 
+        /// <summary>
+        /// Gets the name of the attribute value field.
+        /// </summary>
+        /// <value>
+        /// The name of the attribute value field.
+        /// </value>
+        string AttributeValueFieldName { get; }
+
+        /// <summary>
+        /// Gets the type of the attribute value field.
+        /// </summary>
+        /// <value>
+        /// The type of the attribute value field.
+        /// </value>
+        Type AttributeValueFieldType { get; }
+
         #endregion
 
-        #region Event Handlers 
+        #region Event Handlers
 
         /// <summary>
         /// Occurs when a qualifier is updated.
@@ -200,6 +241,5 @@ namespace Rock.Field
         event EventHandler QualifierUpdated;
 
         #endregion
-
     }
 }

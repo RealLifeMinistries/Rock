@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -95,6 +95,15 @@ namespace Rock.Model
         public virtual Person Person { get; set; }
 
         /// <summary>
+        /// Sets the alias person
+        /// NOTE: This is a special case where we want to allow the AliasPersonId to keep the value even if the associated Person is deleted
+        /// </summary>
+        /// <value>
+        /// The alias person.
+        /// </value>
+        public virtual Person AliasPerson { internal get; set; }
+
+        /// <summary>
         /// Gets the previous encrypted key for the <see cref="Rock.Model.Person"/>.
         /// </summary>
         /// <value>
@@ -152,6 +161,10 @@ namespace Rock.Model
         public PersonAliasConfiguration()
         {
             HasRequired( a => a.Person ).WithMany( p => p.Aliases ).HasForeignKey( a => a.PersonId ).WillCascadeOnDelete( false );
+            
+            // NOTE: The foreign key is a fake foreign key (not a physical foreign key in the database) 
+            // since we want to keep the AliasPersonId even if the associated Person is deleted
+            HasRequired( a => a.AliasPerson ).WithMany().HasForeignKey( a => a.AliasPersonId ).WillCascadeOnDelete( false );
         }
     }
 

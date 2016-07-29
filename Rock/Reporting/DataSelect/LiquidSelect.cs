@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,11 +25,11 @@ using Rock.Web.UI.Controls;
 namespace Rock.Reporting.DataSelect
 {
     /// <summary>
-    /// A special-case DataSelectComponent that can be used to apply a DotLiquid template against the row returned from a Report query
+    /// A special-case DataSelectComponent that can be used to apply a Rock Lava template against the row returned from a Report query
     /// </summary>
-    [Description( "Select output using Liquid template" )]
+    [Description( "Select output using Lava template" )]
     [Export( typeof( DataSelectComponent ) )]
-    [ExportMetadata( "ComponentName", "Liquid Template" )]
+    [ExportMetadata( "ComponentName", "Lava Template" )]
     public class LiquidSelect : DataSelectComponent
     {
         #region Properties
@@ -59,7 +59,7 @@ namespace Rock.Reporting.DataSelect
         {
             get
             {
-                return "Advanced";
+                return base.Section;
             }
         }
 
@@ -73,7 +73,7 @@ namespace Rock.Reporting.DataSelect
         {
             get
             {
-                return "Liquid";
+                return "Lava";
             }
         }
 
@@ -98,7 +98,7 @@ namespace Rock.Reporting.DataSelect
         {
             get
             {
-                return "Liquid";
+                return "Lava";
             }
         }
 
@@ -130,7 +130,22 @@ namespace Rock.Reporting.DataSelect
         /// </value>
         public override string GetTitle( Type entityType )
         {
-            return "Liquid";
+            return "Lava";
+        }
+
+        /// <summary>
+        /// Comma-delimited list of the Entity properties that should be used for Sorting. Normally, you should leave this as null which will make it sort on the returned field
+        /// To disable sorting for this field, return string.Empty;
+        /// </summary>
+        /// <param name="selection"></param>
+        /// <returns></returns>
+        /// <value>
+        /// The sort expression.
+        /// </value>
+        public override string SortProperties( string selection )
+        {
+            // disable sorting on this column since the data doesn't come from the database
+            return string.Empty;
         }
 
         /// <summary>
@@ -155,10 +170,10 @@ namespace Rock.Reporting.DataSelect
         {
             CodeEditor codeEditor = new CodeEditor();
             codeEditor.HelpBlock.Text = @"
-Use Liquid syntax to get the values of any of the fields in this report. For example, to create a link to the Person record, type <code>&lt;a href=&quot;~/Person/{{ Id }}&quot;&gt;{{ NickName }} {{ LastName }}&lt;/a&gt</code><br />  
+Use Lava syntax to get the values of any of the fields in this report. For example, to create a link to the Person record, type <code>&lt;a href=&quot;~/Person/{{ Id }}&quot;&gt;{{ NickName }} {{ LastName }}&lt;/a&gt</code><br />  
 Note: The fieldname will be the Column Label without spaces or special characters.";
 
-            codeEditor.EditorMode = CodeEditorMode.Liquid;
+            codeEditor.EditorMode = CodeEditorMode.Lava;
             codeEditor.ID = parentControl.ID + "_0";
             codeEditor.Label = "Template";
 

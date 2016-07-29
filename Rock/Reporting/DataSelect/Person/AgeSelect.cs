@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -107,6 +107,34 @@ namespace Rock.Reporting.DataSelect.Person
         }
 
         /// <summary>
+        /// Comma-delimited list of the Entity properties that should be used for Sorting. Normally, you should leave this as null which will make it sort on the returned field
+        /// To disable sorting for this field, return string.Empty;
+        /// </summary>
+        /// <param name="selection"></param>
+        /// <returns></returns>
+        /// <value>
+        /// The sort expression.
+        /// </value>
+        public override string SortProperties( string selection )
+        {
+            // sort by Birthdate instead Age since Birthdate will sort much faster than the calculated age, and will give the same sort if we set SortReversed=true
+            return "BirthDate";
+        }
+
+        /// <summary>
+        /// Override this and set to true to have this field sort in the opposite direction
+        /// Normally this should be left as false unless there is a special case where it makes sense have it sort reversed
+        /// </summary>
+        /// <param name="selection">The selection.</param>
+        /// <returns></returns>
+        /// <value></value>
+        public override bool SortReversed( string selection )
+        {
+            // sort reversed since we are sorting by by Birthdate instead Age since Birthdate will sort much faster than the calculated age
+            return true;
+        }
+
+        /// <summary>
         /// Gets the expression.
         /// </summary>
         /// <param name="context">The context.</param>
@@ -125,7 +153,7 @@ namespace Rock.Reporting.DataSelect.Person
                     ? SqlFunctions.DateDiff( "year", p.BirthDate, currentDate ) - 1
                     : SqlFunctions.DateDiff( "year", p.BirthDate, currentDate ));
 
-            var selectAgeExpression = SelectExpressionExtractor.Extract<Rock.Model.Person>( personAgeQuery, entityIdProperty, "p" );
+            var selectAgeExpression = SelectExpressionExtractor.Extract( personAgeQuery, entityIdProperty, "p" );
 
             return selectAgeExpression;
         }

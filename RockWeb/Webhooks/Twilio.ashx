@@ -2,11 +2,11 @@
 // <copyright>
 // Copyright 2013 by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,6 +32,8 @@ public class Twilio : IHttpHandler
     private HttpRequest request;
     private HttpResponse response;
 
+    private const bool ENABLE_LOGGING = true;
+    
     public void ProcessRequest( HttpContext context )
     {
         request = context.Request;
@@ -45,6 +47,11 @@ public class Twilio : IHttpHandler
             return;
         }
 
+        // determine if we should log
+        if ( ( !string.IsNullOrEmpty( request.QueryString["Log"] ) && request.QueryString["Log"] == "true" ) || ENABLE_LOGGING )
+        {
+            WriteToLog();
+        }
 
         if ( request.Form["SmsStatus"] != null )
         {
@@ -80,9 +87,16 @@ public class Twilio : IHttpHandler
             CommunicationRecipientService recipientService = new CommunicationRecipientService(rockContext);
 
             var communicationRecipient = recipientService.Queryable().Where( r => r.UniqueMessageId == messageSid ).FirstOrDefault();
-            communicationRecipient.Status = CommunicationRecipientStatus.Failed;
-            communicationRecipient.StatusNote = "Message failure notified from Twilio on " + RockDateTime.Now.ToString();
-            rockContext.SaveChanges();
+            if ( communicationRecipient != null )
+            {
+                communicationRecipient.Status = CommunicationRecipientStatus.Failed;
+                communicationRecipient.StatusNote = "Message failure notified from Twilio on " + RockDateTime.Now.ToString();
+                rockContext.SaveChanges();
+            }
+            else
+            {
+                WriteToLog( "No recipient was found with the specified MessageSid value!" );
+            }
         }
     }
     
@@ -106,12 +120,6 @@ public class Twilio : IHttpHandler
             body = request.Form["Body"];
         }
         
-        // determine if we should log
-        if ( !string.IsNullOrEmpty( request.QueryString["Log"] ) && request.QueryString["Log"] == "true" )
-        {
-            WriteToLog( fromPhone, toPhone, body );
-        }
-        
         if ( !(string.IsNullOrWhiteSpace(toPhone)) && !(string.IsNullOrWhiteSpace(fromPhone)) )
         {
             string errorMessage = string.Empty;
@@ -125,15 +133,44 @@ public class Twilio : IHttpHandler
         }
     }
 
-    private void WriteToLog (string fromPhone, string toPhone, string body) {
+    private void WriteToLog () 
+    {
+        var formValues = new List<string>();
+        foreach ( string name in request.Form.AllKeys )
+        {
+            formValues.Add( string.Format( "{0}: '{1}'", name, request.Form[name] ) );
+        }
 
+        WriteToLog( formValues.AsDelimited( ", " ) );
+    }
+    
+    private void WriteToLog( string message )
+    {
         string logFile = HttpContext.Current.Server.MapPath( "~/App_Data/Logs/TwilioLog.txt" );
 
-        using ( System.IO.FileStream fs = new System.IO.FileStream( logFile, System.IO.FileMode.Append, System.IO.FileAccess.Write ) )
-        using ( System.IO.StreamWriter sw = new System.IO.StreamWriter( fs ) )
+        // Write to the log, but if an ioexception occurs wait a couple seconds and then try again (up to 3 times).
+        var maxRetry = 3;
+        for ( int retry = 0; retry < maxRetry; retry++ )
         {
-            sw.WriteLine( string.Format("{0} - From: '{1}', To: '{2}', Message: '{3}'", RockDateTime.Now.ToString(), fromPhone, toPhone, body) );
+            try
+            {
+                using ( System.IO.FileStream fs = new System.IO.FileStream( logFile, System.IO.FileMode.Append, System.IO.FileAccess.Write ) )
+                {
+                    using ( System.IO.StreamWriter sw = new System.IO.StreamWriter( fs ) )
+                    {
+                        sw.WriteLine( string.Format( "{0} - {1}", RockDateTime.Now.ToString(), message ) );
+                    }
+                }
+            }
+            catch ( System.IO.IOException )
+            {
+                if ( retry < maxRetry - 1 )
+                {
+                    System.Threading.Thread.Sleep( 2000 );
+                }
+            }
         }
+               
     }
     
     

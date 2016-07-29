@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -82,6 +82,16 @@ namespace Rock.Model
         [MaxLength( 200 )]
         [DataMember]
         public string EntityTypeQualifierValue { get; set; }
+
+        /// <summary>
+        /// Gets or sets the EntityTypeQualifierValuePrevious in the <see cref="EntityTypeQualifierColumn"/> that is used to filter the scope of the WorkflowTrigger.
+        /// </summary>
+        /// <value>
+        /// A <see cref="System.String"/> containing the EntityTypeQualifierValuePrevious that is used to filter the scope of the WorkflowTrigger.
+        /// </value>
+        [MaxLength( 200 )]
+        [DataMember]
+        public string EntityTypeQualifierValuePrevious { get; set; }
 
         /// <summary>
         /// Gets or sets the WorkflowTypeId of the <see cref="Rock.Model.WorkflowType"/> that is executed by this WorkflowTrigger. This property is required.
@@ -203,7 +213,12 @@ namespace Rock.Model
         /// <summary>
         /// Post Delete
         /// </summary>
-        PostDelete = 3
+        PostDelete = 3,
+
+        /// <summary>
+        /// Immediate Post Save
+        /// </summary>
+        ImmediatePostSave = 4
     }
 
     #endregion

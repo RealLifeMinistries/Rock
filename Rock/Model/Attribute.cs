@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -100,7 +100,7 @@ namespace Rock.Model
         /// A <see cref="System.String"/> that represents the Key value that is used to reference and call the Attribute.
         /// </value>
         [Required]
-        [MaxLength( 200 )]
+        [MaxLength( 1000 )]
         [DataMember( IsRequired = true )]
         public string Key { get; set; }
         
@@ -111,7 +111,7 @@ namespace Rock.Model
         /// A <see cref="System.String"/> that represents the name of the Attribute.
         /// </value>
         [Required]
-        [MaxLength( 100 )]
+        [MaxLength( 1000 )]
         [DataMember( IsRequired = true )]
         public string Name { get; set; }
         
@@ -179,8 +179,20 @@ namespace Rock.Model
         /// <value>
         /// A <see cref="System.String"/> representing the name of the icon CSS class. This property will be null if a file based icon is being used.
         /// </value>
+        [MaxLength( 100 )]
         [DataMember]
         public string IconCssClass { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether this Attribute should be used in 'search by attribute value' UIs. 
+        /// For example, if you had a UI where you would allow the user to find people based on a list of attributes
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [allow search]; otherwise, <c>false</c>.
+        /// </value>
+        [Required]
+        [DataMember( IsRequired = true )]
+        public bool AllowSearch { get; set; }
 
         #endregion
 

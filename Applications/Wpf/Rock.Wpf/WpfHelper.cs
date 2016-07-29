@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,7 +32,7 @@ namespace Rock.Wpf
         /// </summary>
         /// <param name="control">The control.</param>
         /// <param name="speed">The speed.</param>
-        public static void FadeIn( Control control, int speed = 0 )
+        public static void FadeIn( FrameworkElement control, int speed = 0 )
         {
             control.Opacity = 0;
             control.Visibility = Visibility.Visible;
@@ -42,7 +42,15 @@ namespace Rock.Wpf
             Storyboard.SetTargetName( fadeInAnimation, control.Name );
             Storyboard.SetTargetProperty( fadeInAnimation, new PropertyPath( "Opacity", 1 ) );
             storyboard.Children.Add( fadeInAnimation );
-            storyboard.Begin( control );
+
+            EventHandler handleCompleted = new EventHandler( ( sender, e ) =>
+            {
+                control.Visibility = Visibility.Visible;
+            } );
+
+            storyboard.Completed += handleCompleted;
+            storyboard.Begin( control, HandoffBehavior.SnapshotAndReplace, true );
+            
         }
 
         /// <summary>
@@ -50,7 +58,7 @@ namespace Rock.Wpf
         /// </summary>
         /// <param name="control">The control.</param>
         /// <param name="speed">The speed.</param>
-        public static void FadeOut( Control control, int speed = 2000 )
+        public static void FadeOut( FrameworkElement control, int speed = 2000 )
         {
             Storyboard storyboard = new Storyboard();
             TimeSpan duration = new TimeSpan( 0, 0, 0, 0, (int)speed );
@@ -65,7 +73,7 @@ namespace Rock.Wpf
             } );
 
             storyboard.Completed += handleCompleted;
-            storyboard.Begin( control );
+            storyboard.Begin( control, HandoffBehavior.SnapshotAndReplace, true  );
         }
     }
 }

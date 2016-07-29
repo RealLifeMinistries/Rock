@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -216,7 +216,7 @@ namespace Rock.Web.Cache
         /// </summary>
         /// <param name="id">The campus id.</param>
         /// <returns></returns>
-        public static string CacheKey( int id )
+        private static string CacheKey( int id )
         {
             return string.Format( "Rock:Campus:{0}", id );
         }
@@ -255,7 +255,6 @@ namespace Rock.Web.Cache
                 .FirstOrDefault( c => c.Id == id );
             if ( campusModel != null )
             {
-                campusModel.LoadAttributes( rockContext );
                 return new CampusCache( campusModel );
             }
 
@@ -322,19 +321,18 @@ namespace Rock.Web.Cache
         /// <summary>
         /// Returns all campuses
         /// </summary>
-        /// <param name="rockContext">The rock context.</param>
         /// <returns></returns>
-        [Obsolete("Use All() method instead. RockContext parameter is no longer needed.")]
-        public static List<CampusCache> All( RockContext rockContext )
+        public static List<CampusCache> All()
         {
-            return All();
+            return All( true );
         }
 
         /// <summary>
         /// Returns all campuses
         /// </summary>
+        /// <param name="includeInactive">if set to <c>true</c> [include inactive].</param>
         /// <returns></returns>
-        public static List<CampusCache> All()
+        public static List<CampusCache> All( bool includeInactive )
         {
             List<CampusCache> campuses = new List<CampusCache>();
             var campusIds = GetOrAddExisting( "Rock:Campus:All", () => LoadAll() );
@@ -342,7 +340,11 @@ namespace Rock.Web.Cache
             {
                 foreach ( int campusId in campusIds )
                 {
-                    campuses.Add( CampusCache.Read( campusId ) );
+                    var campusCache = CampusCache.Read( campusId );
+                    if ( campusCache != null && ( includeInactive || ( campusCache.IsActive ?? false ) ) )
+                    {
+                        campuses.Add( campusCache );
+                    }
                 }
             }
             return campuses;
@@ -377,7 +379,7 @@ namespace Rock.Web.Cache
         /// <summary>
         /// Special class for adding service times as available liquid fields
         /// </summary>
-        [DotLiquid.LiquidType("Day", "Time")]
+        [DotLiquid.LiquidType( "Day", "Time" )]
         public class ServiceTime
         {
             /// <summary>
@@ -400,7 +402,7 @@ namespace Rock.Web.Cache
         /// <summary>
         /// Special class for adding location info as available liquid fields
         /// </summary>
-        [DotLiquid.LiquidType( "Street1", "Street2", "City", "State", "PostalCode", "Country", "Latitude", "Longitude" )]
+        [DotLiquid.LiquidType( "Street1", "Street2", "City", "State", "PostalCode", "Country", "Latitude", "Longitude", "ImageUrl" )]
         public class CampusLocation
         {
             /// <summary>
@@ -468,6 +470,14 @@ namespace Rock.Web.Cache
             public double? Longitude { get; set; }
 
             /// <summary>
+            /// Gets or sets the URL for the image.
+            /// </summary>
+            /// <value>
+            /// The image url.
+            /// </value>
+            public string ImageUrl { get; set; }
+
+            /// <summary>
             /// Initializes a new instance of the <see cref="CampusLocation"/> class.
             /// </summary>
             /// <param name="locationModel">The location model.</param>
@@ -482,6 +492,11 @@ namespace Rock.Web.Cache
                     PostalCode = locationModel.PostalCode;
                     Country = locationModel.Country;
 
+                    if ( locationModel.Image != null )
+                    {
+                        ImageUrl = locationModel.Image.Url;
+                    }
+
                     if ( locationModel.GeoPoint != null )
                     {
                         Latitude = locationModel.GeoPoint.Latitude;
@@ -491,6 +506,6 @@ namespace Rock.Web.Cache
             }
         }
 
-        #endregion    
+        #endregion
     }
 }

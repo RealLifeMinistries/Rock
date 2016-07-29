@@ -1,11 +1,11 @@
-// <copyright>
-// Copyright 2013 by the Spark Development Network
+﻿// <copyright>
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -422,8 +422,8 @@ INSERT INTO [dbo].[HtmlContent]
            ,'13DA5069-802C-4831-BDEF-2C99BD612DAE'
            ,getdate()
            ,getdate()
-           ,1
-           ,1)" );
+           ,null
+           ,null)" );
 
             // add trans report content
             Sql( @"DECLARE @PledgeContentBlock int
@@ -455,8 +455,8 @@ INSERT INTO [dbo].[HtmlContent]
            ,'A1392134-FCE8-4379-AE81-6EDF2F7B8450'
            ,getdate()
            ,getdate()
-           ,1
-           ,1)" );
+           ,null
+           ,null)" );
 
             // add profile edit content
             Sql( @"DECLARE @PledgeContentBlock int
@@ -492,8 +492,8 @@ INSERT INTO [dbo].[HtmlContent]
            ,'6D736357-CEF0-4C29-B5E5-E0A7C9CDFD9B'
            ,getdate()
            ,getdate()
-           ,1
-           ,1)" );
+           ,null
+           ,null)" );
 
             // set blocks to be not system
             Sql( @"  UPDATE [Block]

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -145,8 +145,6 @@ namespace Rock.Reporting.DataSelect.Group
                 groupLocationTypeValueGuid = selectionValues[1].AsGuid();
             }
 
-            const double milesPerMeter = 1 / 1609.344;
-
             IQueryable<double?> groupLocationDistanceQuery;
 
             if ( selectedLocation != null )
@@ -155,7 +153,7 @@ namespace Rock.Reporting.DataSelect.Group
                     .Select( p => p.GroupLocations
                         .Where( gl => gl.GroupLocationTypeValue.Guid == groupLocationTypeValueGuid)
                         .Where( gl => gl.Location.GeoPoint != null)
-                        .Select( s => DbFunctions.Truncate( s.Location.GeoPoint.Distance( selectedLocation.GeoPoint ) * milesPerMeter, 2 ) ).FirstOrDefault() );
+                        .Select( s => DbFunctions.Truncate( s.Location.GeoPoint.Distance( selectedLocation.GeoPoint ) * Location.MilesPerMeter, 2 ) ).FirstOrDefault() );
             }
             else
             {
@@ -163,7 +161,7 @@ namespace Rock.Reporting.DataSelect.Group
                     .Select( p => (double?)null );
             }
 
-            var selectExpression = SelectExpressionExtractor.Extract<Rock.Model.Group>( groupLocationDistanceQuery, entityIdProperty, "p" );
+            var selectExpression = SelectExpressionExtractor.Extract( groupLocationDistanceQuery, entityIdProperty, "p" );
 
             return selectExpression;
         }

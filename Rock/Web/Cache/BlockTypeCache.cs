@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -90,7 +90,7 @@ namespace Rock.Web.Cache
         /// <value>
         /// <c>true</c> if attributes have already been verified; otherwise, <c>false</c>.
         /// </value>
-        public bool IsInstancePropertiesVerified { get; internal set; }
+        public bool IsInstancePropertiesVerified { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether [checked security actions].
@@ -145,7 +145,7 @@ namespace Rock.Web.Cache
 
                 var guidCachePolicy = new CacheItemPolicy();
                 AddChangeMonitor( guidCachePolicy, blockType.Path );
-                SetCache( blockType.Guid.ToString(), new Lazy<int> ( () => AsLazy(blockType.Id) ), guidCachePolicy );
+                SetCache( blockType.Guid.ToString(), blockType.Id, guidCachePolicy );
 
                 this.IsSystem = blockType.IsSystem;
                 this.Path = blockType.Path;
@@ -195,7 +195,7 @@ namespace Rock.Web.Cache
                 var cachePolicy = new CacheItemPolicy();
                 AddChangeMonitor( cachePolicy, blockType.Path );
 
-                SetCache( cacheKey, new Lazy<BlockTypeCache>( () => AsLazy( blockType) ), cachePolicy );
+                SetCache( cacheKey, blockType, cachePolicy );
             }
                 
             return blockType;
@@ -220,7 +220,6 @@ namespace Rock.Web.Cache
             var blockTypeModel = blockTypeService.Get( id );
             if ( blockTypeModel != null )
             {
-                blockTypeModel.LoadAttributes( rockContext );
                 return new BlockTypeCache( blockTypeModel );
             }
 

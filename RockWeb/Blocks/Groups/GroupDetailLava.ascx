@@ -85,6 +85,7 @@
             <asp:Literal ID="lGroupMemberEditPreHtml" runat="server" />
             
             <asp:ValidationSummary ID="vsEditGroupMember" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" />
+            <asp:CustomValidator ID="cvEditGroupMember" runat="server" Display="None" />
             <Rock:NotificationBox ID="nbGroupMemberErrorMessage" runat="server" NotificationBoxType="Danger" />
 
             <div class="row">
@@ -92,7 +93,7 @@
                     <Rock:PersonPicker runat="server" ID="ppGroupMemberPerson" Label="Person" Required="true"/>
                 </div>
                 <div class="col-md-6">
-                    <Rock:RockRadioButtonList ID="rblStatus" runat="server" Label="Status" RepeatDirection="Horizontal" />
+                    <Rock:RockRadioButtonList ID="rblStatus" runat="server" Label="Member Status" RepeatDirection="Horizontal" />
                 </div>
             </div>
 

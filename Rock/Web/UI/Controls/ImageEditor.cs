@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -77,6 +77,23 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the form group class.
+        /// </summary>
+        /// <value>
+        /// The form group class.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        Description( "The CSS class to add to the form-group div." )
+        ]
+        public string FormGroupCssClass
+        {
+            get { return ViewState["FormGroupCssClass"] as string ?? string.Empty; }
+            set { ViewState["FormGroupCssClass"] = value; }
+        }
+
+        /// <summary>
         /// Gets or sets the help text.
         /// </summary>
         /// <value>
@@ -100,6 +117,34 @@ namespace Rock.Web.UI.Controls
                 if ( HelpBlock != null )
                 {
                     HelpBlock.Text = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the warning text.
+        /// </summary>
+        /// <value>
+        /// The warning text.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        DefaultValue( "" ),
+        Description( "The warning block." )
+        ]
+        public string Warning
+        {
+            get
+            {
+                return WarningBlock != null ? WarningBlock.Text : string.Empty;
+            }
+
+            set
+            {
+                if ( WarningBlock != null )
+                {
+                    WarningBlock.Text = value;
                 }
             }
         }
@@ -177,6 +222,14 @@ namespace Rock.Web.UI.Controls
         /// The help block.
         /// </value>
         public HelpBlock HelpBlock { get; set; }
+
+        /// <summary>
+        /// Gets or sets the warning block.
+        /// </summary>
+        /// <value>
+        /// The warning block.
+        /// </value>
+        public WarningBlock WarningBlock { get; set; }
 
         /// <summary>
         /// Gets or sets the required field validator.
@@ -290,6 +343,7 @@ namespace Rock.Web.UI.Controls
             : base()
         {
             HelpBlock = new HelpBlock();
+            WarningBlock = new WarningBlock();
         }
 
         #endregion
@@ -545,6 +599,7 @@ namespace Rock.Web.UI.Controls
             Controls.Add( _fileUpload );
 
             _mdImageDialog = new ModalDialog();
+            _mdImageDialog.ValidationGroup = "vg_mdImageDialog";
             _mdImageDialog.ID = this.ID + "_mdImageDialog";
             _mdImageDialog.Title = "Image";
             _mdImageDialog.SaveButtonText = "Crop";
@@ -727,10 +782,11 @@ namespace Rock.Web.UI.Controls
             }
 
             _nbImageWarning.Visible = false;
-            _imgCropSource.ImageUrl = "~/GetImage.ashx?id=" + CropBinaryFileId;
+            
             var binaryFile = new BinaryFileService( new RockContext() ).Get( CropBinaryFileId ?? 0 );
             if ( binaryFile != null )
             {
+                _imgCropSource.ImageUrl = ( (RockPage)Page ).ResolveRockUrl( "~/GetImage.ashx?guid=" + binaryFile.Guid.ToString() );
                 if ( binaryFile.MimeType != "image/svg+xml" )
                 {
                     using ( var stream = binaryFile.ContentStream )
@@ -750,6 +806,10 @@ namespace Rock.Web.UI.Controls
                     _nbImageWarning.Visible = true;
                     _nbImageWarning.Text = "SVG image cropping is not supported.";
                 }
+            }
+            else
+            {
+                _imgCropSource.ImageUrl = "";
             }
 
             _mdImageDialog.Show();
@@ -881,7 +941,8 @@ namespace Rock.Web.UI.Controls
             {
                 // intentionally ignore and don't tell the fileUploader the limit
             }
-            
+
+            var jsDoneFunction = string.Format("window.location = $('#{0}').prop('href');", _lbUploadImage.ClientID);
             
             var script = string.Format(
 @"
@@ -912,7 +973,7 @@ $('#{6}').Jcrop({{
     boxWidth:480,
     boxHeight:480,
     onSelect: function(c) {{
-        $('#{7}').val(c.x + ',' + c.y + ',' + c.w + ',' +c.h + ',');
+        $('#{7}').val(c.x.toFixed() + ',' + c.y.toFixed() + ',' + c.w.toFixed() + ',' + c.h.toFixed() + ',');
     }}
 }});
 
@@ -928,19 +989,20 @@ $('#{5}').click(function () {{
 }});
 
 ",
-                _fileUpload.ClientID,
-                this.BinaryFileId,
-                this.BinaryFileTypeGuid,
-                _hfBinaryFileId.ClientID,
-                this.ClientID + "_divPhoto",
-                _aRemove.ClientID,
-                _imgCropSource.ClientID,
-                _hfCropCoords.ClientID,
-                _lbUploadImage.ClientID,
-                _lbShowModal.ClientID,
-                Page.ClientScript.GetPostBackEventReference( _lbUploadImage, string.Empty ),
-                this.NoPictureUrl,
-                maxUploadBytes.HasValue ? maxUploadBytes.Value.ToString() : "null" );
+                _fileUpload.ClientID, // {0}
+                this.BinaryFileId, // {1}
+                this.BinaryFileTypeGuid, // {2}
+                _hfBinaryFileId.ClientID, // {3}
+                this.ClientID + "_divPhoto", // {4}
+                _aRemove.ClientID, // {5}
+                _imgCropSource.ClientID, // {6}
+                _hfCropCoords.ClientID, // {7}
+                _lbUploadImage.ClientID, // {8}
+                _lbShowModal.ClientID, // {9}
+                jsDoneFunction, // {10}
+                this.NoPictureUrl, // {11}
+                maxUploadBytes.HasValue ? maxUploadBytes.Value.ToString() : "null"  // {12}
+                );
 
 
             _lbUploadImage.Enabled = false;

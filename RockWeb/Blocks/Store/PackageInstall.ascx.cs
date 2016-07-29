@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -34,7 +34,7 @@ using Rock.Utility;
 using System.Net;
 using System.IO.Compression;
 using Microsoft.Web.XmlTransform;
-
+using Rock.VersionInfo;
 
 namespace RockWeb.Blocks.Store
 {
@@ -50,8 +50,8 @@ namespace RockWeb.Blocks.Store
         #region Fields
 
         // used for private variables
-        private string _installPurchaseMessage = "Login below with your Rock Store account. Your credit card on file will be charged ${0}.";
-        private string _installFreeMessage = "Login below with your Rock Store account to install this free package.";
+        private string _installPurchaseMessage = "Login below with your Rock Store account to install the <em>{0}</em> package. Your credit card on file will be charged ${1}.";
+        private string _installFreeMessage = "Login below with your Rock Store account to install free <em>{0}</em> package.";
         private string _updateMessage = "Login below with your Rock Store account to upgrade this package.";
         private string _installPreviousPurchase = "Login below with your Rock Store account to install this previously purchased package.";
 
@@ -129,28 +129,35 @@ namespace RockWeb.Blocks.Store
         {
             StoreService storeService = new StoreService();
 
-            var installResponse = storeService.Purchase( txtUsername.Text, txtPassword.Text, packageId );
-
-            switch ( installResponse.PurchaseResult )
+            string errorResponse = string.Empty;
+            var installResponse = storeService.Purchase( txtUsername.Text, txtPassword.Text, packageId, out errorResponse );
+            if ( installResponse != null )
             {
-                case PurchaseResult.AuthenicationFailed:
-                    lMessages.Text = string.Format("<div class='alert alert-warning margin-t-md'><strong>Could Not Authenicate</strong> {0}</div>", installResponse.Message);
-                    break;
-                case PurchaseResult.Error:
-                    lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>An Error Occurred</strong> {0}</div>", installResponse.Message );
-                    break;
-                case PurchaseResult.NoCardOnFile:
-                    lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>No Card On File</strong> No credit card is on file for your organization. Please add a card from your <a href='{0}'>Account Page</a>.</div>", ResolveRockUrl("~/RockShop/Account") );
-                    break;
-                case PurchaseResult.NotAuthorized:
-                    lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>Unauthorized</strong> You are not currently authorized to make purchased for this organization. Please see your organization's primary contact to enable your account for purchases.</div>" );
-                    break;
-                case PurchaseResult.PaymentFailed:
-                    lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>Payment Error</strong> An error occurred will processing the credit card on file for your organization. The error was: {0}. Please update your card's information from your <a href='{1}'>Account Page</a>.</div>", installResponse.Message, ResolveRockUrl("~/RockShop/Account") );
-                    break;
-                case PurchaseResult.Success:
-                    ProcessInstall( installResponse );
-                    break;
+                switch ( installResponse.PurchaseResult )
+                {
+                    case PurchaseResult.AuthenicationFailed:
+                        lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>Could Not Authenticate</strong> {0}</div>", installResponse.Message );
+                        break;
+                    case PurchaseResult.Error:
+                        lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>An Error Occurred</strong> {0}</div>", installResponse.Message );
+                        break;
+                    case PurchaseResult.NoCardOnFile:
+                        lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>No Card On File</strong> No credit card is on file for your organization. Please add a card from your <a href='{0}'>Account Page</a>.</div>", ResolveRockUrl( "~/RockShop/Account" ) );
+                        break;
+                    case PurchaseResult.NotAuthorized:
+                        lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>Unauthorized</strong> You are not currently authorized to make purchases for this organization. Please see your organization's primary contact to enable your account for purchases.</div>" );
+                        break;
+                    case PurchaseResult.PaymentFailed:
+                        lMessages.Text = string.Format( "<div class='alert alert-warning margin-t-md'><strong>Payment Error</strong> An error occurred while processing the credit card on file for your organization. The error was: {0}. Please update your card's information from your <a href='{1}'>Account Page</a>.</div>", installResponse.Message, ResolveRockUrl( "~/RockShop/Account" ) );
+                        break;
+                    case PurchaseResult.Success:
+                        ProcessInstall( installResponse );
+                        break;
+                }
+            }
+            else
+            {
+                lMessages.Text = string.Format( "<div class='alert alert-danger margin-t-md'><strong>Install Error</strong> An error occurred while attempting to authenticate your install of this package. The error was: {0}.</div>", ( string.IsNullOrWhiteSpace( errorResponse ) ? "Unknown" : errorResponse ) );
             }
         }
 
@@ -163,8 +170,9 @@ namespace RockWeb.Blocks.Store
 
             if ( purchaseResponse.PackageInstallSteps != null )
             {
+                RockSemanticVersion rockVersion = RockSemanticVersion.Parse( VersionInfo.GetRockSemanticVersionNumber() );
 
-                foreach ( var installStep in purchaseResponse.PackageInstallSteps )
+                foreach ( var installStep in purchaseResponse.PackageInstallSteps.Where( s => s.RequiredRockSemanticVersion <= rockVersion ))
                 {
                     string appRoot = Server.MapPath( "~/" );
                     string rockShopWorkingDir = appRoot + "App_Data/RockShop";
@@ -232,12 +240,17 @@ namespace RockWeb.Blocks.Store
                                     string fullpath = Path.Combine( appRoot, entry.FullName.Replace("content/", "") );
                                     string directory = Path.GetDirectoryName( fullpath ).Replace("content/", "");
 
-                                    if ( !Directory.Exists( directory ) )
+                                    // if entry is a directory ignore it
+                                    if ( entry.Length != 0 )
                                     {
-                                        Directory.CreateDirectory( directory );
-                                    }
+                                        if ( !Directory.Exists( directory ) )
+                                        {
+                                            Directory.CreateDirectory( directory );
+                                        }
 
-                                    entry.ExtractToFile( fullpath, true );
+                                        entry.ExtractToFile( fullpath, true );
+                                    }
+                                    
                                 }
                             }
 
@@ -356,24 +369,19 @@ namespace RockWeb.Blocks.Store
                 // check for errors
                 ErrorCheck( errorResponse );
 
-                lPackageName.Text = package.Name;
-                lPackageDescription.Text = package.Description;
+                //lPackageName.Text = package.Name;
+                imgPackageImage.ImageUrl = package.PackageIconBinaryFile.ImageUrl;
 
-                lPackageImage.Text = String.Format( @"<div class=""margin-b-md"" style=""
-                                background: url('{0}') no-repeat center;
-                                width: 100%;
-                                height: 140px;"">
-                                </div>", package.PackageIconBinaryFile.ImageUrl );
 
                 if ( package.IsFree )
                 {
-                    lCost.Text = "<div class='pricelabel free'><h4>Free</h4></div>";
-                    lInstallMessage.Text = _installFreeMessage;
+                    //lCost.Text = "<div class='pricelabel free'><h4>Free</h4></div>";
+                    lInstallMessage.Text = string.Format(_installFreeMessage, package.Name);
                 }
                 else
                 {
-                    lCost.Text = string.Format( "<div class='pricelabel cost'><h4>${0}</h4></div>", package.Price );
-                    lInstallMessage.Text = string.Format( _installPurchaseMessage, package.Price.ToString() );
+                    //lCost.Text = string.Format( "<div class='pricelabel cost'><h4>${0}</h4></div>", package.Price );
+                    lInstallMessage.Text = string.Format( _installPurchaseMessage, package.Name, package.Price.ToString() );
                 }
 
                 if ( package.IsPurchased )
@@ -384,12 +392,12 @@ namespace RockWeb.Blocks.Store
 
                     if ( installedPackage == null )
                     {
-                        lCost.Visible = false;
+                        //lCost.Visible = false;
                         lInstallMessage.Text = _installPreviousPurchase;
                     }
                     else
                     {
-                        lCost.Visible = false;
+                        //lCost.Visible = false;
                         lInstallMessage.Text = _updateMessage;
                         btnInstall.Text = "Update";
                     }

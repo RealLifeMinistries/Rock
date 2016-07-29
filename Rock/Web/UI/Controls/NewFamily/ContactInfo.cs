@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,8 +28,8 @@ namespace Rock.Web.UI.Controls
     /// <summary>
     /// Report Filter control
     /// </summary>
-    [ToolboxData( "<{0}:NewFamilyContactInfo runat=server></{0}:NewFamilyContactInfo>" )]
-    public class NewFamilyContactInfo : CompositeControl, INamingContainer
+    [ToolboxData( "<{0}:NewGroupContactInfo runat=server></{0}:NewGroupContactInfo>" )]
+    public class NewGroupContactInfo : CompositeControl, INamingContainer
     {
 
         /// <summary>
@@ -38,20 +38,20 @@ namespace Rock.Web.UI.Controls
         /// <value>
         /// The contact information rows.
         /// </value>
-        public List<NewFamilyContactInfoRow> ContactInfoRows
+        public List<NewGroupContactInfoRow> ContactInfoRows
         {
             get
             {
-                var rows = new List<NewFamilyContactInfoRow>();
+                var rows = new List<NewGroupContactInfoRow>();
 
                 foreach ( Control control in Controls )
                 {
-                    if ( control is NewFamilyContactInfoRow )
+                    if ( control is NewGroupContactInfoRow )
                     {
-                        var newFamilyMemberRow = control as NewFamilyContactInfoRow;
-                        if ( newFamilyMemberRow != null )
+                        var newGroupMemberRow = control as NewGroupContactInfoRow;
+                        if ( newGroupMemberRow != null )
                         {
-                            rows.Add( newFamilyMemberRow );
+                            rows.Add( newGroupMemberRow );
                         }
                     }
                 }
@@ -68,7 +68,10 @@ namespace Rock.Web.UI.Controls
         {
             if ( this.Visible )
             {
-                writer.AddAttribute( HtmlTextWriterAttribute.Class, "table table-familycontactinfo" );
+                var homePhone = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME );
+                var cellPhone = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE );
+
+                writer.AddAttribute( HtmlTextWriterAttribute.Class, "table table-groupcontactinfo" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Table );
 
                 writer.RenderBeginTag( HtmlTextWriterTag.Thead );
@@ -80,15 +83,21 @@ namespace Rock.Web.UI.Controls
 
                 writer.AddAttribute( HtmlTextWriterAttribute.Style, "width:20%" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Th );
-                writer.Write( "Home Phone" );
+                writer.Write( homePhone != null ? homePhone.Value.EndsWith( "Phone" ) ? homePhone.Value : homePhone.Value + " Phone" : "Home Phone" );
                 writer.RenderEndTag();
 
                 writer.AddAttribute( HtmlTextWriterAttribute.Style, "width:20%" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Th );
-                writer.Write( "Cell Phone" );
+                writer.Write( cellPhone != null ? cellPhone.Value.EndsWith( "Phone" ) ? cellPhone.Value : cellPhone.Value + " Phone" : "Cell Phone" );
                 writer.RenderEndTag();
 
-                writer.AddAttribute( HtmlTextWriterAttribute.Style, "width:40%" );
+                writer.AddAttribute(HtmlTextWriterAttribute.Style, "width:5%");
+                writer.RenderBeginTag(HtmlTextWriterTag.Th);
+                writer.Write("SMS");
+                writer.RenderEndTag();
+
+
+                writer.AddAttribute( HtmlTextWriterAttribute.Style, "width:35%" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Th );
                 writer.Write( "Email" );
                 writer.RenderEndTag();
@@ -100,7 +109,7 @@ namespace Rock.Web.UI.Controls
 
                 foreach ( Control control in Controls )
                 {
-                    if ( control is NewFamilyContactInfoRow )
+                    if ( control is NewGroupContactInfoRow )
                     {
                         control.RenderControl( writer );
                     }
@@ -119,7 +128,7 @@ namespace Rock.Web.UI.Controls
         {
             for (int i = Controls.Count - 1; i >= 0; i--)
             {
-                if (Controls[i] is NewFamilyContactInfoRow )
+                if (Controls[i] is NewGroupContactInfoRow )
                 {
                     Controls.RemoveAt( i );
                 }

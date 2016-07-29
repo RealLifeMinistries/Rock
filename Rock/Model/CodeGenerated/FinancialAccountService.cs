@@ -5,13 +5,13 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 // <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -75,6 +75,12 @@ namespace Rock.Model
                 errorMessage = string.Format( "This {0} is assigned to a {1}.", FinancialAccount.FriendlyTypeName, FinancialTransactionDetail.FriendlyTypeName );
                 return false;
             }  
+ 
+            if ( new Service<RegistrationInstance>( Context ).Queryable().Any( a => a.AccountId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", FinancialAccount.FriendlyTypeName, RegistrationInstance.FriendlyTypeName );
+                return false;
+            }  
             return true;
         }
     }
@@ -116,14 +122,20 @@ namespace Rock.Model
             target.CampusId = source.CampusId;
             target.Description = source.Description;
             target.EndDate = source.EndDate;
+            target.ForeignGuid = source.ForeignGuid;
+            target.ForeignKey = source.ForeignKey;
             target.GlCode = source.GlCode;
+            target.ImageBinaryFileId = source.ImageBinaryFileId;
             target.IsActive = source.IsActive;
+            target.IsPublic = source.IsPublic;
             target.IsTaxDeductible = source.IsTaxDeductible;
             target.Name = source.Name;
             target.Order = source.Order;
             target.ParentAccountId = source.ParentAccountId;
+            target.PublicDescription = source.PublicDescription;
             target.PublicName = source.PublicName;
             target.StartDate = source.StartDate;
+            target.Url = source.Url;
             target.CreatedDateTime = source.CreatedDateTime;
             target.ModifiedDateTime = source.ModifiedDateTime;
             target.CreatedByPersonAliasId = source.CreatedByPersonAliasId;

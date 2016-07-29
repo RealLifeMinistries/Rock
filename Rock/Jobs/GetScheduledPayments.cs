@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,15 +24,16 @@ using Rock.Model;
 using Rock.Web.Cache;
 using Rock.Attribute;
 using Rock.Financial;
+using Rock.Data;
 
 namespace Rock.Jobs
 {
     /// <summary>
     /// Job to download any scheduled payments that were processed by the payment gateway
     /// </summary>
-    [ComponentField( "Rock.Financial.GatewayContainer, Rock", "Payment Gateway", "The payment gateway to query for scheduled payments that were processed.", true, "", "", 0 )]
     [IntegerField( "Days Back", "The number of days prior to the current date to use as the start date when querying for scheduled payments that were processed.", true, 7, "", 1 )]
     [TextField( "Batch Name Prefix", "The batch prefix name to use when creating a new batch", false, "Online Giving", "", 2 )]
+    [SystemEmailField( "Receipt Email", "The system email to use to send the receipts.", false, "", "", 3 )]
 
     [DisallowConcurrentExecution]
     public class GetScheduledPayments : IJob
@@ -63,36 +64,51 @@ namespace Rock.Jobs
             {
                 // get the job map
                 JobDataMap dataMap = context.JobDetail.JobDataMap;
+                int scheduledPaymentsProcessed = 0;
 
-                string gatewayGuid = dataMap.GetString( "PaymentGateway" );
-                if ( !string.IsNullOrWhiteSpace( gatewayGuid ) )
+                using ( var rockContext = new RockContext() )
                 {
-                    GatewayComponent gateway = GatewayContainer.GetComponent( gatewayGuid );
-                    if ( gateway != null )
+                    foreach ( var financialGateway in new FinancialGatewayService( rockContext )
+                        .Queryable()
+                        .Where( g => g.IsActive ) )
                     {
-                        int daysBack = dataMap.GetString( "DaysBack" ).AsIntegerOrNull() ?? 1;
+                        financialGateway.LoadAttributes( rockContext );
 
-                        DateTime today = RockDateTime.Today;
-                        TimeSpan days = new TimeSpan( daysBack, 0, 0, 0 );
-                        DateTime endDateTime = today.Add( gateway.BatchTimeOffset );
-                        endDateTime = RockDateTime.Now.CompareTo( endDateTime ) < 0 ? endDateTime.AddDays( -1 ) : today;
-                        DateTime startDateTime = endDateTime.Subtract( days );
-
-                        string errorMessage = string.Empty;
-                        var payments = gateway.GetPayments( startDateTime, endDateTime, out errorMessage );
-
-                        if ( string.IsNullOrWhiteSpace( errorMessage ) )
+                        var gateway = financialGateway.GetGatewayComponent();
+                        if ( gateway != null )
                         {
-                            string batchNamePrefix = dataMap.GetString( "BatchNamePrefix" );
-                            FinancialScheduledTransactionService.ProcessPayments( gateway, batchNamePrefix, payments );
-                        }
-                        else
-                        {
-                            throw new Exception( errorMessage );
+                            int daysBack = dataMap.GetString( "DaysBack" ).AsIntegerOrNull() ?? 1;
+
+                            DateTime today = RockDateTime.Today;
+                            TimeSpan days = new TimeSpan( daysBack, 0, 0, 0 );
+                            DateTime endDateTime = today.Add( financialGateway.GetBatchTimeOffset() );
+
+                            // If the calculated end time has not yet occurred, use the previous day.
+                            endDateTime = RockDateTime.Now.CompareTo( endDateTime ) >= 0 ? endDateTime : endDateTime.AddDays( -1 );
+
+                            DateTime startDateTime = endDateTime.Subtract( days );
+
+                            string errorMessage = string.Empty;
+                            var payments = gateway.GetPayments( financialGateway, startDateTime, endDateTime, out errorMessage );
+
+                            if ( string.IsNullOrWhiteSpace( errorMessage ) )
+                            {
+                                Guid? systemEmailGuid = dataMap.GetString( "ReceiptEmail" ).AsGuidOrNull();
+                                string batchNamePrefix = dataMap.GetString( "BatchNamePrefix" );
+                                FinancialScheduledTransactionService.ProcessPayments( financialGateway, batchNamePrefix, payments, string.Empty, systemEmailGuid );
+                                scheduledPaymentsProcessed += payments.Count();
+                            }
+                            else
+                            {
+                                throw new Exception( errorMessage );
+                            }
                         }
                     }
                 }
+
+                context.Result = string.Format( "{0} payments processed", scheduledPaymentsProcessed );
             }
+
             catch ( Exception ex )
             {
                 ExceptionLogService.LogException( ex, null );

@@ -5,13 +5,13 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 // <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,6 +51,18 @@ namespace Rock.Model
         public bool CanDelete( SystemEmail item, out string errorMessage )
         {
             errorMessage = string.Empty;
+ 
+            if ( new Service<Group>( Context ).Queryable().Any( a => a.ExitSystemEmailId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", SystemEmail.FriendlyTypeName, Group.FriendlyTypeName );
+                return false;
+            }  
+ 
+            if ( new Service<Group>( Context ).Queryable().Any( a => a.WelcomeSystemEmailId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", SystemEmail.FriendlyTypeName, Group.FriendlyTypeName );
+                return false;
+            }  
  
             if ( new Service<WorkflowActionForm>( Context ).Queryable().Any( a => a.NotificationSystemEmailId == item.Id ) )
             {
@@ -98,6 +110,8 @@ namespace Rock.Model
             target.Body = source.Body;
             target.CategoryId = source.CategoryId;
             target.Cc = source.Cc;
+            target.ForeignGuid = source.ForeignGuid;
+            target.ForeignKey = source.ForeignKey;
             target.From = source.From;
             target.FromName = source.FromName;
             target.IsSystem = source.IsSystem;

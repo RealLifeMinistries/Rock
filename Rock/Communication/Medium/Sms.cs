@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,28 +61,28 @@ namespace Rock.Communication.Medium
             communication = new CommunicationService( rockContext ).Get( communication.Id );
 
             var globalAttributes = Rock.Web.Cache.GlobalAttributesCache.Read();
-            var mergeValues = Rock.Web.Cache.GlobalAttributesCache.GetMergeFields( null );
+            var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( null );
 
             if ( person != null )
             {
-                mergeValues.Add( "Person", person );
+                mergeFields.Add( "Person", person );
 
-                var recipient = communication.Recipients.Where( r => r.PersonAlias != null && r.PersonAlias.PersonId == person.Id ).FirstOrDefault();
+                var recipient = new CommunicationRecipientService( rockContext ).Queryable().Where(a => a.CommunicationId == communication.Id).Where( r => r.PersonAlias != null && r.PersonAlias.PersonId == person.Id ).FirstOrDefault();
                 if ( recipient != null )
                 {
                     // Add any additional merge fields created through a report
                     foreach ( var mergeField in recipient.AdditionalMergeValues )
                     {
-                        if ( !mergeValues.ContainsKey( mergeField.Key ) )
+                        if ( !mergeFields.ContainsKey( mergeField.Key ) )
                         {
-                            mergeValues.Add( mergeField.Key, mergeField.Value );
+                            mergeFields.Add( mergeField.Key, mergeField.Value );
                         }
                     }
                 }
             }
 
             string message = communication.GetMediumDataValue( "Message" );
-            return message.ResolveMergeFields( mergeValues );
+            return message.ResolveMergeFields( mergeFields );
         }
 
         /// <summary>
@@ -128,7 +128,7 @@ namespace Rock.Communication.Medium
 
             if ( communication != null &&
                 communication.Status == Model.CommunicationStatus.Approved &&
-                communication.Recipients.Where( r => r.Status == Model.CommunicationRecipientStatus.Pending ).Any() &&
+                communication.HasPendingRecipients( rockContext ) &&
                 ( !communication.FutureSendDateTime.HasValue || communication.FutureSendDateTime.Value.CompareTo( RockDateTime.Now ) <= 0 ) )
             {
                 // Update any recipients that should not get sent the communication
@@ -140,7 +140,7 @@ namespace Rock.Communication.Medium
                     .ToList() )
                 {
                     var person = recipient.PersonAlias.Person;
-                    if ( person.IsDeceased ?? false )
+                    if ( person.IsDeceased )
                     {
                         recipient.Status = CommunicationRecipientStatus.Failed;
                         recipient.StatusNote = "Person is deceased!";

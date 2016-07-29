@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,17 +36,14 @@ namespace Rock.Communication.Medium
     [Export( typeof( MediumComponent ) )]
     [ExportMetadata( "ComponentName", "Email" )]
 
-    [CodeEditorField( "Unsubscribe HTML", "The HTML to inject into email contents when the communication is a Bulk Communication.  Contents will be placed wherever the 'Unsubcribe HTML' merge field is used, or if not used, at the end of the email in email contents.", CodeEditorMode.Liquid, CodeEditorTheme.Rock, 200, false, @"
-<p style='float: right;'>
-    <small><a href='{{ GlobalAttribute.PublicApplicationRoot }}Unsubscribe/{{ Person.UrlEncodedKey }}'>Unsubscribe</a></small>
-</p>
-", "", 2 )]
-    [CodeEditorField( "Default Plain Text", "The text to use when the plain text field is left blank.", CodeEditorMode.Liquid, CodeEditorTheme.Rock, 200, false, @"
+    [CodeEditorField( "Unsubscribe HTML", "The HTML to inject into email contents when the communication is a Bulk Communication.  Contents will be placed wherever the 'Unsubcribe HTML' merge field is used, or if not used, at the end of the email in email contents.", CodeEditorMode.Lava, CodeEditorTheme.Rock, 200, false, @"
+<a href='{{ 'Global' | Attribute:'PublicApplicationRoot' }}Unsubscribe/{{ Person.UrlEncodedKey }}'>Unsubscribe</a>", "", 2 )]
+    [CodeEditorField( "Default Plain Text", "The text to use when the plain text field is left blank.", CodeEditorMode.Lava, CodeEditorTheme.Rock, 200, false, @"
 Unfortunately, you cannot view the contents of this email as it contains formatting that is not supported 
 by your email client.  
 
 You can view an online version of this email here: 
-{{ GlobalAttribute.PublicApplicationRoot }}GetCommunication.ashx?c={{ Communication.Id }}&p={{ Person.UrlEncodedKey }}
+{{ 'Global' | Attribute:'PublicApplicationRoot' }}GetCommunication.ashx?c={{ Communication.Id }}&p={{ Person.UrlEncodedKey }}
 ", "", 3 )]
     public class Email : MediumComponent
     {
@@ -74,25 +71,25 @@ You can view an online version of this email here:
             StringBuilder sbContent = new StringBuilder();
 
             var globalAttributes = Rock.Web.Cache.GlobalAttributesCache.Read();
-            var mergeValues = Rock.Web.Cache.GlobalAttributesCache.GetMergeFields( null );
+            var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( null );
 
             // Requery the Communication object
             communication = new CommunicationService( rockContext ).Get( communication.Id );
-            mergeValues.Add( "Communication", communication );
+            mergeFields.Add( "Communication", communication );
 
             if ( person != null )
             {
-                mergeValues.Add( "Person", person );
+                mergeFields.Add( "Person", person );
 
-                var recipient = communication.Recipients.Where( r => r.PersonAlias != null && r.PersonAlias.PersonId == person.Id ).FirstOrDefault();
+                var recipient = new CommunicationRecipientService( rockContext ).Queryable().Where( a => a.CommunicationId == communication.Id ).Where( r => r.PersonAlias != null && r.PersonAlias.PersonId == person.Id ).FirstOrDefault();
                 if ( recipient != null )
                 {
                     // Add any additional merge fields created through a report
                     foreach ( var mergeField in recipient.AdditionalMergeValues )
                     {
-                        if ( !mergeValues.ContainsKey( mergeField.Key ) )
+                        if ( !mergeFields.ContainsKey( mergeField.Key ) )
                         {
-                            mergeValues.Add( mergeField.Key, mergeField.Value );
+                            mergeFields.Add( mergeField.Key, mergeField.Value );
                         }
                     }
                 }
@@ -100,7 +97,7 @@ You can view an online version of this email here:
 
             // Body
             string htmlContent = communication.GetMediumDataValue( "HtmlMessage" );
-            sbContent.Append( Email.ProcessHtmlBody( communication, globalAttributes, mergeValues ) );
+            sbContent.Append( Email.ProcessHtmlBody( communication, globalAttributes, mergeFields ) );
 
             // Attachments
             StringBuilder sbAttachments = new StringBuilder();
@@ -228,12 +225,12 @@ You can view an online version of this email here:
             var rockContext = new RockContext();
             var communicationService = new CommunicationService( rockContext );
 
-            communication = communicationService.Queryable( "Recipients" )
+            communication = communicationService.Queryable()
                 .FirstOrDefault( t => t.Id == communication.Id );
 
             if ( communication != null &&
                 communication.Status == Model.CommunicationStatus.Approved &&
-                communication.Recipients.Where( r => r.Status == Model.CommunicationRecipientStatus.Pending ).Any() &&
+                communication.HasPendingRecipients( rockContext ) &&
                 ( !communication.FutureSendDateTime.HasValue || communication.FutureSendDateTime.Value.CompareTo( RockDateTime.Now ) <= 0 ) )
             {
                 // Update any recipients that should not get sent the communication
@@ -245,12 +242,12 @@ You can view an online version of this email here:
                     .ToList() )
                 {
                     var person = recipient.PersonAlias.Person;
-                    if ( !(person.IsEmailActive ?? true))
+                    if ( !person.IsEmailActive)
                     {
                         recipient.Status = CommunicationRecipientStatus.Failed;
                         recipient.StatusNote = "Email is not active!";
                     }
-                    if ( person.IsDeceased ?? false )
+                    if ( person.IsDeceased )
                     {
                         recipient.Status = CommunicationRecipientStatus.Failed;
                         recipient.StatusNote = "Person is deceased!";
@@ -267,7 +264,7 @@ You can view an online version of this email here:
                     }
                 }
 
-                // If an unbsubcribe value has been entered, and this is a bulk email, add the text
+                // If an unsubscribe value has been entered, and this is a bulk email, add the text
                 if ( communication.IsBulkCommunication )
                 {
                     string unsubscribeHtml = GetAttributeValue( "UnsubscribeHTML" );

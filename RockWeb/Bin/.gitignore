@@ -14,3 +14,6 @@
 /Rock.Plugin.dll
 *.PayFlowPro.dll
 /DotLiquid.dll
+/Rock.Mandrill.dll
+/Rock.Mailgun.dll
+/Rock.NMI.dll

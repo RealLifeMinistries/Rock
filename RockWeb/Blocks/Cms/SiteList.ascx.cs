@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,9 +52,8 @@ namespace RockWeb.Blocks.Cms
             gSites.GridRebind += gSites_GridRebind;
 
             // Block Security and special attributes (RockPage takes care of View)
-            bool canAddEditDelete = IsUserAuthorized( Authorization.EDIT );
-            gSites.Actions.ShowAdd = canAddEditDelete;
-            gSites.IsDeleteEnabled = canAddEditDelete;
+            bool canAddEdit = IsUserAuthorized( Authorization.EDIT );
+            gSites.Actions.ShowAdd = canAddEdit;
 
             SecurityField securityField = gSites.Columns[5] as SecurityField;
             securityField.EntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.Site ) ).Id;
@@ -99,38 +98,6 @@ namespace RockWeb.Blocks.Cms
         }
 
         /// <summary>
-        /// Handles the Delete event of the gSites control.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="RowEventArgs" /> instance containing the event data.</param>
-        protected void gSites_Delete( object sender, RowEventArgs e )
-        {
-            bool canDelete = false;
-
-            var rockContext = new RockContext();
-            SiteService siteService = new SiteService( rockContext );
-            Site site = siteService.Get( e.RowKeyId );
-            if ( site != null )
-            {
-                string errorMessage;
-                canDelete = siteService.CanDelete( site, out errorMessage, includeSecondLvl: true );
-                if ( !canDelete )
-                {
-                    mdGridWarning.Show( errorMessage, ModalAlertType.Alert );
-                    return;
-                }
-
-                siteService.Delete( site );
-
-                rockContext.SaveChanges();
-
-                SiteCache.Flush( site.Id );
-            }
-
-            BindGrid();
-        }
-
-        /// <summary>
         /// Handles the GridRebind event of the gSites control.
         /// </summary>
         /// <param name="sender">The source of the event.</param>
@@ -161,8 +128,8 @@ namespace RockWeb.Blocks.Cms
             {
                 gSites.DataSource = qry.OrderBy( s => s.Name ).ToList();
             }
-            
-            
+
+            gSites.EntityTypeId = EntityTypeCache.Read<Site>().Id;
             gSites.DataBind();
         }
 

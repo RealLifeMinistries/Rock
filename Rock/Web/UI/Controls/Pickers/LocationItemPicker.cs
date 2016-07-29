@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,16 +50,22 @@ namespace Rock.Web.UI.Controls
             if ( location != null )
             {
                 ItemId = location.Id.ToString();
-
-                string parentLocationIds = string.Empty;
+                List<int> parentLocationIds = new List<int>();
                 var parentLocation = location.ParentLocation;
+
                 while ( parentLocation != null )
                 {
-                    parentLocationIds = parentLocation.Id + "," + parentLocationIds;
+                    if ( parentLocationIds.Contains( parentLocation.Id ) )
+                    {
+                        // infinite recursion
+                        break;
+                    }
+
+                    parentLocationIds.Insert( 0, parentLocation.Id ); ;
                     parentLocation = parentLocation.ParentLocation;
                 }
 
-                InitialItemParentIds = parentLocationIds.TrimEnd( new char[] { ',' } );
+                InitialItemParentIds = parentLocationIds.AsDelimited( "," );
                 ItemName = location.ToString();
             }
             else
@@ -81,7 +87,7 @@ namespace Rock.Web.UI.Controls
             {
                 var ids = new List<string>();
                 var names = new List<string>();
-                var parentLocationIds = string.Empty;
+                List<int> parentLocationIds = new List<int>();
 
                 foreach ( var location in theLocations )
                 {
@@ -93,13 +99,19 @@ namespace Rock.Web.UI.Controls
 
                         while ( parentLocation != null )
                         {
-                            parentLocationIds += parentLocation.Id.ToString() + ",";
+                            if ( parentLocationIds.Contains( parentLocation.Id ) )
+                            {
+                                // infinite recursion
+                                break;
+                            }
+
+                            parentLocationIds.Insert( 0, parentLocation.Id ); ;
                             parentLocation = parentLocation.ParentLocation;
                         }
                     }
                 }
 
-                InitialItemParentIds = parentLocationIds.TrimEnd( new[] { ',' } );
+                InitialItemParentIds = parentLocationIds.AsDelimited( "," );
                 ItemIds = ids;
                 ItemNames = names;
             }

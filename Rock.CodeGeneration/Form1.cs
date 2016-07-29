@@ -9,6 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using System.Xml;
 using Rock;
@@ -38,7 +39,7 @@ namespace Rock.CodeGeneration
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         private void btnLoad_Click( object sender, EventArgs e )
         {
-            if ( lblAssemblyPath.Text == string.Empty )
+            if ( !Directory.Exists( lblAssemblyPath.Text ) || lblAssemblyPath.Text == string.Empty )
             {
                 rockAssembly = typeof( Rock.Data.IEntity ).Assembly;
                 FileInfo fi = new FileInfo( ( new System.Uri( rockAssembly.CodeBase ) ).AbsolutePath );
@@ -50,15 +51,6 @@ namespace Rock.CodeGeneration
             ofdAssembly.FileName = "Rock.dll";
             ofdAssembly.RestoreDirectory = true;
 
-            var projectName = Path.GetFileNameWithoutExtension( lblAssemblyPath.Text );
-            tbServiceFolder.Text = Path.Combine( RootFolder().FullName, projectName );
-            tbRestFolder.Text = Path.Combine( RootFolder().FullName, projectName + ".Rest" );
-            tbClientFolder.Text = Path.Combine( RootFolder().FullName, projectName + ".Client" );
-            if ( projectName != "Rock" )
-            {
-                tbRestFolder.Text = Path.Combine( RootFolder().FullName, projectName + "\\Rest" );
-            }
-
             if ( ofdAssembly.ShowDialog() == DialogResult.OK )
             {
                 Cursor = Cursors.WaitCursor;
@@ -67,16 +59,23 @@ namespace Rock.CodeGeneration
 
                 foreach ( var file in ofdAssembly.FileNames )
                 {
-                    lblAssemblyPath.Text = file;
-                    var assembly = Assembly.LoadFrom( file );
-
-                    foreach ( Type type in assembly.GetTypes().OfType<Type>().OrderBy( a => a.FullName ) )
+                    FileInfo fi = new FileInfo( file );
+                    if ( fi.Exists )
                     {
-                        if ( type.Namespace != null && !type.Namespace.StartsWith( "Rock.Data" ) && !type.IsAbstract && type.GetCustomAttribute<NotMappedAttribute>() == null )
+                        lblAssemblyPath.Text = file;
+                        lblAssemblyDateTime.Text = fi.LastWriteTime.ToElapsedString();
+                        toolTip1.SetToolTip( lblAssemblyDateTime, fi.LastWriteTime.ToString() );
+
+                        var assembly = Assembly.LoadFrom( file );
+
+                        foreach ( Type type in assembly.GetTypes().OfType<Type>().OrderBy( a => a.FullName ) )
                         {
-                            if ( typeof( Rock.Data.IEntity ).IsAssignableFrom( type ) || type.GetCustomAttribute( typeof( TableAttribute ) ) != null )
+                            if ( type.Namespace != null && !type.Namespace.StartsWith( "Rock.Data" ) && !type.IsAbstract && type.GetCustomAttribute<NotMappedAttribute>() == null )
                             {
-                                cblModels.Items.Add( type );
+                                if ( typeof( Rock.Data.IEntity ).IsAssignableFrom( type ) || type.GetCustomAttribute( typeof( TableAttribute ) ) != null )
+                                {
+                                    cblModels.Items.Add( type );
+                                }
                             }
                         }
                     }
@@ -86,6 +85,25 @@ namespace Rock.CodeGeneration
                 cbSelectAll.Checked = true;
 
                 Cursor = Cursors.Default;
+            }
+
+            var projectName = Path.GetFileNameWithoutExtension( lblAssemblyPath.Text );
+
+            tbServiceFolder.Text = Path.Combine( RootFolder().FullName, projectName );
+            tbRestFolder.Text = Path.Combine( RootFolder().FullName, projectName + ".Rest" );
+            tbClientFolder.Text = Path.Combine( RootFolder().FullName, projectName + ".Client" );
+            tbDatabaseFolder.Text = Path.Combine( RootFolder().FullName, "Database" );
+
+            if ( projectName != "Rock" )
+            {
+                tbRestFolder.Text = Path.Combine( RootFolder().FullName, projectName + "\\Rest" );
+                tbDatabaseFolder.Text = Path.Combine( RootFolder().FullName, Path.GetFileNameWithoutExtension( projectName ) + ".Database" );
+            }
+
+            SqlConnection sqlconn = GetSqlConnection( RootFolder().FullName );
+            if ( sqlconn != null )
+            {
+                lblDatabase.Text = sqlconn.Database;
             }
         }
 
@@ -143,16 +161,106 @@ namespace Rock.CodeGeneration
                         if ( cbClient.Checked )
                         {
                             WriteRockClientFile( rockClientFolder, type );
-                            WriteRockClientSystemGuidFiles( rockClientFolder );
                         }
+                    }
+
+                    var projectName = Path.GetFileNameWithoutExtension( lblAssemblyPath.Text );
+
+                    if (cbClient.Checked)
+                    {
+                        WriteRockClientIncludeClientFiles( rockClientFolder, cblModels.CheckedItems.OfType<Type>().ToList() );
+                        WriteRockClientSystemGuidFiles( rockClientFolder );
+                        WriteRockClientEnumsFile( rockClientFolder );
+                    }
+
+                    if ( cbDatabaseProcs.Checked )
+                    {
+                        WriteDatabaseProcsScripts( tbDatabaseFolder.Text, projectName );
                     }
                 }
             }
 
             progressBar1.Visible = false;
             Cursor = Cursors.Default;
-
             MessageBox.Show( "Files have been generated" );
+        }
+
+        /// <summary>
+        /// Writes the database procs scripts.
+        /// </summary>
+        /// <param name="databaseRootFolder">The database root folder.</param>
+        /// <param name="projectName">Name of the project.</param>
+        public void WriteDatabaseProcsScripts( string databaseRootFolder, string projectName )
+        {
+            SqlConnection sqlconn = GetSqlConnection( new DirectoryInfo( databaseRootFolder ).Parent.FullName );
+            sqlconn.Open();
+            var qryProcs = sqlconn.CreateCommand();
+            qryProcs.CommandType = System.Data.CommandType.Text;
+            qryProcs.CommandText = "select ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE FROM INFORMATION_SCHEMA.ROUTINES";
+            var readerProcs = qryProcs.ExecuteReader();
+            string procPrefixFilter;
+            if (projectName == "Rock")
+            {
+                procPrefixFilter = string.Empty;
+            }
+            else
+            {
+                procPrefixFilter = "_" + Path.GetFileNameWithoutExtension( projectName ).Replace( ".", "_" );
+            }
+
+            while ( readerProcs.Read() )
+            {
+                string routineSchema = readerProcs["ROUTINE_SCHEMA"] as string;
+                string routineName = readerProcs["ROUTINE_NAME"] as string;
+                string routineType = readerProcs["ROUTINE_TYPE"] as string;
+                var helpTextCommand = sqlconn.CreateCommand();
+                helpTextCommand.CommandText = string.Format( "EXEC sp_helptext '{0}.{1}';", routineSchema, routineName );
+                var helpTextReader = helpTextCommand.ExecuteReader();
+                var script = string.Empty;
+                while ( helpTextReader.Read() )
+                {
+                    script += helpTextReader[0];
+                }
+
+                string folder;
+                if ( routineType == "PROCEDURE" )
+                {
+                    folder = "Procedures";
+                }
+                else
+                {
+                    folder = "Functions";
+                }
+                
+                string filePath = Path.Combine( databaseRootFolder, folder, routineName + ".sql" );
+                Directory.CreateDirectory( Path.GetDirectoryName( filePath ) );
+
+                script = Regex.Replace( script, "(^\\s*)CREATE\\s*PROCEDURE", "$1ALTER PROCEDURE", RegexOptions.IgnoreCase | RegexOptions.Multiline );
+                script = Regex.Replace( script, "(^\\s*)CREATE\\s*FUNCTION", "$1ALTER FUNCTION", RegexOptions.IgnoreCase | RegexOptions.Multiline );
+                
+                if (string.IsNullOrEmpty(procPrefixFilter) || routineName.StartsWith(procPrefixFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.WriteAllText( filePath, script.Trim() );
+                }
+            }
+
+            var qryViews = sqlconn.CreateCommand();
+            qryViews.CommandText = "SELECT TABLE_NAME, VIEW_DEFINITION FROM INFORMATION_SCHEMA.VIEWS";
+            var readerViews = qryViews.ExecuteReader();
+            while ( readerViews.Read() )
+            {
+                string viewName = readerViews["TABLE_NAME"] as string;
+                string script = readerViews["VIEW_DEFINITION"] as string;
+
+                string filePath = Path.Combine( databaseRootFolder, "Views", viewName + ".sql" );
+                Directory.CreateDirectory( Path.GetDirectoryName( filePath ) );
+                script = Regex.Replace( script, "(^\\s*)CREATE\\s*VIEW", "$1ALTER VIEW", RegexOptions.IgnoreCase | RegexOptions.Multiline );
+
+                if ( string.IsNullOrEmpty( procPrefixFilter ) || viewName.StartsWith( procPrefixFilter, StringComparison.OrdinalIgnoreCase ) )
+                {
+                    File.WriteAllText( filePath, script.Trim() );
+                }
+            }
         }
 
         /// <summary>
@@ -180,7 +288,7 @@ namespace Rock.CodeGeneration
                 dbContextFullName = dbContextFullName.Replace( "Rock.Data.", "" );
             }
 
-            var properties = GetEntityProperties( type );
+            var properties = GetEntityProperties( type, false );
 
             var sb = new StringBuilder();
 
@@ -191,13 +299,13 @@ namespace Rock.CodeGeneration
             sb.AppendLine( "// </auto-generated>" );
             sb.AppendLine( "//------------------------------------------------------------------------------" );
             sb.AppendLine( "// <copyright>" );
-            sb.AppendLine( "// Copyright 2013 by the Spark Development Network" );
+            sb.AppendLine( "// Copyright by the Spark Development Network" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// Licensed under the Apache License, Version 2.0 (the \"License\");" );
+            sb.AppendLine( "// Licensed under the Rock Community License (the \"License\");" );
             sb.AppendLine( "// you may not use this file except in compliance with the License." );
             sb.AppendLine( "// You may obtain a copy of the License at" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// http://www.apache.org/licenses/LICENSE-2.0" );
+            sb.AppendLine( "// http://www.rockrms.com/license" );
             sb.AppendLine( "//" );
             sb.AppendLine( "// Unless required by applicable law or agreed to in writing, software" );
             sb.AppendLine( "// distributed under the License is distributed on an \"AS IS\" BASIS," );
@@ -307,18 +415,15 @@ namespace Rock.CodeGeneration
         /// <param name="rootFolder">The root folder.</param>
         /// <param name="type">The type.</param>
         /// <returns></returns>
-        private string GetCanDeleteCode( string rootFolder, Type type )
+        private string GetCanDeleteCode( string serviceFolder, Type type )
         {
-            var di = new DirectoryInfo( rootFolder );
-            var file = new FileInfo( Path.Combine( di.Parent.FullName, @"RockWeb\web.ConnectionStrings.config" ) );
-            if ( !file.Exists )
+            
+            SqlConnection sqlconn = GetSqlConnection( new DirectoryInfo(serviceFolder).Parent.FullName );
+            if (sqlconn == null)
+            {
                 return string.Empty;
+            }
 
-            XmlDocument xmlDoc = new XmlDocument();
-            xmlDoc.Load( file.FullName );
-            XmlNode root = xmlDoc.DocumentElement;
-            XmlNode node = root.SelectNodes( "add[@name = \"RockContext\"]" )[0];
-            SqlConnection sqlconn = new SqlConnection( node.Attributes["connectionString"].Value );
             sqlconn.Open();
 
             string sql = @"
@@ -460,6 +565,22 @@ order by [parentTable], [columnName]
 
         }
 
+        private static SqlConnection GetSqlConnection( string rootFolder )
+        {
+            var file = new FileInfo( Path.Combine( rootFolder, @"RockWeb\web.ConnectionStrings.config" ) );
+            if ( !file.Exists )
+            {
+                return null;
+            }
+
+            XmlDocument xmlDoc = new XmlDocument();
+            xmlDoc.Load( file.FullName );
+            XmlNode root = xmlDoc.DocumentElement;
+            XmlNode node = root.SelectNodes( "add[@name = \"RockContext\"]" )[0];
+            SqlConnection sqlconn = new SqlConnection( node.Attributes["connectionString"].Value );
+            return sqlconn;
+        }
+
         /// <summary>
         /// Writes the REST file for a given type
         /// </summary>
@@ -480,13 +601,13 @@ order by [parentTable], [columnName]
             sb.AppendLine( "// </auto-generated>" );
             sb.AppendLine( "//------------------------------------------------------------------------------" );
             sb.AppendLine( "// <copyright>" );
-            sb.AppendLine( "// Copyright 2013 by the Spark Development Network" );
+            sb.AppendLine( "// Copyright by the Spark Development Network" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// Licensed under the Apache License, Version 2.0 (the \"License\");" );
+            sb.AppendLine( "// Licensed under the Rock Community License (the \"License\");" );
             sb.AppendLine( "// you may not use this file except in compliance with the License." );
             sb.AppendLine( "// You may obtain a copy of the License at" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// http://www.apache.org/licenses/LICENSE-2.0" );
+            sb.AppendLine( "// http://www.rockrms.com/license" );
             sb.AppendLine( "//" );
             sb.AppendLine( "// Unless required by applicable law or agreed to in writing, software" );
             sb.AppendLine( "// distributed under the License is distributed on an \"AS IS\" BASIS," );
@@ -644,7 +765,14 @@ order by [parentTable], [columnName]
         {
             if ( type.IsEnum )
             {
-                return GetKeyName( "Int32" ) + " /* " + type.Name + "*/";
+                if ( type.Namespace == "Rock.Model" )
+                {
+                    return "Rock.Client.Enums." + type.Name;
+                }
+                else
+                {
+                    return GetKeyName( "Int32" ) + " /* " + type.Name + "*/";
+                }
             }
             else
             {
@@ -652,26 +780,29 @@ order by [parentTable], [columnName]
             }
         }
 
-        private Dictionary<Type, Dictionary<string, string>> _entityProperties { get; set; }
-
-        private Dictionary<string, string> GetEntityProperties( Type type )
+        private Dictionary<string, PropertyInfo> GetEntityProperties( Type type, bool includeRockClientIncludes )
         {
-            _entityProperties = _entityProperties ?? new Dictionary<Type, Dictionary<string, string>>();
-            if ( _entityProperties.ContainsKey( type ) )
-            {
-                return _entityProperties[type];
-            }
-
-            var properties = new Dictionary<string, string>();
+            var properties = new Dictionary<string, PropertyInfo>();
 
             var interfaces = type.GetInterfaces();
 
             foreach ( var property in type.GetProperties().SortByStandardOrder() )
             {
+                bool include = false;
+                if (includeRockClientIncludes && property.GetCustomAttribute<Rock.Data.RockClientIncludeAttribute>() != null)
+                {
+                    include = true;
+                }
+                
                 var getMethod = property.GetGetMethod();
+                if (getMethod == null)
+                {
+                    continue;
+                }
+
                 if ( getMethod.IsVirtual )
                 {
-                    if ( !getMethod.IsFinal )
+                    if ( !include && !getMethod.IsFinal )
                     {
                         continue;
                     }
@@ -685,7 +816,7 @@ order by [parentTable], [columnName]
                             break;
                         }
                     }
-                    if ( !interfaceProperty )
+                    if ( !include && !interfaceProperty )
                     {
                         continue;
                     }
@@ -693,18 +824,93 @@ order by [parentTable], [columnName]
 
                 if ( !property.GetCustomAttributes( typeof( DatabaseGeneratedAttribute ) ).Any() )
                 {
-                    if ( property.SetMethod != null && property.SetMethod.IsPublic && property.GetMethod.IsPublic )
+                    if ( (property.GetCustomAttribute<ObsoleteAttribute>() == null) )
                     {
-                        properties.Add( property.Name, PropertyTypeName( property.PropertyType ) );
+                        if ( property.SetMethod != null && property.SetMethod.IsPublic && property.GetMethod.IsPublic )
+                        {
+                            properties.Add( property.Name, property );
+                        }
                     }
                 }
             }
 
-            _entityProperties[type] = properties;
-
             return properties;
         }
 
+        /// <summary>
+        /// Writes the rock client model enums file.
+        /// </summary>
+        /// <param name="rootFolder">The root folder.</param>
+        private void WriteRockClientEnumsFile( string rootFolder )
+        {
+            rockAssembly = typeof( Rock.Data.IEntity ).Assembly;
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine( "//------------------------------------------------------------------------------" );
+            sb.AppendLine( "// <auto-generated>" );
+            sb.AppendLine( "//     This code was generated by the Rock.CodeGeneration project" );
+            sb.AppendLine( "//     Changes to this file will be lost when the code is regenerated." );
+            sb.AppendLine( "// </auto-generated>" );
+            sb.AppendLine( "//------------------------------------------------------------------------------" );
+            sb.AppendLine( "// <copyright>" );
+            sb.AppendLine( "// Copyright by the Spark Development Network" );
+            sb.AppendLine( "//" );
+            sb.AppendLine( "// Licensed under the Rock Community License (the \"License\");" );
+            sb.AppendLine( "// you may not use this file except in compliance with the License." );
+            sb.AppendLine( "// You may obtain a copy of the License at" );
+            sb.AppendLine( "//" );
+            sb.AppendLine( "// http://www.rockrms.com/license" );
+            sb.AppendLine( "//" );
+            sb.AppendLine( "// Unless required by applicable law or agreed to in writing, software" );
+            sb.AppendLine( "// distributed under the License is distributed on an \"AS IS\" BASIS," );
+            sb.AppendLine( "// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied." );
+            sb.AppendLine( "// See the License for the specific language governing permissions and" );
+            sb.AppendLine( "// limitations under the License." );
+            sb.AppendLine( "// </copyright>" );
+            sb.AppendLine( "//" );
+            sb.AppendLine( "using System;" );
+            sb.AppendLine( "using System.Collections.Generic;" );
+            sb.AppendLine( "" );
+
+            sb.AppendLine( "namespace Rock.Client.Enums" );
+            sb.AppendLine( "{" );
+
+            foreach ( var enumType in rockAssembly.GetTypes().Where( a => a.IsEnum ).OrderBy( a => a.Name ) )
+            {
+                if ( enumType.Namespace == "Rock.Model" )
+                {
+                    sb.AppendLine( "    /// <summary>" );
+                    sb.AppendLine( "    /// </summary>" );
+                    if (enumType.GetCustomAttribute<FlagsAttribute>() != null)
+                    {
+                        sb.AppendLine( "    [Flags]");
+                    }
+                    sb.AppendFormat( "    public enum {0}" + Environment.NewLine, enumType.Name );
+                    sb.AppendLine( "    {" );
+                    var enumValues = Enum.GetValues( enumType);
+                    foreach ( var enumValueName in Enum.GetNames( enumType ) )
+                    {
+                        int enumValue = (int)Convert.ChangeType( Enum.Parse( enumType, enumValueName ), typeof( int ) );
+                        string enumValueParam = enumValue >= 0 ? " = 0x" + enumValue.ToString( "x" ) : " = " + enumValue.ToString();
+                        sb.AppendFormat( "        {0}{1},", enumValueName, enumValueParam );
+                        sb.AppendLine( "" );
+                    }
+
+                    sb.AppendLine( "    }" );
+                    sb.AppendLine( "" );
+                }
+            }
+
+
+            sb.AppendLine( "}" );
+
+            var file = new FileInfo( Path.Combine( rootFolder, "CodeGenerated\\Enums", "RockEnums.cs" ) );
+            WriteFile( file, sb );
+        }
+
+        /// <summary>
+        /// Writes the rock client system unique identifier files.
+        /// </summary>
+        /// <param name="rootFolder">The root folder.</param>
         private void WriteRockClientSystemGuidFiles( string rootFolder )
         {
             rockAssembly = typeof( Rock.Data.IEntity ).Assembly;
@@ -716,13 +922,13 @@ order by [parentTable], [columnName]
             sb.AppendLine( "// </auto-generated>" );
             sb.AppendLine( "//------------------------------------------------------------------------------" );
             sb.AppendLine( "// <copyright>" );
-            sb.AppendLine( "// Copyright 2013 by the Spark Development Network" );
+            sb.AppendLine( "// Copyright by the Spark Development Network" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// Licensed under the Apache License, Version 2.0 (the \"License\");" );
+            sb.AppendLine( "// Licensed under the Rock Community License (the \"License\");" );
             sb.AppendLine( "// you may not use this file except in compliance with the License." );
             sb.AppendLine( "// You may obtain a copy of the License at" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// http://www.apache.org/licenses/LICENSE-2.0" );
+            sb.AppendLine( "// http://www.rockrms.com/license" );
             sb.AppendLine( "//" );
             sb.AppendLine( "// Unless required by applicable law or agreed to in writing, software" );
             sb.AppendLine( "// distributed under the License is distributed on an \"AS IS\" BASIS," );
@@ -762,17 +968,46 @@ order by [parentTable], [columnName]
         }
 
         /// <summary>
+        /// Writes the rock client include client files.
+        /// </summary>
+        /// <param name="rootFolder">The root folder.</param>
+        /// <param name="alreadyIncludedTypes">The already included types.</param>
+        private void WriteRockClientIncludeClientFiles( string rootFolder, IEnumerable<Type> alreadyIncludedTypes)
+        {
+            foreach ( var rockClientIncludeType in rockAssembly.GetTypes().Where( a => a.GetCustomAttribute<Rock.Data.RockClientIncludeAttribute>() != null ).OrderBy( a => a.Name ) )
+            {
+                if ( !alreadyIncludedTypes.Any( a => a == rockClientIncludeType ) )
+                {
+                    WriteRockClientFile( rootFolder, rockClientIncludeType );
+                }
+            }
+        }
+
+        /// <summary>
         /// Writes the DTO file for a given type
         /// </summary>
         /// <param name="rootFolder"></param>
         /// <param name="type"></param>
         private void WriteRockClientFile( string rootFolder, Type type )
         {
-            var dataMembers = type.GetProperties().SortByStandardOrder()
-                .Where( a => a.GetCustomAttribute( typeof( DataMemberAttribute ) ) != null )
-                .Where( a => a.GetCustomAttribute( typeof( NotMappedAttribute ) ) == null );
+            // make a copy of the EntityProperties since we are deleting some for this method
+            var entityProperties = GetEntityProperties( type, true ).ToDictionary( k => k.Key, v => v.Value);
 
-            if ( !dataMembers.Any() )
+            var dataMembers = type.GetProperties().SortByStandardOrder()
+                .Where( a => a.GetCustomAttribute<DataMemberAttribute>() != null )
+                .Where( a => a.GetCustomAttribute<ObsoleteAttribute>() == null )
+                .Where( a => (a.GetCustomAttribute<NotMappedAttribute>() == null || a.GetCustomAttribute<Rock.Data.RockClientIncludeAttribute>() != null) )
+                .Where( a => !entityProperties.Keys.Contains( a.Name ) );
+
+            var rockClientIncludeAttribute = type.GetCustomAttribute<Rock.Data.RockClientIncludeAttribute>();
+            string comments = null;
+
+            if ( rockClientIncludeAttribute != null)
+            {
+                comments = rockClientIncludeAttribute.DocumentationMessage;
+            }
+            
+            if ( !entityProperties.Any() && !dataMembers.Any() )
             {
                 return;
             }
@@ -790,13 +1025,13 @@ order by [parentTable], [columnName]
             sb.AppendLine( "// </auto-generated>" );
             sb.AppendLine( "//------------------------------------------------------------------------------" );
             sb.AppendLine( "// <copyright>" );
-            sb.AppendLine( "// Copyright 2013 by the Spark Development Network" );
+            sb.AppendLine( "// Copyright by the Spark Development Network" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// Licensed under the Apache License, Version 2.0 (the \"License\");" );
+            sb.AppendLine( "// Licensed under the Rock Community License (the \"License\");" );
             sb.AppendLine( "// you may not use this file except in compliance with the License." );
             sb.AppendLine( "// You may obtain a copy of the License at" );
             sb.AppendLine( "//" );
-            sb.AppendLine( "// http://www.apache.org/licenses/LICENSE-2.0" );
+            sb.AppendLine( "// http://www.rockrms.com/license" );
             sb.AppendLine( "//" );
             sb.AppendLine( "// Unless required by applicable law or agreed to in writing, software" );
             sb.AppendLine( "// distributed under the License is distributed on an \"AS IS\" BASIS," );
@@ -812,29 +1047,157 @@ order by [parentTable], [columnName]
 
             sb.AppendFormat( "namespace Rock.Client" + Environment.NewLine, type.Namespace );
             sb.AppendLine( "{" );
+
             sb.AppendLine( "    /// <summary>" );
-            sb.AppendFormat( "    /// Simple Client Model for {0}" + Environment.NewLine, type.Name );
+            
+            
+            if ( !string.IsNullOrWhiteSpace( comments ) )
+            {
+                sb.AppendFormat( "    /// {0}" + Environment.NewLine, comments );
+            }
+            else
+            {
+                sb.AppendFormat( "    /// Base client model for {0} that only includes the non-virtual fields. Use this for PUT/POSTs" + Environment.NewLine, type.Name );
+            }
+
             sb.AppendLine( "    /// </summary>" );
 
-            sb.AppendFormat( "    public partial class {0}" + Environment.NewLine, type.Name );
+            sb.AppendFormat( "    public partial class {0}Entity" + Environment.NewLine, type.Name );
+            sb.AppendLine( "    {" );
+
+            foreach ( var keyVal in entityProperties )
+            {
+                var propertyRockClientIncludeAttribute = keyVal.Value.GetCustomAttribute<Rock.Data.RockClientIncludeAttribute>();
+                var defaultValueAttribute = keyVal.Value.GetCustomAttribute<System.ComponentModel.DefaultValueAttribute>();
+                string propertyComments = null;
+
+                if ( propertyRockClientIncludeAttribute != null )
+                {
+                    propertyComments = propertyRockClientIncludeAttribute.DocumentationMessage;
+                }
+
+                if ( !string.IsNullOrWhiteSpace( propertyComments ) )
+                {
+                    sb.AppendLine( "        /// <summary>" );
+                    sb.AppendFormat( "        /// {0}" + Environment.NewLine, propertyComments );
+                    sb.AppendLine( "        /// </summary>" );
+                }
+                else
+                {
+                    sb.AppendLine( "        /// <summary />" );
+                }
+
+                if ( defaultValueAttribute != null )
+                {
+                    sb.AppendFormat( "        public {0} {1}" + Environment.NewLine, this.PropertyTypeName( keyVal.Value.PropertyType ), keyVal.Key );
+                    sb.AppendLine( "        {" );
+                    sb.AppendFormat( "            get {{ return _{0}; }}" + Environment.NewLine, keyVal.Key );
+                    sb.AppendFormat( "            set {{ _{0} = value; }}" + Environment.NewLine, keyVal.Key );
+                    sb.AppendLine( "        }" );
+                    if ( defaultValueAttribute.Value is string )
+                    {
+                        sb.AppendFormat( "        private {0} _{1} = \"{2}\";" + Environment.NewLine, this.PropertyTypeName( keyVal.Value.PropertyType ), keyVal.Key, defaultValueAttribute.Value );
+                    }
+                    else if ( defaultValueAttribute.Value is bool )
+                    {
+                        sb.AppendFormat( "        private {0} _{1} = {2};" + Environment.NewLine, this.PropertyTypeName( keyVal.Value.PropertyType ), keyVal.Key, (bool)defaultValueAttribute.Value ? "true" : "false" );
+                    }
+                    else
+                    {
+                        sb.AppendFormat( "        private {0} _{1} = {2};" + Environment.NewLine, this.PropertyTypeName( keyVal.Value.PropertyType ), keyVal.Key, defaultValueAttribute.Value );
+                    }
+                    /*
+                     public bool IsEmailActive
+        {
+            get { return _isEmailActive; }
+            set { _isEmailActive = value; }
+        }
+        private bool _isEmailActive = true;
+                     
+                     */
+                }
+                else
+                {
+                    sb.AppendFormat( "        public {0} {1} {{ get; set; }}" + Environment.NewLine, this.PropertyTypeName( keyVal.Value.PropertyType ), keyVal.Key );
+                }
+                sb.AppendLine( "" );
+            }
+
+            sb.AppendFormat( 
+@"        /// <summary>
+        /// Copies the base properties from a source {0} object
+        /// </summary>
+        /// <param name=""source"">The source.</param>
+        public void CopyPropertiesFrom( {0} source )
+        {{
+", type.Name );
+
+            foreach ( var keyVal in entityProperties )
+            {
+                sb.AppendFormat( "            this.{0} = source.{0};" + Environment.NewLine, keyVal.Key );
+            }
+
+            sb.Append( @"
+        }
+" );
+
+            sb.AppendLine( "    }" );
+
+            sb.AppendLine( "" );
+            
+            sb.AppendLine( "    /// <summary>" );
+
+            if ( !string.IsNullOrWhiteSpace( comments ) )
+            {
+                sb.AppendFormat( "    /// {0}" + Environment.NewLine, comments );
+            }
+            else
+            {
+                sb.AppendFormat( "    /// Client model for {0} that includes all the fields that are available for GETs. Use this for GETs (use {0}Entity for POST/PUTs)" + Environment.NewLine, type.Name );
+            }
+
+            sb.AppendLine( "    /// </summary>" );
+
+            sb.AppendFormat( "    public partial class {0} : {0}Entity" + Environment.NewLine, type.Name );
             sb.AppendLine( "    {" );
 
             foreach ( var dataMember in dataMembers )
             {
-                sb.AppendLine( "        /// <summary />" );
+                var dataMemberRockClientIncludeAttribute = dataMember.GetCustomAttribute<Rock.Data.RockClientIncludeAttribute>();
+                string dataMemberComments = null;
+
+                if ( dataMemberRockClientIncludeAttribute != null )
+                {
+                    dataMemberComments = dataMemberRockClientIncludeAttribute.DocumentationMessage;
+                }
+                
+                if (!string.IsNullOrWhiteSpace(dataMemberComments))
+                {
+                    sb.AppendLine( "        /// <summary>" );
+                    sb.AppendFormat( "        /// {0}" + Environment.NewLine, dataMemberComments );
+                    sb.AppendLine( "        /// </summary>" );
+                }
+                else
+                {
+                    sb.AppendLine( "        /// <summary />" );    
+                }
+                
                 sb.AppendFormat( "        public {0} {1} {{ get; set; }}" + Environment.NewLine, PropertyTypeName( dataMember.PropertyType ), dataMember.Name );
                 sb.AppendLine( "" );
             }
 
-
             // if this is a IHasAttributes type, generate Attribute/AttributeValues since they can be fetched thru REST when ?loadAttributes is specified
             if ( typeof( Rock.Attribute.IHasAttributes ).IsAssignableFrom( type ) )
             {
-                sb.AppendLine( "        /// <summary />" );
-                sb.AppendLine( "        public Dictionary<string, Rock.Client.Attribute> Attributes { get; set; }" + Environment.NewLine );
+                sb.AppendLine( "        /// <summary>" );
+                sb.AppendLine( "        /// NOTE: Attributes are only populated when ?loadAttributes is specified. Options for loadAttributes are true, false, 'simple', 'expanded' " );
+                sb.AppendLine( "        /// </summary>" );
+                sb.AppendLine( "        public Dictionary<string, Rock.Client.Attribute> Attributes { get; set; }" );
                 sb.AppendLine( "" );
-                sb.AppendLine( "        /// <summary />" );
-                sb.AppendLine( "        public Dictionary<string, Rock.Client.AttributeValue> AttributeValues { get; set; }" + Environment.NewLine );
+                sb.AppendLine( "        /// <summary>" );
+                sb.AppendLine( "        /// NOTE: AttributeValues are only populated when ?loadAttributes is specified. Options for loadAttributes are true, false, 'simple', 'expanded' " );
+                sb.AppendLine( "        /// </summary>" );
+                sb.AppendLine( "        public Dictionary<string, Rock.Client.AttributeValue> AttributeValues { get; set; }" );
             }
 
             sb.AppendLine( "    }" );

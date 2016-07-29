@@ -3,7 +3,7 @@
 <asp:UpdatePanel ID="upnlContent" runat="server">
     <ContentTemplate>
 
-        <div class="panel panel-block">
+        <div class="panel panel-block list-as-blocks">
             <div class="panel-heading">
                 <h1 class="panel-title"><i class="fa fa-bullhorn"></i> My Content</h1>
 
@@ -14,30 +14,26 @@
             </div>
             <div class="panel-body">
 
-                <div class="list-as-blocks margin-t-lg clearfix">
-                    <ul class="list-unstyled">
-                        <asp:Repeater ID="rptChannels" runat="server">
-                            <ItemTemplate>
-                                <li class='<%# Eval("Class") %>'>
-                                    <asp:LinkButton ID="lbChannel" runat="server" CommandArgument='<%# Eval("Channel.Id") %>' CommandName="Display">
-                                        <i class='<%# Eval("Channel.IconCssClass") %>'></i>
-                                        <h3><%# Eval("Channel.Name") %> </h3>
-                                        <div class="notification">
-                                            <span class="label label-danger"><%# ((int)Eval("Count")).ToString("#,###,###") %></span>
-                                        </div>
-                                    </asp:LinkButton>
-                                </li>
-                            </ItemTemplate>
-                        </asp:Repeater>
-                    </ul>
-                </div>
-
-                
+                <ul>
+                    <asp:Repeater ID="rptChannels" runat="server">
+                        <ItemTemplate>
+                            <li class='<%# Eval("Class") %>'>
+                                <asp:LinkButton ID="lbChannel" runat="server" CommandArgument='<%# Eval("Channel.Id") %>' CommandName="Display">
+                                    <i class='<%# Eval("Channel.IconCssClass") %>'></i>
+                                    <h3><%# Eval("Channel.Name") %> </h3>
+                                    <div class="notification">
+                                        <span class="label label-danger"><%# ((int)Eval("Count")).ToString("#,###,###") %></span>
+                                    </div>
+                                </asp:LinkButton>
+                            </li>
+                        </ItemTemplate>
+                    </asp:Repeater>
+                </ul>
 
             </div>
         </div>
 
-        <div class="panel panel-block" id="divItemPanel" runat="server" visible="false">
+        <div class="panel panel-block js-grid-header" id="divItemPanel" runat="server" visible="false">
             <div class="panel-heading">
                 <div class="panel-title">
                     <i class="fa fa-bullhorn"></i> <asp:Literal ID="lContentChannelItems" runat="server"></asp:Literal></h1>
@@ -50,6 +46,8 @@
                         <Rock:RockDropDownList ID="ddlStatus" runat="server" Label="Status" />
                         <Rock:DateRangePicker ID="drpDateRange" runat="server" Label="Date Range" />
                         <Rock:RockTextBox ID="tbTitle" runat="server" Label="Title" />
+                        <Rock:PersonPicker ID="ppCreatedBy" runat="server" Label="Created By" />
+                        <asp:PlaceHolder ID="phAttributeFilters" runat="server" />
                     </Rock:GridFilter>               
 
                     <Rock:ModalAlert ID="mdGridWarning" runat="server" />
@@ -65,6 +63,14 @@
                 $(".my-contentItems .list-as-blocks li").removeClass('active');
                 $(this).addClass('active');
             });
+
+            function scrollToGrid() {
+                if (!$('.js-grid-header').visible(true)) {
+                    $('html, body').animate({
+                        scrollTop: $('.js-grid-header').offset().top + 'px'
+                    }, 'fast');
+                }
+            }
         </script>
     </ContentTemplate>
 </asp:UpdatePanel>

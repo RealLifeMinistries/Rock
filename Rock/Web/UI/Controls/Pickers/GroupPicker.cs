@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,17 +29,64 @@ namespace Rock.Web.UI.Controls
     /// </summary>
     public class GroupPicker : ItemPicker
     {
+        #region Controls
+
+        /// <summary>
+        /// The checkbox to show inactive groups
+        /// </summary>
+        private RockCheckBox _cbShowInactiveGroups;
+
+        #endregion
+
+        /// <summary>
+        /// Gets or sets the root group identifier.
+        /// </summary>
+        /// <value>
+        /// The root group identifier.
+        /// </value>
+        public int? RootGroupId
+        {
+            get
+            {
+                return ViewState["RootGroupId"] as int?;
+            }
+
+            set
+            {
+                ViewState["RootGroupId"] = value;
+                SetExtraRestParams();
+            }
+        }
+
+        /// <summary>
+        /// Called by the ASP.NET page framework to notify server controls that use composition-based implementation to create any child controls they contain in preparation for posting back or rendering.
+        /// </summary>
+        protected override void CreateChildControls()
+        {
+            base.CreateChildControls();
+
+            _cbShowInactiveGroups = new RockCheckBox();
+            _cbShowInactiveGroups.ContainerCssClass = "pull-right";
+            _cbShowInactiveGroups.SelectedIconCssClass = "fa fa-check-square-o";
+            _cbShowInactiveGroups.UnSelectedIconCssClass = "fa fa-square-o";
+            _cbShowInactiveGroups.ID = this.ID + "_cbShowInactiveGroups";
+            _cbShowInactiveGroups.Text = "Show Inactive";
+            _cbShowInactiveGroups.AutoPostBack = true;
+            _cbShowInactiveGroups.CheckedChanged += _cbShowInactiveGroups_CheckedChanged;
+            this.Controls.Add( _cbShowInactiveGroups );
+        }
+        
         /// <summary>
         /// Raises the <see cref="E:System.Web.UI.Control.Init" /> event.
         /// </summary>
         /// <param name="e">An <see cref="T:System.EventArgs" /> object that contains the event data.</param>
         protected override void OnInit( EventArgs e )
         {
-            ItemRestUrlExtraParams = "";
+            SetExtraRestParams();
             this.IconCssClass = "fa fa-users";
             base.OnInit( e );
         }
-        
+
         /// <summary>
         /// Sets the value.
         /// </summary>
@@ -49,16 +96,9 @@ namespace Rock.Web.UI.Controls
             if ( group != null )
             {
                 ItemId = group.Id.ToString();
-                
-                string parentGroupIds = string.Empty;
-                var parentGroup = group.ParentGroup;
-                while ( parentGroup != null )
-                {
-                    parentGroupIds = parentGroup.Id + "," + parentGroupIds;
-                    parentGroup = parentGroup.ParentGroup;
-                }
 
-                InitialItemParentIds = parentGroupIds.TrimEnd( new[] { ',' } );
+                var parentIds = GetGroupAncestorsIdList( group.ParentGroup );
+                InitialItemParentIds = parentIds.AsDelimited( "," );
                 ItemName = group.Name;
             }
             else
@@ -66,6 +106,39 @@ namespace Rock.Web.UI.Controls
                 ItemId = Constants.None.IdValue;
                 ItemName = Constants.None.TextHtml;
             }
+        }
+
+        /// <summary>
+        /// Returns a list of the ancestor Groups of the specified Group.
+        /// If the ParentGroup property of the Group is not populated, it is assumed to be a top-level node.
+        /// </summary>
+        /// <param name="group"></param>
+        /// <param name="ancestorGroupIds"></param>
+        /// <returns></returns>
+        private List<int> GetGroupAncestorsIdList( Group group, List<int> ancestorGroupIds = null )
+        {
+            if ( ancestorGroupIds == null )
+            {
+                ancestorGroupIds = new List<int>();
+            }
+
+            if ( group == null )
+            {
+                return ancestorGroupIds;
+            }
+
+            // If we have encountered this node previously in our tree walk, there is a recursive loop in the tree.
+            if ( ancestorGroupIds.Contains( group.Id ) )
+            {
+                return ancestorGroupIds;
+            }
+
+            // Create or add this node to the history stack for this tree walk.
+            ancestorGroupIds.Insert(0, group.Id );
+
+            ancestorGroupIds = this.GetGroupAncestorsIdList( group.ParentGroup, ancestorGroupIds );
+
+            return ancestorGroupIds;
         }
 
         /// <summary>
@@ -80,7 +153,7 @@ namespace Rock.Web.UI.Controls
             {
                 var ids = new List<string>();
                 var names = new List<string>();
-                var parentGroupIds = string.Empty;
+                var parentIds = new List<int>();
 
                 foreach ( var group in theGroups )
                 {
@@ -89,16 +162,12 @@ namespace Rock.Web.UI.Controls
                         ids.Add( group.Id.ToString() );
                         names.Add( group.Name );
                         var parentGroup = group.ParentGroup;
-
-                        while ( parentGroup != null )
-                        {
-                            parentGroupIds += parentGroup.Id.ToString() + ",";
-                            parentGroup = parentGroup.ParentGroup;
-                        }
+                        var groupParentIds = GetGroupAncestorsIdList( parentGroup );
+                        parentIds.AddRange( groupParentIds );
                     }
                 }
 
-                InitialItemParentIds = parentGroupIds.TrimEnd( new[] { ',' } );
+                InitialItemParentIds = parentIds.AsDelimited( "," );
                 ItemIds = ids;
                 ItemNames = names;
             }
@@ -138,5 +207,38 @@ namespace Rock.Web.UI.Controls
             get { return "~/api/groups/getchildren/"; }
         }
 
+        /// <summary>
+        /// Render any additional picker actions
+        /// </summary>
+        /// <param name="writer">The writer.</param>
+        public override void RenderCustomPickerActions( HtmlTextWriter writer )
+        {
+            base.RenderCustomPickerActions( writer );
+
+            _cbShowInactiveGroups.RenderControl( writer );
+        }
+
+        /// <summary>
+        /// Sets the extra rest parameters.
+        /// </summary>
+        private void SetExtraRestParams( bool includeInactiveGroups = false )
+        {
+            ItemRestUrlExtraParams = "?includeInactiveGroups=" + includeInactiveGroups.ToTrueFalse();
+            if ( RootGroupId.HasValue )
+            {
+                ItemRestUrlExtraParams += string.Format( "&rootGroupId={0}", RootGroupId.Value );
+            }
+        }
+
+        /// <summary>
+        /// Handles the CheckedChanged event of the _cbShowInactiveGroups control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        public void _cbShowInactiveGroups_CheckedChanged( object sender, EventArgs e )
+        {
+            ShowDropDown = true;
+            SetExtraRestParams( _cbShowInactiveGroups.Checked );
+        }
     }
 }

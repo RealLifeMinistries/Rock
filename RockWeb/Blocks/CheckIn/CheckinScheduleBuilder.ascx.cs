@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,11 +33,12 @@ namespace RockWeb.Blocks.CheckIn
     /// <summary>
     /// 
     /// </summary>
-    [DisplayName( "Scedule Builder" )]
+    [DisplayName( "Schedule Builder" )]
     [Category( "Check-in" )]
     [Description( "Helps to build schedules to be used for checkin." )]
     public partial class CheckinScheduleBuilder : RockBlock
     {
+
         #region Control Methods
 
         /// <summary>
@@ -85,7 +86,7 @@ namespace RockWeb.Blocks.CheckIn
             var scheduleQry = scheduleService.Queryable().Where( a => a.CheckInStartOffsetMinutes != null );
 
             // limit Schedules to the Category from the Filter
-            int scheduleCategoryId = rFilter.GetUserPreference( "Category" ).AsIntegerOrNull() ?? Rock.Constants.All.Id;
+            int scheduleCategoryId = pCategory.SelectedValueAsInt() ?? Rock.Constants.All.Id;
             if ( scheduleCategoryId != Rock.Constants.All.Id )
             {
                 scheduleQry = scheduleQry.Where( a => a.CategoryId == scheduleCategoryId );
@@ -160,8 +161,21 @@ namespace RockWeb.Blocks.CheckIn
                 ddlGroupType.Visible = false;
             }
 
-            var filterCategory = new CategoryService( rockContext ).Get( rFilter.GetUserPreference( "Category" ).AsInteger() );
-            pCategory.SetValue( filterCategory );
+            int? categoryId = rFilter.GetUserPreference( "Category" ).AsIntegerOrNull();
+            if ( !categoryId.HasValue )
+            {
+                var categoryCache = CategoryCache.Read( Rock.SystemGuid.Category.SCHEDULE_SERVICE_TIMES.AsGuid() );
+                categoryId = categoryCache != null ? categoryCache.Id : (int?)null;
+            }
+
+            if ( categoryId.HasValue )
+            {
+                pCategory.SetValue( new CategoryService( rockContext ).Get( categoryId.Value ) );
+            }
+            else
+            {
+                pCategory.SetValue( null );
+            }
 
             pkrParentLocation.SetValue( rFilter.GetUserPreference( "Parent Location" ).AsIntegerOrNull() );
         }
@@ -261,6 +275,8 @@ namespace RockWeb.Blocks.CheckIn
 
             var groupLocationService = new GroupLocationService( rockContext );
             var groupTypeService = new GroupTypeService( rockContext );
+            var groupService = new GroupService( rockContext );
+
             IEnumerable<GroupTypePath> groupPaths = new List<GroupTypePath>();
             var groupLocationQry = groupLocationService.Queryable();
             int groupTypeId;
@@ -311,42 +327,80 @@ namespace RockWeb.Blocks.CheckIn
                 groupLocationQry = groupLocationQry.OrderBy( a => a.Group.Name ).ThenBy( a => a.Location.Name );
             }
 
-            var qryList = groupLocationQry.Select( a =>
+            var qryList = groupLocationQry
+                .Where( a => a.Location != null )
+                .Select( a =>
                 new
                 {
                     GroupLocationId = a.Id,
+                    a.Location,
+                    GroupId = a.GroupId,
                     GroupName = a.Group.Name,
-                    LocationName = a.Location.Name,
                     ScheduleIdList = a.Schedules.Select( s => s.Id ),
-                    a.LocationId,
                     GroupTypeId = a.Group.GroupTypeId
                 } ).ToList();
 
+            var locationService = new LocationService( rockContext );
             int parentLocationId = pkrParentLocation.SelectedValueAsInt() ?? Rock.Constants.All.Id;
             if ( parentLocationId != Rock.Constants.All.Id )
             {
-                var descendantLocationIds = new LocationService( rockContext ).GetAllDescendents( parentLocationId ).Select( a => a.Id );
-                qryList = qryList.Where( a => descendantLocationIds.Contains( a.LocationId ) ).ToList();
+                var currentAndDescendantLocationIds = new List<int>();
+                currentAndDescendantLocationIds.Add( parentLocationId );
+                currentAndDescendantLocationIds.AddRange( locationService.GetAllDescendents( parentLocationId ).Select( a => a.Id ) );
+                
+                qryList = qryList.Where( a => currentAndDescendantLocationIds.Contains( a.Location.Id ) ).ToList();
             }
 
             // put stuff in a datatable so we can dynamically have columns for each Schedule
             DataTable dataTable = new DataTable();
             dataTable.Columns.Add( "GroupLocationId" );
+            dataTable.Columns.Add( "GroupId" );
             dataTable.Columns.Add( "GroupName" );
+            dataTable.Columns.Add( "GroupPath" );
             dataTable.Columns.Add( "LocationName" );
-            dataTable.Columns.Add( "Path" );
+            dataTable.Columns.Add( "LocationPath" );
             foreach ( var field in gGroupLocationSchedule.Columns.OfType<CheckBoxEditableField>() )
             {
                 dataTable.Columns.Add( field.DataField, typeof( bool ) );
             }
 
+            var locationPaths = new Dictionary<int, string>();
+
             foreach ( var row in qryList )
             {
                 DataRow dataRow = dataTable.NewRow();
                 dataRow["GroupLocationId"] = row.GroupLocationId;
-                dataRow["GroupName"] = row.GroupName;
-                dataRow["LocationName"] = row.LocationName;
-                dataRow["Path"] = groupPaths.Where( gt => gt.GroupTypeId == row.GroupTypeId ).Select( gt => gt.Path ).FirstOrDefault();
+                dataRow["GroupName"] = groupService.GroupAncestorPathName( row.GroupId );
+                dataRow["GroupPath"] = groupPaths.Where( gt => gt.GroupTypeId == row.GroupTypeId ).Select( gt => gt.Path ).FirstOrDefault();
+                dataRow["LocationName"] = row.Location.Name;
+
+                if ( row.Location.ParentLocationId.HasValue )
+                {
+                    int locationId = row.Location.ParentLocationId.Value;
+
+                    if ( !locationPaths.ContainsKey( locationId ) )
+                    {
+                        var locationNames = new List<string>();
+                        var parentLocation = locationService.Get( locationId );
+                        while ( parentLocation != null )
+                        {
+                            locationNames.Add( parentLocation.Name );
+                            parentLocation = parentLocation.ParentLocation;
+                        }
+                        if ( locationNames.Any() )
+                        {
+                            locationNames.Reverse();
+                            locationPaths.Add( locationId, locationNames.AsDelimited( " > " ) );
+                        }
+                        else
+                        {
+                            locationPaths.Add( locationId, string.Empty );
+                        }
+                    }
+
+                    dataRow["LocationPath"] = locationPaths[locationId];
+                }
+
                 foreach ( var field in gGroupLocationSchedule.Columns.OfType<CheckBoxEditableField>() )
                 {
                     int scheduleId = int.Parse( field.DataField.Replace( "scheduleField_", string.Empty ) );
@@ -356,6 +410,7 @@ namespace RockWeb.Blocks.CheckIn
                 dataTable.Rows.Add( dataRow );
             }
 
+            gGroupLocationSchedule.EntityTypeId = EntityTypeCache.Read<GroupLocation>().Id;
             gGroupLocationSchedule.DataSource = dataTable;
             gGroupLocationSchedule.DataBind();
         }
@@ -371,7 +426,7 @@ namespace RockWeb.Blocks.CheckIn
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         protected void btnCancel_Click( object sender, EventArgs e )
         {
-            NavigateToParentPage();
+            NavigateToParentPage( new Dictionary<string, string> { { "CheckinTypeId", this.PageParameter( "groupTypeId" ) } } );
         }
 
         /// <summary>
@@ -427,7 +482,9 @@ namespace RockWeb.Blocks.CheckIn
 
             rockContext.SaveChanges();
 
-            NavigateToParentPage();
+            Rock.CheckIn.KioskDevice.FlushAll();
+
+            NavigateToParentPage( new Dictionary<string, string> { { "CheckinTypeId", this.PageParameter( "groupTypeId" ) } } );
 
         }
 
@@ -468,6 +525,24 @@ namespace RockWeb.Blocks.CheckIn
                         {
                             cell.Attributes["title"] = schedule.ToString();
                         }
+                    }
+                }
+            }
+            else
+            {
+                if (e.Row.DataItem != null)
+                {
+                    var dataRow = e.Row.DataItem as System.Data.DataRowView;
+                    Literal lGroupName = e.Row.FindControl( "lGroupName" ) as Literal;
+                    if ( lGroupName != null )
+                    {
+                        lGroupName.Text = string.Format( "{0}<br /><small>{1}</small>", dataRow["GroupName"] as string, dataRow["GroupPath"] as string );
+                    }
+
+                    Literal lLocationName = e.Row.FindControl( "lLocationName" ) as Literal;
+                    if ( lLocationName != null )
+                    {
+                        lLocationName.Text = string.Format( "{0}<br /><small>{1}</small>", dataRow["LocationName"] as string, dataRow["LocationPath"] as string );
                     }
                 }
             }

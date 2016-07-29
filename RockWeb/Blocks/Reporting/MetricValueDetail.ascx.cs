@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -139,7 +139,7 @@ namespace RockWeb.Blocks.Reporting
                 metricValue = new MetricValue();
                 metricValueService.Add( metricValue );
                 metricValue.MetricId = hfMetricId.ValueAsInt();
-                metricValue.Metric = metricValue.Metric ?? new MetricService(rockContext).Get(metricValue.MetricId);
+                metricValue.Metric = metricValue.Metric ?? new MetricService( rockContext ).Get( metricValue.MetricId );
             }
             else
             {
@@ -150,11 +150,11 @@ namespace RockWeb.Blocks.Reporting
             metricValue.XValue = tbXValue.Text;
             metricValue.YValue = tbYValue.Text.AsDecimalOrNull();
             metricValue.Note = tbNote.Text;
-            metricValue.MetricValueDateTime = dtpMetricValueDateTime.SelectedDateTimeIsBlank ? null : dtpMetricValueDateTime.SelectedDateTime;
+            metricValue.MetricValueDateTime = dpMetricValueDateTime.SelectedDate;
 
             // Get EntityId from EntityType UI controls
             var metricEntityType = EntityTypeCache.Read( metricValue.Metric.EntityTypeId ?? 0 );
-            Control entityTypeEditControl = phEntityTypeEntityIdValue.FindControl("entityTypeEditControl");
+            Control entityTypeEditControl = phEntityTypeEntityIdValue.FindControl( "entityTypeEditControl" );
             if ( metricEntityType != null && metricEntityType.SingleValueFieldType != null && metricEntityType.SingleValueFieldType.Field is IEntityFieldType )
             {
                 metricValue.EntityId = ( metricEntityType.SingleValueFieldType.Field as IEntityFieldType ).GetEditValueAsEntityId( entityTypeEditControl, new Dictionary<string, ConfigurationValue>() );
@@ -175,6 +175,7 @@ namespace RockWeb.Blocks.Reporting
             var qryParams = new Dictionary<string, string>();
             qryParams.Add( "MetricId", hfMetricId.Value );
             qryParams.Add( "MetricCategoryId", hfMetricCategoryId.Value );
+            qryParams.Add( "ExpandedIds", PageParameter( "ExpandedIds" ) );
             NavigateToParentPage( qryParams );
         }
 
@@ -220,7 +221,7 @@ namespace RockWeb.Blocks.Reporting
             tbYValue.Text = metricValue.YValue.ToString();
             hfMetricId.Value = metricValue.MetricId.ToString();
             tbNote.Text = metricValue.Note;
-            dtpMetricValueDateTime.SelectedDateTime = metricValue.MetricValueDateTime;
+            dpMetricValueDateTime.SelectedDate = metricValue.MetricValueDateTime;
 
             var metricEntityType = EntityTypeCache.Read( metricValue.Metric.EntityTypeId ?? 0 );
 
@@ -249,7 +250,18 @@ namespace RockWeb.Blocks.Reporting
             bool readOnly = false;
 
             nbEditModeMessage.Text = string.Empty;
-            if ( !IsUserAuthorized( Authorization.EDIT ) )
+
+            bool canEdit = UserCanEdit;
+            if ( !canEdit && metricId.HasValue && metricId.Value > 0 )
+            {
+                var metric = new MetricService( new RockContext() ).Get( metricId.Value );
+                if ( metric != null && metric.IsAuthorized( Authorization.EDIT, CurrentPerson ) ) 
+                {
+                    canEdit = true;
+                }
+            }
+
+            if ( !canEdit )
             {
                 readOnly = true;
                 nbEditModeMessage.Text = EditModeMessage.ReadOnlyEditActionNotAllowed( MetricValue.FriendlyTypeName );
@@ -265,7 +277,7 @@ namespace RockWeb.Blocks.Reporting
             tbXValue.ReadOnly = readOnly;
             tbYValue.ReadOnly = readOnly;
             tbNote.ReadOnly = readOnly;
-            dtpMetricValueDateTime.Enabled = !readOnly;
+            dpMetricValueDateTime.Enabled = !readOnly;
             if ( entityTypeEditControl is WebControl )
             {
                 ( entityTypeEditControl as WebControl ).Enabled = !readOnly;

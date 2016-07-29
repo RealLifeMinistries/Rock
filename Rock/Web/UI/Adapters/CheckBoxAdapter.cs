@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -57,7 +57,16 @@ namespace Rock.Web.UI.Adapters
                 bool renderCheckboxLabel = true;
                 if ( renderCheckboxLabel )
                 {
-                    writer.AddAttribute( HtmlTextWriterAttribute.Class, "checkbox" );
+                    var containerCssClass = "checkbox";
+
+                    if ( cb is RockCheckBox )
+                    {
+                        containerCssClass += " " + ( cb as RockCheckBox ).ContainerCssClass;
+                    }
+
+                    writer.AddAttribute( HtmlTextWriterAttribute.Class, containerCssClass );
+                    writer.AddAttribute( HtmlTextWriterAttribute.Style, cb.Style.Value );
+
                     writer.RenderBeginTag( HtmlTextWriterTag.Div );
 
                     if ( cb is RockCheckBox )
@@ -129,10 +138,16 @@ namespace Rock.Web.UI.Adapters
                 {
                     bool renderRockLabel = !string.IsNullOrEmpty( rockCb.Label );
                     bool renderRockHelp = rockCb.HelpBlock != null && !string.IsNullOrWhiteSpace( rockCb.Help );
+                    bool renderRockWarning = rockCb.WarningBlock != null && !string.IsNullOrWhiteSpace( rockCb.Warning );
 
                     if ( !renderRockLabel && renderRockHelp )
                     {
                         rockCb.HelpBlock.RenderControl( writer );
+                    }
+
+                    if ( !renderRockLabel && renderRockWarning )
+                    {
+                        rockCb.WarningBlock.RenderControl( writer );
                     }
                 }
 

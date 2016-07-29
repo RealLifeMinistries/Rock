@@ -5,13 +5,13 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 // <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,6 +51,12 @@ namespace Rock.Model
         public bool CanDelete( Person item, out string errorMessage )
         {
             errorMessage = string.Empty;
+ 
+            if ( new Service<PersonAlias>( Context ).Queryable().Any( a => a.PersonId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", Person.FriendlyTypeName, PersonAlias.FriendlyTypeName );
+                return false;
+            }  
             return true;
         }
     }
@@ -97,6 +103,8 @@ namespace Rock.Model
             target.EmailNote = source.EmailNote;
             target.EmailPreference = source.EmailPreference;
             target.FirstName = source.FirstName;
+            target.ForeignGuid = source.ForeignGuid;
+            target.ForeignKey = source.ForeignKey;
             target.Gender = source.Gender;
             target.GivingGroupId = source.GivingGroupId;
             target.GraduationYear = source.GraduationYear;
@@ -109,6 +117,7 @@ namespace Rock.Model
             target.MiddleName = source.MiddleName;
             target.NickName = source.NickName;
             target.PhotoId = source.PhotoId;
+            target.RecordStatusLastModifiedDateTime = source.RecordStatusLastModifiedDateTime;
             target.RecordStatusReasonValueId = source.RecordStatusReasonValueId;
             target.RecordStatusValueId = source.RecordStatusValueId;
             target.RecordTypeValueId = source.RecordTypeValueId;

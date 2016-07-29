@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -181,6 +181,8 @@ namespace RockWeb.Blocks.Core
 
             if ( Device != null )
             {
+                int deviceId = Device.Id;
+
                 string errorMessage;
                 if ( !DeviceService.CanDelete( Device, out errorMessage ) )
                 {
@@ -190,6 +192,8 @@ namespace RockWeb.Blocks.Core
 
                 DeviceService.Delete( Device );
                 rockContext.SaveChanges();
+
+                Rock.CheckIn.KioskDevice.Flush( deviceId );
             }
 
             BindGrid();
@@ -248,6 +252,7 @@ namespace RockWeb.Blocks.Core
         {
             var deviceService = new DeviceService( new RockContext() );
             var sortProperty = gDevice.SortProperty;
+            gDevice.EntityTypeId = EntityTypeCache.Read<Device>().Id;
 
             var queryable = deviceService.Queryable().Select( a =>
                 new
@@ -309,6 +314,7 @@ namespace RockWeb.Blocks.Core
                 gDevice.DataSource = queryable.OrderBy( d => d.Name ).ToList();
             }
 
+            gDevice.EntityTypeId = EntityTypeCache.Read<Rock.Model.Device>().Id;
             gDevice.DataBind();
         }
 

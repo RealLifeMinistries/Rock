@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -60,12 +60,28 @@ namespace Rock.Jobs
         /// <seealso cref="JobExecutionVetoed(IJobExecutionContext)"/>
         public void JobToBeExecuted( IJobExecutionContext context )
         {
+            StringBuilder message = new StringBuilder();
+
+            // get job type id
+            int jobId = context.JobDetail.Description.AsInteger();
+
+            // load job
+            var rockContext = new RockContext();
+            var jobService = new ServiceJobService( rockContext );
+            var job = jobService.Get( jobId );
+
+            if (job != null && job.Guid != Rock.SystemGuid.ServiceJob.JOB_PULSE.AsGuid())
+            {
+                job.LastStatus = "Running";
+                job.LastStatusMessage = "Started at " + RockDateTime.Now.ToString();
+                rockContext.SaveChanges();
+            }
         }
 
         /// <summary>
         /// Called by the <see cref="IScheduler"/> when a <see cref="IJobDetail"/>
         /// was about to be executed (an associated <see cref="ITrigger"/>
-        /// has occurred), but a <see cref="ITriggerListener"/> vetoed it's
+        /// has occurred), but a <see cref="ITriggerListener"/> vetoed its
         /// execution.
         /// </summary>
         /// <param name="context"></param>
@@ -117,7 +133,10 @@ namespace Rock.Jobs
             {
                 job.LastSuccessfulRunDateTime = job.LastRunDateTime;
                 job.LastStatus = "Success";
-                job.LastStatusMessage = string.Empty;
+                if ( context.Result is string )
+                {
+                    job.LastStatusMessage = context.Result as string;
+                }
 
                 message.Append( "Result: Success" );
 

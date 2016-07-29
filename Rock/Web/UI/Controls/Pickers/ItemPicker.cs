@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,6 +50,23 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the form group class.
+        /// </summary>
+        /// <value>
+        /// The form group class.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        Description( "The CSS class to add to the form-group div." )
+        ]
+        public string FormGroupCssClass
+        {
+            get { return ViewState["FormGroupCssClass"] as string ?? string.Empty; }
+            set { ViewState["FormGroupCssClass"] = value; }
+        }
+
+        /// <summary>
         /// Gets or sets the CSS Icon text.
         /// </summary>
         /// <value>
@@ -91,6 +108,34 @@ namespace Rock.Web.UI.Controls
                 if ( HelpBlock != null )
                 {
                     HelpBlock.Text = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the warning text.
+        /// </summary>
+        /// <value>
+        /// The warning text.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        DefaultValue( "" ),
+        Description( "The warning block." )
+        ]
+        public string Warning
+        {
+            get
+            {
+                return WarningBlock != null ? WarningBlock.Text : string.Empty;
+            }
+
+            set
+            {
+                if ( WarningBlock != null )
+                {
+                    WarningBlock.Text = value;
                 }
             }
         }
@@ -174,6 +219,14 @@ namespace Rock.Web.UI.Controls
         /// The help block.
         /// </value>
         public HelpBlock HelpBlock { get; set; }
+
+        /// <summary>
+        /// Gets or sets the warning block.
+        /// </summary>
+        /// <value>
+        /// The warning block.
+        /// </value>
+        public WarningBlock WarningBlock { get; set; }
 
         /// <summary>
         /// Gets or sets the required field validator.
@@ -308,7 +361,7 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
-        /// Gets or sets the selected value.
+        /// Gets the selected value.
         /// </summary>
         /// <value>
         /// The selected value.  NOTE: If nothing was previously set, it will return <see cref="Rock.Constants.None.IdValue"/>.
@@ -444,6 +497,7 @@ namespace Rock.Web.UI.Controls
         {
             RequiredFieldValidator = new HiddenFieldValidator();
             HelpBlock = new HelpBlock();
+            WarningBlock = new WarningBlock();
         }
 
         #endregion
@@ -491,8 +545,8 @@ namespace Rock.Web.UI.Controls
     expandedIds: [{5}]
 }});
 ";
-            string treeViewScript = string.Format( treeViewScriptFormat, this.ID, this.ResolveUrl( ItemRestUrl ), this.AllowMultiSelect.ToString().ToLower(), this.DefaultText, _hfItemRestUrlExtraParams.ClientID, this.InitialItemParentIds );
-            ScriptManager.RegisterStartupScript( this, this.GetType(), "item_picker-treeviewscript_" + this.ID, treeViewScript, true );
+            string treeViewScript = string.Format( treeViewScriptFormat, this.ClientID, this.ResolveUrl( ItemRestUrl ), this.AllowMultiSelect.ToString().ToLower(), this.DefaultText, _hfItemRestUrlExtraParams.ClientID, this.InitialItemParentIds );
+            ScriptManager.RegisterStartupScript( this, this.GetType(), "item_picker-treeviewscript_" + this.ClientID, treeViewScript, true );
         }
 
         /// <summary>
@@ -586,7 +640,7 @@ namespace Rock.Web.UI.Controls
         {
             if ( this.Enabled )
             {
-                writer.AddAttribute( "id", this.ID.ToString() );
+                writer.AddAttribute( "id", this.ClientID.ToString() );
                 writer.AddAttribute( "class", "picker picker-select rollover-container " + this.CssClass );
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
 
@@ -599,12 +653,12 @@ namespace Rock.Web.UI.Controls
                 {
                     string pickerLabelHtmlFormat = @"
                     <a class='picker-label' href='#'>
-                        <i class='{2}'></i>
+                        <i class='{2} icon-fw'></i>
                         <span id='selectedItemLabel_{0}' class='selected-names'>{1}</span>
                         <b class='fa fa-caret-down pull-right'></b>
                     </a>";
 
-                    writer.Write( pickerLabelHtmlFormat, this.ID, this.ItemName, this.IconCssClass );
+                    writer.Write( pickerLabelHtmlFormat, this.ClientID, this.ItemName, this.IconCssClass );
 
                     writer.WriteLine();
 
@@ -642,13 +696,17 @@ namespace Rock.Web.UI.Controls
                                     </div>
                                 </div>
                             </div>",
-                           this.ID );
+                           this.ClientID );
 
                 // picker actions
                 writer.AddAttribute( "class", "picker-actions" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
                 _btnSelect.RenderControl( writer );
-                writer.Write( "<a class='btn btn-xs btn-link picker-cancel' id='btnCancel_{0}'>Cancel</a>", this.ID );
+                writer.Write( "<a class='btn btn-xs btn-link picker-cancel' id='btnCancel_{0}'>Cancel</a>", this.ClientID );
+
+                // render any additional picker actions that a child class if ItemPicker implements
+                RenderCustomPickerActions( writer );
+                
                 writer.WriteLine();
                 writer.RenderEndTag();
 
@@ -676,7 +734,16 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
-        /// Gets the selected value as int.
+        /// Render any additional picker actions
+        /// </summary>
+        /// <param name="writer">The writer.</param>
+        public virtual void RenderCustomPickerActions( HtmlTextWriter writer )
+        {
+            //
+        }
+
+        /// <summary>
+        /// Gets the selected value as an integer, returning NULL if the selected value is "0"
         /// </summary>
         /// <param name="noneAsNull">if set to <c>true</c> [none as null].</param>
         /// <returns></returns>
@@ -690,7 +757,7 @@ namespace Rock.Web.UI.Controls
                 return null;
             }
 
-            int result = int.Parse( ItemId );
+            int result = ItemId.AsInteger();
             if ( noneAsNull )
             {
                 if ( result == Constants.None.Id )
@@ -714,8 +781,7 @@ namespace Rock.Web.UI.Controls
                 return null;
             }
 
-            int result = int.Parse( ItemId );
-
+            int result = ItemId.AsInteger();
             if ( result == Constants.None.Id )
             {
                 return null;
@@ -762,7 +828,15 @@ namespace Rock.Web.UI.Controls
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void btnSelect_Click( object sender, EventArgs e )
         {
-            SetValueOnSelect();
+            if ( this.AllowMultiSelect )
+            {
+                SetValuesOnSelect();
+            }
+            else
+            {
+                SetValueOnSelect();
+            }
+
             if ( SelectItem != null )
             {
                 SelectItem( sender, e );

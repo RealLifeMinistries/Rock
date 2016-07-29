@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -49,7 +49,7 @@ namespace Rock.Reporting
         /// </value>
         public virtual string Section
         {
-            get { return "Other"; }
+            get { return "Advanced"; }
         }
 
         /// <summary>
@@ -77,20 +77,55 @@ namespace Rock.Reporting
         public abstract string ColumnPropertyName { get; }
 
         /// <summary>
+        /// Comma-delimited list of the Entity properties that should be used for Sorting. Normally, you should leave this as null which will make it sort on the returned field 
+        /// To disable sorting for this field, return string.Empty;
+        /// </summary>
+        /// <value>
+        /// The sort expression.
+        /// </value>
+        public virtual string SortProperties ( string selection )
+        {
+            return null;
+        }
+
+        /// <summary>
+        /// Override this and set to true to have this field sort in the opposite direction
+        /// Normally this should be left as false unless there is a special case where it makes sense have it sort reversed
+        /// </summary>
+        /// <param name="selection">The selection.</param>
+        /// <returns></returns>
+        /// <value></value>
+        public virtual bool SortReversed( string selection )
+        {
+            return false;
+        }
+
+        /// <summary>
         /// Gets the type of the column field.
+        /// Override this property to specify a Type other than the default of System.String
         /// </summary>
         /// <value>
         /// The type of the column field.
         /// </value>
-        public abstract Type ColumnFieldType { get; }
+        public virtual Type ColumnFieldType
+        {
+            get
+            {
+                return typeof( System.String );
+            }
+        }
 
         /// <summary>
         /// Gets the default column header text.
+        /// Override this property to specify a Header that is different from the ColumnPropertyName.
         /// </summary>
         /// <value>
         /// The default column header text.
         /// </value>
-        public abstract string ColumnHeaderText { get; }
+        public virtual string ColumnHeaderText
+        {
+            get { return this.ColumnPropertyName; }
+        }
 
         #endregion
 
@@ -109,12 +144,16 @@ namespace Rock.Reporting
         }
 
         /// <summary>
-        /// Gets the title.
+        /// Gets the title of the DataSelectComponent.
+        /// Override this property to specify a Title that is different from the ColumnPropertyName.
         /// </summary>
         /// <value>
         /// The title.
         /// </value>
-        public abstract string GetTitle( Type entityType );
+        public virtual string GetTitle( Type entityType )
+        {
+            return this.ColumnPropertyName;
+        }
 
         /// <summary>
         /// Creates the child controls.
@@ -280,6 +319,34 @@ namespace Rock.Reporting
         public virtual Expression GetExpression( System.Data.Entity.DbContext context, MemberExpression entityIdProperty, string selection )
         {
             return GetExpression( context as RockContext, entityIdProperty, selection );
+        }
+
+        /// <summary>
+        /// Returns a <see cref="System.String" /> that represents this instance.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="System.String" /> that represents this instance.
+        /// </returns>
+        public override string ToString()
+        {
+            string title = null;
+            try
+            {
+                title = this.GetTitle( null );
+            }
+            catch
+            {
+                //
+            }
+            
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                return title;
+            }
+            else
+            { 
+                return base.ToString();
+            }
         }
 
         #endregion

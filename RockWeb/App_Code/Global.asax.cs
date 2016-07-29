@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Caching;
@@ -44,6 +45,7 @@ using Rock.Model;
 using Rock.Plugin;
 using Rock.Transactions;
 using Rock.Web.Cache;
+using Rock.Web.UI;
 
 namespace RockWeb
 {
@@ -64,11 +66,6 @@ namespace RockWeb
         /// </summary>
         public static bool QueueInUse = false;
 
-        /// <summary>
-        /// The base URL
-        /// </summary>
-        public static string BaseUrl = null;
-
         // cache callback object
         private static CacheItemRemovedCallback OnCacheRemove = null;
 
@@ -88,7 +85,37 @@ namespace RockWeb
         {
             Response.Headers.Remove( "Server" );
             Response.Headers.Remove( "X-AspNet-Version" );
-            Response.AddHeader( "X-Frame-Options", "SAMEORIGIN" );
+
+            bool useFrameDomains = false;
+            string allowedDomains = string.Empty;
+
+            int? siteId = ( Context.Items["Rock:SiteId"] ?? "" ).ToString().AsIntegerOrNull();
+            try
+            {
+                if ( siteId.HasValue )
+                {
+                    var site = SiteCache.Read( siteId.Value );
+                    if ( site != null && ! String.IsNullOrWhiteSpace( site.AllowedFrameDomains ) )
+                    {
+                        useFrameDomains = true;
+                        allowedDomains = site.AllowedFrameDomains;
+                    }
+                }
+            }
+            catch
+            { }
+
+            if ( useFrameDomains )
+            {
+                // string concat is 5x faster than String.Format in this senario
+                Response.AddHeader( "Content-Security-Policy", "frame-ancestors " + allowedDomains );
+            }
+            else
+            {
+                Response.AddHeader( "X-Frame-Options", "SAMEORIGIN" );
+                Response.AddHeader( "Content-Security-Policy", "frame-ancestors 'self'" );
+            }
+            
         }
 
         /// <summary>
@@ -100,9 +127,9 @@ namespace RockWeb
         {
             try
             {
-                LogMessage( APP_LOG_FILENAME, "Application Starting..." );
-
-                DateTime startDateTime = RockDateTime.Now;
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                LogMessage( APP_LOG_FILENAME, "Application Starting..." ); 
+                
                 if ( System.Web.Hosting.HostingEnvironment.IsDevelopmentEnvironment )
                 {
                     System.Diagnostics.Debug.WriteLine( string.Format( "Application_Start: {0}", RockDateTime.Now.ToString( "hh:mm:ss.FFF" ) ) );
@@ -111,43 +138,56 @@ namespace RockWeb
                 // Clear all cache
                 RockMemoryCache.Clear();
 
+                // If not migrating, set up view cache to speed up startup (Not supported when running migrations).
+                var fileInfo = new FileInfo( Server.MapPath( "~/App_Data/Run.Migration" ) );
+                if ( !fileInfo.Exists )
+                {
+                    RockInteractiveViews.SetViewFactory( Server.MapPath( "~/App_Data/RockModelViews.xml" ) );
+                }
+
                 // Get a db context
                 using ( var rockContext = new RockContext() )
                 {
-                    //// Run any needed Rock and/or plugin migrations
-                    //// NOTE: MigrateDatabase must be the first thing that touches the database to help prevent EF from creating empty tables for a new database
-                    MigrateDatabase( rockContext );
-
-                    // Preload the commonly used objects
-                    LoadCacheObjects( rockContext );
-                     
-
-                    // Run any plugin migrations
-                    MigratePlugins( rockContext );
-
                     if ( System.Web.Hosting.HostingEnvironment.IsDevelopmentEnvironment )
                     {
                         try
                         {
+                            // default Initializer is CreateDatabaseIfNotExists, so set it to NULL so that nothing happens if there isn't a database yet
+                            Database.SetInitializer<Rock.Data.RockContext>( null );
                             new AttributeService( rockContext ).Get( 0 );
-                            System.Diagnostics.Debug.WriteLine( string.Format( "ConnectToDatabase - {0} ms", ( RockDateTime.Now - startDateTime ).TotalMilliseconds ) );
-                            startDateTime = RockDateTime.Now;
+                            System.Diagnostics.Debug.WriteLine( string.Format( "ConnectToDatabase {2}/{1} - {0} ms", stopwatch.Elapsed.TotalMilliseconds, rockContext.Database.Connection.Database, rockContext.Database.Connection.DataSource ) );
                         }
                         catch
                         {
                             // Intentionally Blank
                         }
                     }
+                    
+                    //// Run any needed Rock and/or plugin migrations
+                    //// NOTE: MigrateDatabase must be the first thing that touches the database to help prevent EF from creating empty tables for a new database
+                    MigrateDatabase( rockContext );
+                    
+                    // Preload the commonly used objects
+                    stopwatch.Restart();
+                    LoadCacheObjects( rockContext );
+
+                    if ( System.Web.Hosting.HostingEnvironment.IsDevelopmentEnvironment )
+                    {
+                        System.Diagnostics.Debug.WriteLine( string.Format( "LoadCacheObjects - {0} ms", stopwatch.Elapsed.TotalMilliseconds ) );
+                    }
+
+                    // Run any plugin migrations
+                    MigratePlugins( rockContext );
 
                     RegisterRoutes( rockContext, RouteTable.Routes );
 
                     // Configure Rock Rest API
+                    stopwatch.Restart();
                     GlobalConfiguration.Configure( Rock.Rest.WebApiConfig.Register );
-
                     if ( System.Web.Hosting.HostingEnvironment.IsDevelopmentEnvironment )
                     {
-                        System.Diagnostics.Debug.WriteLine( string.Format( "LoadCacheObjects - {0} ms", ( RockDateTime.Now - startDateTime ).TotalMilliseconds ) );
-                        startDateTime = RockDateTime.Now;
+                        System.Diagnostics.Debug.WriteLine( string.Format( "Configure WebApiConfig - {0} ms", stopwatch.Elapsed.TotalMilliseconds ) );
+                        stopwatch.Restart();
                     }
 
                     // setup and launch the jobs infrastructure if running under IIS
@@ -165,19 +205,32 @@ namespace RockWeb
                         ServiceJobService jobService = new ServiceJobService( rockContext );
                         foreach ( ServiceJob job in jobService.GetActiveJobs().ToList() )
                         {
-                            try
+                            const string errorLoadingStatus = "Error Loading Job";
+                            try  
                             {
                                 IJobDetail jobDetail = jobService.BuildQuartzJob( job );
                                 ITrigger jobTrigger = jobService.BuildQuartzTrigger( job );
 
                                 sched.ScheduleJob( jobDetail, jobTrigger );
+
+                                //// if the last status was an error, but we now loaded successful, clear the error
+                                // also, if the last status was 'Running', clear that status because it would have stopped if the app restarted
+                                if ( job.LastStatus == errorLoadingStatus || job.LastStatus == "Running" )
+                                {
+                                    job.LastStatusMessage = string.Empty;
+                                    job.LastStatus = string.Empty;
+                                    rockContext.SaveChanges();
+                                }
                             }
                             catch ( Exception ex )
                             {
+                                // log the error
+                                LogError( ex, null );
+
                                 // create a friendly error message
-                                string message = string.Format( "Error loading the job: {0}.  Ensure that the correct version of the job's assembly ({1}.dll) in the websites App_Code directory. \n\n\n\n{2}", job.Name, job.Assembly, ex.Message );
+                                string message = string.Format( "Error loading the job: {0}.\n\n{2}", job.Name, job.Assembly, ex.Message );
                                 job.LastStatusMessage = message;
-                                job.LastStatus = "Error Loading Job";
+                                job.LastStatus = errorLoadingStatus;
                                 rockContext.SaveChanges();
                             }
                         }
@@ -206,7 +259,7 @@ namespace RockWeb
 
                     // add call back to keep IIS process awake at night and to provide a timer for the queued transactions
                     AddCallBack();
-
+                    
                     Rock.Security.Authorization.Load();
                 }
 
@@ -220,13 +273,32 @@ namespace RockWeb
 
                 SqlServerTypes.Utilities.LoadNativeAssemblies( Server.MapPath( "~" ) );
 
-                LogMessage( APP_LOG_FILENAME, "Application Started Succesfully" );
+                LogMessage( APP_LOG_FILENAME, "Application Started Successfully" );
+                if ( System.Web.Hosting.HostingEnvironment.IsDevelopmentEnvironment )
+                {
+                    System.Diagnostics.Debug.WriteLine( string.Format( "Application_Started_Successfully: {0}", RockDateTime.Now.ToString( "hh:mm:ss.FFF" ) ) );
+                }
             }
             catch (Exception ex)
             {
                 SetError66();
                 throw ( new Exception( "Error occurred during application startup", ex ) );
             }
+
+            // Update attributes for new workflow actions
+            new Thread( () =>
+            {
+                Rock.Workflow.ActionContainer.Instance.UpdateAttributes();
+            } ).Start();
+            
+            // compile less files
+            new Thread( () =>
+            {
+                Thread.CurrentThread.IsBackground = true;
+                RockTheme.CompileAll();
+                
+            } ).Start();
+            
         }
 
         /// <summary>
@@ -279,15 +351,8 @@ namespace RockWeb
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         protected void Application_BeginRequest( object sender, EventArgs e )
         {
-            if ( string.IsNullOrWhiteSpace( Global.BaseUrl ) )
-            {
-                if ( Context.Request.Url != null )
-                {
-                    Global.BaseUrl = string.Format( "{0}://{1}/", Context.Request.Url.Scheme, Context.Request.Url.Authority );
-                }
-            }
-
             Context.Items.Add( "Request_Start_Time", RockDateTime.Now );
+            Context.Items.Add( "Cache_Hits", new Dictionary<string, bool>() );
         }
 
         /// <summary>
@@ -314,7 +379,47 @@ namespace RockWeb
                 {
                     var ex = context.Server.GetLastError();
 
-                    SendNotification( ex );
+                    try
+                    {
+                        HttpException httpEx = ex as HttpException;
+                        if ( httpEx != null )
+                        {
+                            int statusCode = httpEx.GetHttpCode();
+                            if ( ( statusCode == 404 ) && !GlobalAttributesCache.Read().GetValue( "Log404AsException" ).AsBoolean())
+                            {
+                                context.ClearError();
+                                context.Response.StatusCode = 404;
+                                return;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        //
+                    }
+
+                    while (ex is HttpUnhandledException && ex.InnerException != null )
+                    {
+                        ex = ex.InnerException;
+                    }
+
+                    // Check for EF error
+                    if ( ex is System.Data.Entity.Core.EntityCommandExecutionException )
+                    {
+                        try
+                        {
+                            throw new Exception( "An error occurred in Entity Framework when attempting to connect to your database. This could be caused by a missing 'MultipleActiveResultSets=true' parameter in your connection string settings.", ex );
+                        }
+                        catch ( Exception newEx )
+                        {
+                            ex = newEx;
+                        }
+                    }
+
+                    if ( !(ex is HttpRequestValidationException ) )
+                    {
+                        SendNotification( ex );
+                    }
 
                     object siteId = context.Items["Rock:SiteId"];
                     if ( context.Session != null )
@@ -400,37 +505,27 @@ namespace RockWeb
         {
             bool result = false;
 
+            // default Initializer is CreateDatabaseIfNotExists, so set it to NULL so it doesn't try to do anything special
+            Database.SetInitializer<Rock.Data.RockContext>( null );
+
             var fileInfo = new FileInfo( Server.MapPath( "~/App_Data/Run.Migration" ) );
             if ( fileInfo.Exists )
             {
-                Database.SetInitializer( new MigrateDatabaseToLatestVersion<Rock.Data.RockContext, Rock.Migrations.Configuration>() );
-
-                // explictly check if the database exists, and force create it if doesn't exist
-                if ( !rockContext.Database.Exists() )
+                // get the pendingmigrations sorted by name (in the order that they run), then run to the latest migration
+                var migrator = new System.Data.Entity.Migrations.DbMigrator( new Rock.Migrations.Configuration() );
+                var pendingMigrations = migrator.GetPendingMigrations().OrderBy(a => a);
+                if ( pendingMigrations.Any() )
                 {
-                    // If database did not exist, initialize a database (which runs existing Rock migrations)
-                    rockContext.Database.Initialize( true );
+                    LogMessage( APP_LOG_FILENAME, "Migrating Database..." );
+                    
+                    var lastMigration = pendingMigrations.Last();
+                    
+                    // NOTE: we need to specify the last migration vs null so it won't detect/complain about pending changes
+                    migrator.Update( lastMigration );
                     result = true;
-                }
-                else
-                {
-                    // If database does exist, run any pending Rock migrations
-                    var migrator = new System.Data.Entity.Migrations.DbMigrator( new Rock.Migrations.Configuration() );
-                    if ( migrator.GetPendingMigrations().Any() )
-                    {
-                        LogMessage( APP_LOG_FILENAME, "Migrating Database..." );
-
-                        migrator.Update();
-                        result = true;
-                    }
                 }
 
                 fileInfo.Delete();
-            }
-            else
-            {
-                // default Initializer is CreateDatabaseIfNotExists, but we don't want that to happen if automigrate is false, so set it to NULL so that nothing happens
-                Database.SetInitializer<Rock.Data.RockContext>( null );
             }
 
             return result;
@@ -479,6 +574,12 @@ namespace RockWeb
                             if ( !assemblies.ContainsKey( assemblyName ) )
                             {
                                 assemblies.Add( assemblyName, new Dictionary<int, Type>() );
+                            }
+
+                            // Check to make sure no another migration has same number
+                            if ( assemblies[assemblyName].ContainsKey( migrationNumberAttr.Number ) )
+                            {
+                                throw new Exception( string.Format( "The '{0}' plugin assembly contains duplicate migration numbers ({1}).", assemblyName, migrationNumberAttr.Number ) );
                             }
                             assemblies[assemblyName].Add( migrationNumberAttr.Number, migrationType );
                         }
@@ -596,6 +697,10 @@ namespace RockWeb
 
             PageRouteService pageRouteService = new PageRouteService( rockContext );
 
+            //Add ingore rule for asp.net ScriptManager files. 
+            routes.Ignore("{resource}.axd/{*pathInfo}");
+
+
             // find each page that has defined a custom routes.
             foreach ( PageRoute pageRoute in pageRouteService.Queryable() )
             {
@@ -616,17 +721,22 @@ namespace RockWeb
         private void LoadCacheObjects( RockContext rockContext )
         {
             // Cache all the entity types
-            foreach ( var entityType in new Rock.Model.EntityTypeService( rockContext ).Queryable() )
+            foreach ( var entityType in new Rock.Model.EntityTypeService( rockContext ).Queryable().AsNoTracking() )
             {
                 EntityTypeCache.Read( entityType );
             }
 
             // Cache all the Field Types
+            foreach ( var fieldType in new Rock.Model.FieldTypeService( rockContext ).Queryable().AsNoTracking() )
+            {
+                Rock.Web.Cache.FieldTypeCache.Read( fieldType );
+            }
+
             var all = Rock.Web.Cache.FieldTypeCache.All();
 
             // Read all the qualifiers first so that EF doesn't perform a query for each attribute when it's cached
             var qualifiers = new Dictionary<int, Dictionary<string, string>>();
-            foreach ( var attributeQualifier in new Rock.Model.AttributeQualifierService( rockContext ).Queryable() )
+            foreach ( var attributeQualifier in new Rock.Model.AttributeQualifierService( rockContext ).Queryable().AsNoTracking() )
             {
                 try
                 {
@@ -643,8 +753,16 @@ namespace RockWeb
                 }
             }
 
-            // Cache all the attributes.
-            foreach ( var attribute in new Rock.Model.AttributeService( rockContext ).Queryable( "Categories" ).ToList() )
+            // Cache all the attributes, except for user preferences
+            
+            var attributeQuery = new Rock.Model.AttributeService( rockContext ).Queryable( "Categories" );
+            int? personUserValueEntityTypeId = Rock.Web.Cache.EntityTypeCache.GetId( Person.USER_VALUE_ENTITY );
+            if (personUserValueEntityTypeId.HasValue)
+            {
+                attributeQuery = attributeQuery.Where(a => !a.EntityTypeId.HasValue || a.EntityTypeId.Value != personUserValueEntityTypeId);
+            }
+
+            foreach ( var attribute in attributeQuery.AsNoTracking().ToList() )
             {
                 if ( qualifiers.ContainsKey( attribute.Id ) )
                     Rock.Web.Cache.AttributeCache.Read( attribute, qualifiers[attribute.Id] );
@@ -652,6 +770,11 @@ namespace RockWeb
                     Rock.Web.Cache.AttributeCache.Read( attribute, new Dictionary<string, string>() );
             }
 
+            // cache all the Country Defined Values since those can be loaded in just a few millisecond here, but take around 1-2 seconds if first loaded when formatting an address
+            foreach ( var definedValue in new Rock.Model.DefinedValueService( rockContext ).GetByDefinedTypeGuid( Rock.SystemGuid.DefinedType.LOCATION_COUNTRIES.AsGuid() ).AsNoTracking() )
+            {
+                DefinedValueCache.Read( definedValue, rockContext );
+            }
         }
 
 
@@ -684,12 +807,14 @@ namespace RockWeb
             int? pageId = ( Context.Items["Rock:PageId"] ?? "" ).ToString().AsIntegerOrNull(); ;
             int? siteId = ( Context.Items["Rock:SiteId"] ?? "" ).ToString().AsIntegerOrNull();;
             PersonAlias personAlias = null;
+            Person person = null;
 
             try
             {
                 var user = UserLoginService.GetCurrentUser();
                 if ( user != null && user.Person != null )
                 {
+                    person = user.Person;
                     personAlias = user.Person.PrimaryAlias;
                 }
             }
@@ -703,64 +828,121 @@ namespace RockWeb
 
             try
             {
-                string siteName = "Rock";
-                if ( siteId.HasValue )
-                {
-                    var site = SiteCache.Read( siteId.Value );
-                    if ( site != null )
-                    {
-                        siteName = site.Name;
-                    }
-                }
+                bool sendNotification = true;
 
-                // setup merge codes for email
-                var mergeObjects = GlobalAttributesCache.GetMergeFields( null );
-                mergeObjects.Add( "ExceptionDetails", "An error occurred on the " + siteName + " site on page: <br>" + Context.Request.Url.OriginalString + "<p>" + FormatException( ex, "" ) );
-
-                // get email addresses to send to
                 var globalAttributesCache = GlobalAttributesCache.Read();
-                string emailAddressesList = globalAttributesCache.GetValue( "EmailExceptionsList" );
 
-                if ( !string.IsNullOrWhiteSpace( emailAddressesList ) )
+                string filterSettings = globalAttributesCache.GetValue( "EmailExceptionsFilter" );
+                if ( !string.IsNullOrWhiteSpace( filterSettings ) )
                 {
-                    string[] emailAddresses = emailAddressesList.Split( new[] { ',' }, StringSplitOptions.RemoveEmptyEntries );
+                    // Get the current request's list of server variables
+                    var serverVarList = Context.Request.ServerVariables;
 
-                    var recipients = new List<RecipientData>();
-                    foreach ( string emailAddress in emailAddresses )
+                    string[] nameValues = filterSettings.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries );
+                    foreach ( string nameValue in nameValues )
                     {
-                        recipients.Add( new RecipientData( emailAddress, mergeObjects ) );
-                    }
-
-                    if ( recipients.Any() )
-                    {
-                        bool sendNotification = true;
-
-                        string filterSettings = globalAttributesCache.GetValue( "EmailExceptionsFilter" );
-                        var serverVarList = Context.Request.ServerVariables;
-
-                        if ( !string.IsNullOrWhiteSpace( filterSettings ) && serverVarList.Count > 0 )
+                        string[] nameAndValue = nameValue.Split( new char[] { '^' }, StringSplitOptions.RemoveEmptyEntries );
                         {
-                            string[] nameValues = filterSettings.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries );
-                            foreach ( string nameValue in nameValues )
+                            if ( nameAndValue.Length == 2 )
                             {
-                                string[] nameAndValue = nameValue.Split( new char[] { '^' }, StringSplitOptions.RemoveEmptyEntries );
+                                switch ( nameAndValue[0].ToLower() )
                                 {
-                                    if ( nameAndValue.Length == 2 )
-                                    {
-                                        var serverValue = serverVarList[nameAndValue[0]];
-                                        if ( serverValue != null && serverValue.ToUpper().Contains( nameAndValue[1].ToUpper().Trim() ) )
+                                    case "type":
                                         {
-                                            sendNotification = false;
+                                            if ( ex.GetType().Name.ToLower().Contains( nameAndValue[1].ToLower() ) )
+                                            {
+                                                sendNotification = false;
+                                            }
                                             break;
                                         }
-                                    }
+                                    case "source":
+                                        {
+                                            if ( ex.Source.ToLower().Contains( nameAndValue[1].ToLower() ) )
+                                            {
+                                                sendNotification = false;
+                                            }
+                                            break;
+                                        }
+                                    case "message":
+                                        {
+                                            if ( ex.Message.ToLower().Contains( nameAndValue[1].ToLower() ) )
+                                            {
+                                                sendNotification = false;
+                                            }
+                                            break;
+                                        }
+                                    case "stacktrace":
+                                        {
+                                            if ( ex.StackTrace.ToLower().Contains( nameAndValue[1].ToLower() ) )
+                                            {
+                                                sendNotification = false;
+                                            }
+                                            break;
+                                        }
+                                    default:
+                                        {
+                                            var serverValue = serverVarList[nameAndValue[0]];
+                                            if ( serverValue != null && serverValue.ToUpper().Contains( nameAndValue[1].ToUpper().Trim() ) )
+                                            {
+                                                sendNotification = false;
+                                            }
+                                            break;
+                                        }
                                 }
                             }
                         }
 
-                        if ( sendNotification )
+                        if ( !sendNotification )
                         {
-                            Email.Send( Rock.SystemGuid.SystemEmail.CONFIG_EXCEPTION_NOTIFICATION.AsGuid(), recipients );
+                            break;
+                        }
+                    }
+                }
+
+                if ( sendNotification )
+                {
+                    // get email addresses to send to
+                    string emailAddressesList = globalAttributesCache.GetValue( "EmailExceptionsList" );
+                    if ( !string.IsNullOrWhiteSpace( emailAddressesList ) )
+                    {
+                        string[] emailAddresses = emailAddressesList.Split( new[] { ',' }, StringSplitOptions.RemoveEmptyEntries );
+                        if ( emailAddresses.Length > 0 )
+                        {
+                            string siteName = "Rock";
+                            if ( siteId.HasValue )
+                            {
+                                var site = SiteCache.Read( siteId.Value );
+                                if ( site != null )
+                                {
+                                    siteName = site.Name;
+                                }
+                            }
+
+                            // setup merge codes for email
+                            var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( null );
+                            mergeFields.Add( "ExceptionDetails", string.Format( "An error occurred{0} on the {1} site on page: <br>{2}<p>{3}</p>",
+                                person != null ? " for " + person.FullName : "", siteName, Context.Request.Url.OriginalString, FormatException( ex, "" ) ) );
+
+                            try
+                            {
+                                mergeFields.Add( "Exception", Hash.FromAnonymousObject( ex ) );
+                            }
+                            catch
+                            {
+                                // ignore
+                            }
+
+                            mergeFields.Add( "Person", person );
+                            var recipients = new List<RecipientData>();
+                            foreach ( string emailAddress in emailAddresses )
+                            {
+                                recipients.Add( new RecipientData( emailAddress, mergeFields ) );
+                            }
+
+                            if ( recipients.Any() )
+                            {
+                                Email.Send( Rock.SystemGuid.SystemEmail.CONFIG_EXCEPTION_NOTIFICATION.AsGuid(), recipients, string.Empty, string.Empty, false );
+                            }
                         }
                     }
                 }
@@ -778,8 +960,8 @@ namespace RockWeb
             string message = string.Empty;
 
             message += "<h2>" + exLevel + ex.GetType().Name + " in " + ex.Source + "</h2>";
-            message += "<p style=\"font-size: 10px; overflow: hidden;\"><strong>Message</strong><br>" + ex.Message + "</div>";
-            message += "<p style=\"font-size: 10px; overflow: hidden;\"><strong>Stack Trace</strong><br>" + ex.StackTrace.ConvertCrLfToHtmlBr() + "</p>";
+            message += "<p style=\"font-size: 10px; overflow: hidden;\"><strong>Message</strong><br>" + HttpUtility.HtmlEncode( ex.Message ) + "</div>";
+            message += "<p style=\"font-size: 10px; overflow: hidden;\"><strong>Stack Trace</strong><br>" + HttpUtility.HtmlEncode( ex.StackTrace ).ConvertCrLfToHtmlBr() + "</p>";
 
             // check for inner exception
             if ( ex.InnerException != null )
@@ -792,6 +974,8 @@ namespace RockWeb
         } 
 
         #region Static Methods
+
+
 
         /// <summary>
         /// Adds the call back.
@@ -924,12 +1108,25 @@ namespace RockWeb
                     // add cache item again
                     AddCallBack();
 
-                    // call a page on the site to keep IIS alive 
-                    if ( !string.IsNullOrWhiteSpace( Global.BaseUrl ) )
+                    var keepAliveUrl = GlobalAttributesCache.Value( "KeepAliveUrl" );
+                    if ( string.IsNullOrWhiteSpace( keepAliveUrl ) )
                     {
-                        string url = Global.BaseUrl + "KeepAlive.aspx";
-                        WebRequest request = WebRequest.Create( url );
-                        WebResponse response = request.GetResponse();
+                        keepAliveUrl = GlobalAttributesCache.Value( "InternalApplicationRoot" ) ?? string.Empty;
+                        keepAliveUrl = keepAliveUrl.EnsureTrailingForwardslash() + "KeepAlive.aspx";
+                    }
+
+                    // call a page on the site to keep IIS alive 
+                    if ( !string.IsNullOrWhiteSpace( keepAliveUrl ) )
+                    {
+                        try
+                        {
+                            WebRequest request = WebRequest.Create( keepAliveUrl );
+                            WebResponse response = request.GetResponse();
+                        }
+                        catch ( Exception ex )
+                        {
+                            LogError( new Exception( "Error doing KeepAlive request.", ex ), null );
+                        }
                     }
                 }
                 else

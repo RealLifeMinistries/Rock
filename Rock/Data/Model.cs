@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,7 @@ using System.Runtime.Serialization;
 using Rock.Attribute;
 using Rock.Model;
 using Rock.Security;
+using Rock.Web.Cache;
 
 namespace Rock.Data
 {
@@ -47,6 +48,7 @@ namespace Rock.Data
         /// </value>
         [DataMember]
         [IncludeForReporting]
+        [RockClientInclude( "Leave this as NULL to let Rock set this" )]
         public DateTime? CreatedDateTime { get; set; }
 
         /// <summary>
@@ -57,6 +59,7 @@ namespace Rock.Data
         /// </value>
         [DataMember]
         [IncludeForReporting]
+        [RockClientInclude( "This does not need to be set or changed. Rock will always set this to the current date/time when saved to the database." )]
         public DateTime? ModifiedDateTime { get; set; }
 
         /// <summary>
@@ -66,6 +69,7 @@ namespace Rock.Data
         /// The created by person alias identifier.
         /// </value>
         [DataMember]
+        [RockClientInclude( "Leave this as NULL to let Rock set this" )]
         public int? CreatedByPersonAliasId { get; set; }
 
         /// <summary>
@@ -75,6 +79,7 @@ namespace Rock.Data
         /// The modified by person alias identifier.
         /// </value>
         [DataMember]
+        [RockClientInclude( "If you need to set this manually, set ModifiedAuditValuesAlreadyUpdated=True to prevent Rock from setting it" )]
         public int? ModifiedByPersonAliasId { get; set; }
 
         #endregion
@@ -171,6 +176,29 @@ namespace Rock.Data
                 return string.Empty;
             }
         }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the ModifiedByPersonAliasId value has already been
+        /// updated to reflect who/when model was updated. If this value is false (default) the framework will update
+        /// the value with the current user when the model is saved. Set this value to true if this automatic
+        /// update should not be done.
+        /// </summary>
+        /// <value>
+        /// <c>false</c> if rock should set the ModifiedByPersonAliasId to current user when saving model; otherwise, <c>true</c>.
+        /// </value>
+        [NotMapped]
+        [DataMember]
+        [RockClientInclude("If the ModifiedByPersonAliasId is being set manually and should not be overwritten with current user when saved, set this value to true")]
+        public virtual bool ModifiedAuditValuesAlreadyUpdated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a field that can be used for custom sorting.
+        /// </summary>
+        /// <value>
+        /// The sort value.
+        /// </value>
+        [NotMapped]
+        public virtual object CustomSortValue { get; set; }
 
         #endregion
 
@@ -321,6 +349,17 @@ namespace Rock.Data
         }
 
         /// <summary>
+        /// Allows the security role.
+        /// </summary>
+        /// <param name="action">The action.</param>
+        /// <param name="group">The group.</param>
+        /// <param name="rockContext">The rock context.</param>
+        public virtual void AllowSecurityRole( string action, Group group, RockContext rockContext = null )
+        {
+            Security.Authorization.AllowSecurityRole( this, action, group, rockContext );
+        }
+
+        /// <summary>
         /// Gets the <see cref="System.Object"/> with the specified key.
         /// </summary>
         /// <remarks>
@@ -343,6 +382,8 @@ namespace Rock.Data
                 object item = base[key];
                 if ( item == null )
                 {
+                    var lavaSupportLevel = GlobalAttributesCache.Read().LavaSupportLevel; 
+                    
                     if (this.Attributes == null)
                     {
                         this.LoadAttributes();
@@ -358,6 +399,12 @@ namespace Rock.Data
                     // deprecated ( in v4.0 ), and only the new method of using the Attribute filter is 
                     // suported (e.g. {{ Person | Attribute:'BaptismDate' }} ), the remainder of this method 
                     // can be removed
+
+                    if ( lavaSupportLevel == Lava.LavaSupportLevel.NoLegacy )
+                    {
+                        return null;
+                    }
+                    
 
                     if ( this.Attributes != null )
                     {
@@ -381,13 +428,18 @@ namespace Rock.Data
                             var attribute = this.Attributes[attributeKey];
                             if ( attribute.IsAuthorized( Authorization.VIEW, null ) )
                             {
-                                var field = attribute.FieldType.Field;
-                                string value = GetAttributeValue( attribute.Key );
+                                if ( lavaSupportLevel == Lava.LavaSupportLevel.LegacyWithWarning )
+                                {
+                                    Rock.Model.ExceptionLogService.LogException( new Rock.Lava.LegacyLavaSyntaxDetectedException( this.GetType().GetFriendlyTypeName(), attributeKey ), System.Web.HttpContext.Current );
+                                }
 
                                 if ( unformatted )
                                 {
-                                    return value;
+                                    return GetAttributeValueAsType( attribute.Key );
                                 }
+
+                                var field = attribute.FieldType.Field;
+                                string value = GetAttributeValue( attribute.Key );
 
                                 if ( url && field is Rock.Field.ILinkableFieldType )
                                 {
@@ -473,7 +525,7 @@ namespace Rock.Data
         [NotMapped]
         [DataMember]
         [LavaIgnore]
-        public virtual Dictionary<string, Rock.Web.Cache.AttributeCache> Attributes { get; set; }
+        public virtual Dictionary<string, AttributeCache> Attributes { get; set; }
 
         /// <summary>
         /// Dictionary of all attributes and their value.  Key is the attribute key, and value is the associated attribute value
@@ -484,7 +536,7 @@ namespace Rock.Data
         [NotMapped]
         [DataMember]
         [LavaIgnore]
-        public virtual Dictionary<string, Rock.Model.AttributeValue> AttributeValues { get; set; }
+        public virtual Dictionary<string, AttributeValueCache> AttributeValues { get; set; }
 
         /// <summary>
         /// Gets the attribute value defaults.
@@ -514,6 +566,28 @@ namespace Rock.Data
                 this.Attributes.ContainsKey( key ) )
             {
                 return this.Attributes[key].DefaultValue;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the type of the attribute value as.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        public object GetAttributeValueAsType( string key )
+        {
+            if ( this.AttributeValues != null &&
+                this.AttributeValues.ContainsKey( key ) )
+            {
+                return this.AttributeValues[key].ValueAsType;
+            }
+
+            if ( this.Attributes != null &&
+                this.Attributes.ContainsKey( key ) )
+            {
+                return this.Attributes[key].DefaultValueAsType;
             }
 
             return null;

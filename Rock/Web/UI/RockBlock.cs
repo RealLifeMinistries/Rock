@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -471,8 +471,32 @@ namespace Rock.Web.UI
         /// <param name="e">The <see cref="T:System.EventArgs" /> object that contains the event data.</param>
         protected override void OnLoad( EventArgs e )
         {
+            try
+            {
+                if ( this.PageParameter( "ShowDebugTimings" ).AsBoolean() )
+                {
+                    TimeSpan tsDuration = RockDateTime.Now.Subtract( (DateTime)Context.Items["Request_Start_Time"] );
+                    var lblShowDebugTimings = this.Page.Form.Controls.OfType<Label>().Where( a => a.ID == "lblShowDebugTimings" ).FirstOrDefault();
+                    if ( lblShowDebugTimings != null )
+                    {
+                        lblShowDebugTimings.Text += string.Format( "<pre>Start OnLoad {0} @ {1}</pre>", this.BlockName, tsDuration.TotalMilliseconds );
+                    }
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+            
             base.OnLoad( e );
-            SetValidationGroup( this.Controls, BlockValidationGroup );
+
+            if ( this.BlockCache == null ||
+                this.BlockCache.Page == null || 
+                this.BlockCache.Page.Layout == null || 
+                this.BlockCache.Page.Layout.FileName != "Dialog" )
+            {
+                SetValidationGroup( this.Controls, BlockValidationGroup );
+            }
         }
 
         #endregion
@@ -640,6 +664,16 @@ namespace Rock.Web.UI
         }
 
         /// <summary>
+        /// If this Attribute is a reference to a PageRoute, this will return the Route, otherwise it will return the normal URL
+        /// </summary>
+        /// <param name="attributeKey">The attribute key.</param>
+        /// <returns></returns>
+        public string LinkedPageRoute( string attributeKey  )
+        {
+            return new PageReference( GetAttributeValue( attributeKey ) ).Route;
+        }
+
+        /// <summary>
         /// Navigate to a linked <see cref="Rock.Model.Page"/>.
         /// </summary>
         /// <param name="attributeKey">A <see cref="System.String"/> representing the name of the linked <see cref="Rock.Model.Page"/> attribute key.</param>
@@ -681,6 +715,22 @@ namespace Rock.Web.UI
             }
 
             return NavigateToLinkedPage( attributeKey, queryParams );
+        }
+
+        /// <summary>
+        /// Navigates to current page.
+        /// </summary>
+        /// <param name="queryString">The query string.</param>
+        /// <returns></returns>
+        public bool NavigateToCurrentPage( Dictionary<string, string> queryString = null )
+        {
+            var pageCache = PageCache.Read( RockPage.PageId );
+            if ( pageCache != null )
+            {
+                return NavigateToPage( pageCache.Guid, queryString );
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -764,6 +814,72 @@ namespace Rock.Web.UI
 
             return false;
         }
+
+        /// <summary>
+        /// Creates an HTML img element for a given binary file id
+        /// </summary>
+        /// <param name="imageId">The image identifier.</param>
+        /// <param name="maxWidth">The maximum width.</param>
+        /// <param name="maxHeight">The maximum height.</param>
+        /// <param name="showPlaceholderImage">if set to <c>true</c> [show placeholder image].</param>
+        /// <param name="isThumbnail">if set to <c>true</c> [is thumbnail].</param>
+        /// <returns></returns>
+        public string GetImageTag( int? imageId, int? maxWidth = null, int? maxHeight = null, bool showPlaceholderImage = true, bool isThumbnail = false )
+        {
+            var photoUrl = new StringBuilder();
+
+            photoUrl.Append( System.Web.VirtualPathUtility.ToAbsolute( "~/" ) );
+
+            if ( imageId.HasValue )
+            {
+                photoUrl.AppendFormat( "GetImage.ashx?id={0}", imageId );
+
+                if ( maxWidth.HasValue )
+                {
+                    photoUrl.AppendFormat( "&maxwidth={0}", maxWidth.Value );
+                }
+                if ( maxHeight.HasValue )
+                {
+                    photoUrl.AppendFormat( "&maxheight={0}", maxHeight.Value );
+                }
+
+                if ( isThumbnail )
+                {
+                    return string.Format( "<img class='img-thumbnail' src='{0}'/>", photoUrl.ToString() );
+                }
+                else
+                {
+                    return string.Format( "<img src='{0}'/>", photoUrl.ToString() );
+                }
+            }
+
+            if ( showPlaceholderImage )
+            {
+                photoUrl.Append( "Assets/Images/no-picture.svg?" );
+
+                string styleString = string.Empty;
+
+                if ( maxWidth.HasValue || maxHeight.HasValue )
+                {
+                    styleString = string.Format( " style='{0}{1}'",
+                        maxWidth.HasValue ? "max-width:" + maxWidth.Value.ToString() + "px; " : "",
+                        maxHeight.HasValue ? "max-height:" + maxHeight.Value.ToString() + "px;" : "" );
+                }
+
+                if ( isThumbnail )
+                {
+                    return string.Format( "<img class='img-thumbnail' src='{0}'{1}/>", photoUrl.ToString(), styleString );
+                }
+                else
+                {
+                    return string.Format( "<img src='{0}'{1}/>", photoUrl.ToString(), styleString );
+                }
+                
+            }
+
+            return string.Empty;
+        }
+
 
         /// <summary>
         /// Sets the visibility of the secondary blocks on the page
@@ -861,6 +977,15 @@ namespace Rock.Web.UI
             }
         }
 
+        /// <summary>
+        /// Gets the ip address.
+        /// </summary>
+        /// <returns></returns>
+        public string GetClientIpAddress()
+        {
+            return RockPage.GetClientIpAddress();
+        }
+
         #region User Preferences
 
         /// <summary>
@@ -889,14 +1014,83 @@ namespace Rock.Web.UI
         }
 
         /// <summary>
-        /// Sets a user preference for the current user with the specified key and value.
+        /// Sets a user preference for the current user with the specified key and value, and optionally save value to database
         /// </summary>
-        /// <param name="key">A <see cref="System.String"/> that represents the key value that identifies the 
+        /// <param name="key">A <see cref="System.String" /> that represents the key value that identifies the
         /// user preference.</param>
-        /// <param name="value">A <see cref="System.String"/> that represents the value of the user preference.</param>
-        public void SetUserPreference( string key, string value )
+        /// <param name="value">A <see cref="System.String" /> that represents the value of the user preference.</param>
+        /// <param name="saveValue">if set to <c>true</c> [save value].</param>
+        public void SetUserPreference( string key, string value, bool saveValue = true )
         {
-            RockPage.SetUserPreference( key, value );
+            RockPage.SetUserPreference( key, value, saveValue );
+        }
+
+        /// <summary>
+        /// Saves the user preferences.
+        /// </summary>
+        /// <param name="keyPrefix">The key prefix.</param>
+        public void SaveUserPreferences( string keyPrefix )
+        {
+            RockPage.SaveUserPreferences( keyPrefix );
+        }
+
+        /// <summary>
+        /// Deletes a user preference value for the specified key
+        /// </summary>
+        /// <param name="key">A <see cref="System.String"/> representing the name of the key.</param>
+        public void DeleteUserPreference( string key )
+        {
+            RockPage.DeleteUserPreference( key );
+        }
+
+        #endregion
+
+        #region User Preferences for a specific block
+
+        /// <summary>
+        /// Gets the prefix for a user preference key that includes the block id so that it specific to the this block
+        /// </summary>
+        /// <value>
+        /// The block user preference prefix.
+        /// </value>
+        private string BlockUserPreferencePrefix
+        {
+            get
+            {
+                return string.Format( "block-{0}-", this.BlockId );
+            }
+        }
+
+        /// <summary>
+        /// Returns the user preference value for the current user and block for a given key
+        /// </summary>
+        /// <param name="key">A <see cref="System.String" /> representing the key to the user preference.</param>
+        /// <returns>A <see cref="System.String" /> representing the user preference value. If a match for the key is not found, 
+        /// an empty string will be returned.</returns>
+        public string GetBlockUserPreference( string key )
+        {
+            return RockPage.GetUserPreference( BlockUserPreferencePrefix + key );
+        }
+
+        /// <summary>
+        /// Sets a user preference for the current user and block with the specified key and value, and optionally save value to database
+        /// </summary>
+        /// <param name="key">A <see cref="System.String" /> that represents the key value that identifies the
+        /// user preference.</param>
+        /// <param name="value">A <see cref="System.String" /> that represents the value of the user preference.</param>
+        /// <param name="saveValue">if set to <c>true</c> [save value].</param>
+        public void SetBlockUserPreference( string key, string value, bool saveValue = true )
+        {
+            RockPage.SetUserPreference( BlockUserPreferencePrefix + key, value, saveValue );
+        }
+
+        /// <summary>
+        /// Deletes a user preference value for the current user and block with the specified key
+        /// </summary>
+        /// <param name="key">A <see cref="System.String"/> representing the name of the key.</param>
+        public void DeleteBlockUserPreference( string key )
+        {
+            RockPage.DeleteUserPreference( BlockUserPreferencePrefix + key );
         }
 
         #endregion
@@ -1015,14 +1209,10 @@ namespace Rock.Web.UI
         /// <summary>
         /// Creates and or updates any <see cref="Rock.Model.Block"/> <see cref="Rock.Model.Attribute">Attributes</see>.
         /// </summary>
-        internal void CreateAttributes( RockContext rockContext )
+        internal bool CreateAttributes( RockContext rockContext )
         {
             int? blockEntityTypeId = EntityTypeCache.Read( typeof( Block ) ).Id;
-
-            if ( Rock.Attribute.Helper.UpdateAttributes( this.GetType(), blockEntityTypeId, "BlockTypeId", this.BlockCache.BlockTypeId.ToString(), rockContext ) )
-            {
-                this.BlockCache.ReloadAttributeValues();
-            }
+            return Rock.Attribute.Helper.UpdateAttributes( this.GetType(), blockEntityTypeId, "BlockTypeId", this.BlockCache.BlockTypeId.ToString(), rockContext );
         }
 
         /// <summary>

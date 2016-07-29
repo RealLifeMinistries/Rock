@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,7 +50,7 @@ namespace RockWeb.Blocks.Groups
     [DefinedValueField( Rock.SystemGuid.DefinedType.MAP_STYLES, "Map Style", "The map theme that should be used for styling the map.", true, false, Rock.SystemGuid.DefinedValue.MAP_STYLE_GOOGLE, "", 3 )]
     [IntegerField( "Map Height", "Height of the map in pixels (default value is 600px)", false, 600, "", 4 )]
     [TextField( "Polygon Colors", "Comma-Delimited list of colors to use when displaying multiple polygons (e.g. #f37833,#446f7a,#afd074,#649dac,#f8eba2,#92d0df,#eaf7fc).", true, "#f37833,#446f7a,#afd074,#649dac,#f8eba2,#92d0df,#eaf7fc", "", 5 )]
-    [CodeEditorField( "Info Window Contents", "Liquid template for the info window. To suppress the window provide a blank template.", CodeEditorMode.Liquid, CodeEditorTheme.Rock, 600, false, @"
+    [CodeEditorField( "Info Window Contents", "Liquid template for the info window. To suppress the window provide a blank template.", CodeEditorMode.Lava, CodeEditorTheme.Rock, 600, false, @"
 <div style='width:250px'>
 
     <div class='clearfix'>
@@ -141,6 +141,22 @@ namespace RockWeb.Blocks.Groups
 
             if ( !Page.IsPostBack )
             {
+                // only list GroupTypes that could have a location (and have ShowInNavigation and ShowInGrouplist)
+                gtpGroupType.GroupTypes = new GroupTypeService( new RockContext() ).Queryable().Where( 
+                    a => a.ShowInNavigation 
+                        && a.ShowInGroupList 
+                        && a.LocationSelectionMode != GroupLocationPickerMode.None).OrderBy( a => a.Name ).ToList();
+
+                var selectedGroupTypeIds = this.GetBlockUserPreference( "GroupTypeIds" );
+                if ( !string.IsNullOrWhiteSpace( selectedGroupTypeIds ) )
+                {
+                    var selectedGroupTypeIdList = selectedGroupTypeIds.Split( ',' ).AsIntegerList();
+                    gtpGroupType.SelectedGroupTypeIds = selectedGroupTypeIdList;
+                }
+
+                var showChildGroups = this.GetBlockUserPreference( "ShowChildGroups" ).AsBoolean();
+                cbShowAllGroups.Checked = showChildGroups;
+                
                 var statuses = DefinedTypeCache.Read( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS.AsGuid() ).DefinedValues
                     .OrderBy( v => v.Order )
                     .ThenBy( v => v.Value )
@@ -267,7 +283,7 @@ namespace RockWeb.Blocks.Groups
 
         var mapStyle = {1};
 
-        var pinShadow = new google.maps.MarkerImage('//chart.apis.google.com/chart?chst=d_map_pin_shadow',
+        var pinShadow = new google.maps.MarkerImage('//chart.googleapis.com/chart?chst=d_map_pin_shadow',
             new google.maps.Size(40, 37),
             new google.maps.Point(0, 0),
             new google.maps.Point(12, 35));
@@ -296,6 +312,14 @@ namespace RockWeb.Blocks.Groups
             map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
             map.setTilt(45);
 
+            var getChildMapInfoUrl =  Rock.settings.get('baseUrl') + 'api/Groups/GetMapInfo/{0}/Children';
+            if ('{10}' != '') {{
+                getChildMapInfoUrl += '?includeDescendants={10}';
+                if ('{11}' != '') {{
+                    getChildMapInfoUrl += '&groupTypeIds={11}';
+                }}  
+            }}
+
             // Query for group, child group, and group member locations asyncronously
             $.when (
 
@@ -316,7 +340,7 @@ namespace RockWeb.Blocks.Groups
                 }}),
 
                 // Get Child Groups
-                $.get( Rock.settings.get('baseUrl') + 'api/Groups/GetMapInfo/{0}/Children', function( mapItems ) {{
+                $.get(getChildMapInfoUrl, function( mapItems ) {{
                     $.each(mapItems, function (i, mapItem) {{
                         var items = addMapItem(i, mapItem, '{4}');
                         for (var i = 0; i < items.length; i++) {{
@@ -388,7 +412,7 @@ namespace RockWeb.Blocks.Groups
                     color = 'FE7569'
                 }}
 
-                var pinImage = new google.maps.MarkerImage('http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|' + color,
+                var pinImage = new google.maps.MarkerImage('//chart.googleapis.com/chart?chst=d_map_pin_letter&chld=%E2%80%A2|' + color,
                     new google.maps.Size(21, 34),
                     new google.maps.Point(0,0),
                     new google.maps.Point(10, 34));
@@ -563,13 +587,35 @@ namespace RockWeb.Blocks.Groups
 </script>";
 
             string mapScript = string.Format( mapScriptFormat,
-                groupId.Value, styleCode, polygonColors, _groupColor, _childGroupColor, _memberColor, infoWindowJson,
-                latitude, longitude, zoom);
+                    groupId.Value, // {0}
+                    styleCode, // {1}
+                    polygonColors, // {2}
+                    _groupColor, // {3}
+                    _childGroupColor, // {4}
+                    _memberColor, // {5}
+                    infoWindowJson, // {6}
+                    latitude, // {7}
+                    longitude, // {8}
+                    zoom, // {9}
+                    cbShowAllGroups.Checked.ToTrueFalse(), // {10}
+                    gtpGroupType.SelectedGroupTypeIds.AsDelimited(",") // {11}
+                );
 
             ScriptManager.RegisterStartupScript( pnlMap, pnlMap.GetType(), "group-map-script", mapScript, false );
-
         }
 
+        /// <summary>
+        /// Handles the Click event of the btnApplyOptions control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void btnApplyOptions_Click( object sender, EventArgs e )
+        {
+            this.SetBlockUserPreference( "GroupTypeIds", gtpGroupType.SelectedGroupTypeIds.AsDelimited( "," ) );
+            this.SetBlockUserPreference( "ShowChildGroups", cbShowAllGroups.Checked.ToTrueFalse() );
+
+            Map();
+        }
 
         #endregion
     }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -65,15 +65,6 @@ namespace Rock.Model
         public int? EntityId { get; set; }
 
         /// <summary>
-        /// Gets or sets the Id of the SourceType <see cref="Rock.Model.DefinedValue"/>. This shows how/where the note was created.
-        /// </summary>
-        /// <value>
-        /// A <see cref="System.Int32"/> representing the Source Type <see cref="Rock.Model.DefinedValue"/>.
-        /// </value>
-        [DataMember]
-        public int? SourceTypeValueId { get; set; }
-
-        /// <summary>
         /// Gets or sets the caption
         /// </summary>
         /// <value>
@@ -91,6 +82,15 @@ namespace Rock.Model
         /// </value>
         [DataMember]
         public bool? IsAlert { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether this note is viewable to only the person that created the note
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is private note; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool IsPrivateNote { get; set; }
 
         /// <summary>
         /// Gets or sets the text/body of the note.
@@ -115,15 +115,6 @@ namespace Rock.Model
         public virtual NoteType NoteType { get; set; }
 
         /// <summary>
-        /// Gets or sets the source of the note.
-        /// </summary>
-        /// <value>
-        /// A <see cref="Rock.Model.DefinedValue"/> representing the source of the note.
-        /// </value>
-        [DataMember]
-        public virtual DefinedValue SourceType { get; set; }
-
-        /// <summary>
         /// Gets the parent security authority of this Note. Where security is inherited from.
         /// </summary>
         /// <value>
@@ -133,8 +124,48 @@ namespace Rock.Model
         {
             get
             {
-                return this.NoteType;
+                return this.NoteType != null ? this.NoteType : base.ParentAuthority;
             }
+        }
+
+        /// <summary>
+        /// Determines whether the specified action is authorized.
+        /// </summary>
+        /// <param name="action">The action.</param>
+        /// <param name="person">The person.</param>
+        /// <returns></returns>
+        public override bool IsAuthorized( string action, Person person )
+        {
+            if ( CreatedByPersonAlias != null && person != null &&
+                CreatedByPersonAlias.PersonId == person.Id )
+            {
+                return true;
+            }
+
+            if ( IsPrivateNote )
+            {
+                return false;
+            }
+
+            return base.IsAuthorized( action, person );
+        }
+
+        /// <summary>
+        /// Determines whether the specified action is private.
+        /// </summary>
+        /// <param name="action">The action.</param>
+        /// <param name="person">The person.</param>
+        /// <returns></returns>
+        public override bool IsPrivate( string action, Person person )
+        {
+            if ( CreatedByPersonAlias != null && person != null &&
+                CreatedByPersonAlias.PersonId == person.Id &&
+                IsPrivateNote )
+            {
+                return true;
+            }
+
+            return base.IsPrivate( action, person );
         }
 
         #endregion
@@ -169,7 +200,6 @@ namespace Rock.Model
         public NoteConfiguration()
         {
             this.HasRequired( p => p.NoteType ).WithMany().HasForeignKey( p => p.NoteTypeId ).WillCascadeOnDelete( true );
-            this.HasOptional( p => p.SourceType ).WithMany().HasForeignKey( p => p.SourceTypeValueId ).WillCascadeOnDelete( false );
         }
     }
 

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -60,7 +60,7 @@ namespace RockWeb.Blocks.Crm
             gPersonBadge.Actions.ShowAdd = canAddEditDelete;
             gPersonBadge.IsDeleteEnabled = canAddEditDelete;
 
-            SecurityField securityField = gPersonBadge.Columns[3] as SecurityField;
+            SecurityField securityField = gPersonBadge.Columns[4] as SecurityField;
             securityField.EntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.PersonBadge ) ).Id;
         }
 
@@ -111,21 +111,21 @@ namespace RockWeb.Blocks.Crm
         protected void gPersonBadge_Delete( object sender, RowEventArgs e )
         {
             var rockContext = new RockContext();
-            PersonBadgeService PersonBadgeService = new PersonBadgeService( rockContext );
-            PersonBadge PersonBadge = PersonBadgeService.Get( e.RowKeyId );
+            PersonBadgeService personBadgeService = new PersonBadgeService( rockContext );
+            PersonBadge personBadge = personBadgeService.Get( e.RowKeyId );
 
-            if ( PersonBadge != null )
+            if ( personBadge != null )
             {
                 string errorMessage;
-                if ( !PersonBadgeService.CanDelete( PersonBadge, out errorMessage ) )
+                if ( !personBadgeService.CanDelete( personBadge, out errorMessage ) )
                 {
                     mdGridWarning.Show( errorMessage, ModalAlertType.Information );
                     return;
                 }
 
-                PersonBadgeCache.Flush( PersonBadge.Id );
+                PersonBadgeCache.Flush( personBadge.Id );
 
-                PersonBadgeService.Delete( PersonBadge );
+                personBadgeService.Delete( personBadge );
                 rockContext.SaveChanges();
             }
 
@@ -136,9 +136,14 @@ namespace RockWeb.Blocks.Crm
         {
             var rockContext = new RockContext();
             var service = new PersonBadgeService( rockContext );
-            var badges = service.Queryable().OrderBy( b => b.Order );
-            service.Reorder( badges.ToList(), e.OldIndex, e.NewIndex );
+            var personBadges = service.Queryable().OrderBy( b => b.Order );
+            service.Reorder( personBadges.ToList(), e.OldIndex, e.NewIndex );
             rockContext.SaveChanges();
+
+            foreach ( var personBadge in personBadges )
+            {
+                PersonBadgeCache.Flush( personBadge.Id );
+            }
 
             BindGrid();
 
@@ -164,7 +169,7 @@ namespace RockWeb.Blocks.Crm
         private void BindGrid()
         {
             gPersonBadge.DataSource = new PersonBadgeService( new RockContext() )
-                .Queryable().OrderBy( b => b.Order ).ToList();
+                .Queryable( "EntityType").OrderBy( b => b.Order ).ToList();
             gPersonBadge.DataBind();
         }
 

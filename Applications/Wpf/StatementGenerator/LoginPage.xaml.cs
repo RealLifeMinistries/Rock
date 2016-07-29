@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,6 +54,7 @@ namespace Rock.Apps.StatementGenerator
         /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void btnLogin_Click( object sender, RoutedEventArgs e )
         {
+            lblLoginWarning.Visibility = Visibility.Hidden;
             txtUsername.Text = txtUsername.Text.Trim();
             txtRockUrl.Text = txtRockUrl.Text.Trim();
             Uri rockUrl = new Uri( txtRockUrl.Text );
@@ -67,6 +68,13 @@ namespace Rock.Apps.StatementGenerator
 
             string userName = txtUsername.Text;
             string password = txtPassword.Password;
+
+            if ( string.IsNullOrWhiteSpace( userName ) )
+            {
+                lblLoginWarning.Content = "Username cannot be blank";
+                lblLoginWarning.Visibility = Visibility.Visible;
+                return;
+            }
 
             // start a background thread to Login since this could take a little while and we want a Wait cursor
             BackgroundWorker bw = new BackgroundWorker();
@@ -214,6 +222,17 @@ namespace Rock.Apps.StatementGenerator
             {
                 btnLogin_Click( null, null );
             }
+        }
+
+        /// <summary>
+        /// (EasterEgg) Handles the MouseDoubleClick event of the LoginLabel control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="MouseButtonEventArgs"/> instance containing the event data.</param>
+        private void LoginLabel_MouseDoubleClick( object sender, MouseButtonEventArgs e )
+        {
+            lblRockUrl.Visibility = Visibility.Visible;
+            txtRockUrl.Visibility = Visibility.Visible;
         }
     }
 }

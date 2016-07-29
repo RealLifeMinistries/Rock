@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,10 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
+using System.Web.Http.OData;
+using Rock;
 using Rock.Data;
+using Rock.Financial;
 using Rock.Model;
 using Rock.Rest.Filters;
 using Rock.Security;
@@ -29,7 +32,7 @@ using Rock.Security;
 namespace Rock.Rest.Controllers
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     public partial class FinancialTransactionsController
     {
@@ -45,15 +48,41 @@ namespace Rock.Rest.Controllers
         public HttpResponseMessage PostScanned( [FromBody]FinancialTransactionScannedCheck financialTransactionScannedCheck )
         {
             FinancialTransaction financialTransaction = financialTransactionScannedCheck.FinancialTransaction;
-            financialTransaction.CheckMicrEncrypted = Encryption.EncryptString( financialTransactionScannedCheck.ScannedCheckMicr );
-            financialTransaction.CheckMicrHash = Encryption.GetSHA1Hash( financialTransactionScannedCheck.ScannedCheckMicr );
+            financialTransaction.CheckMicrEncrypted = Encryption.EncryptString( financialTransactionScannedCheck.ScannedCheckMicrData );
+
+            // note: BadMicr scans don't get checked for duplicates, but just in case, make sure that CheckMicrHash isn't set if this has a bad MICR read
+            if ( financialTransaction.MICRStatus != MICRStatus.Fail )
+            {
+                financialTransaction.CheckMicrHash = Encryption.GetSHA1Hash( financialTransactionScannedCheck.ScannedCheckMicrData );
+            }
+
+            financialTransaction.CheckMicrParts = Encryption.EncryptString( financialTransactionScannedCheck.ScannedCheckMicrParts );
             return this.Post( financialTransaction );
         }
 
         /// <summary>
-        /// Returns true if a transaction with the same routing number, accountnumber and checknumber is already in the database
+        /// Posts the specified value.
         /// </summary>
-        /// <param name="scannedCheckMicr">The scanned check micr in the format {RoutingNumber}_{AccountNumber}_{CheckNumber}</param>
+        /// <param name="value">The value.</param>
+        /// <returns></returns>
+        public override HttpResponseMessage Post( FinancialTransaction value )
+        {
+            if ( !value.FinancialPaymentDetailId.HasValue )
+            {
+                //// manually enforce that FinancialPaymentDetailId has a value so that Pre-V4 check
+                //// scanners (that don't know about the new FinancialPaymentDetailId) can't post
+                return ControllerContext.Request.CreateErrorResponse(
+                    HttpStatusCode.BadRequest,
+                    "FinancialPaymentDetailId cannot be null" );
+            }
+
+            return base.Post( value );
+        }
+
+        /// <summary>
+        /// Returns true if a transaction with the same MICR track data is already in the database
+        /// </summary>
+        /// <param name="scannedCheckMicr">The scanned check micr track data</param>
         /// <returns></returns>
         [HttpPost]
         [System.Web.Http.Route( "api/FinancialTransactions/AlreadyScanned" )]
@@ -74,7 +103,7 @@ namespace Rock.Rest.Controllers
         [Authenticate, Secured]
         [HttpPost]
         [System.Web.Http.Route( "api/FinancialTransactions/GetContributionPersonGroupAddress" )]
-        public DataSet GetContributionPersonGroupAddress( [FromBody]Rock.Net.RestParameters.ContributionStatementOptions options )
+        public DataSet GetContributionPersonGroupAddress( [FromBody]ContributionStatementOptions options )
         {
             Dictionary<string, object> parameters = new Dictionary<string, object>();
             parameters.Add( "startDate", options.StartDate );
@@ -119,7 +148,40 @@ namespace Rock.Rest.Controllers
 
             if ( result.Tables.Count > 0 )
             {
-                result.Tables[0].TableName = "contribution_person_group_address";
+                var dataTable = result.Tables[0];
+                dataTable.TableName = "contribution_person_group_address";
+
+                if ( options.DataViewId.HasValue )
+                {
+                    var dataView = new DataViewService( new RockContext() ).Get( options.DataViewId.Value );
+                    if ( dataView != null )
+                    {
+                        List<string> errorMessages = new List<string>();
+                        var personList = dataView.GetQuery( null, null, out errorMessages ).OfType<Rock.Model.Person>().Select( a => new { a.Id, a.GivingGroupId } ).ToList();
+                        HashSet<int> personIds = new HashSet<int>( personList.Select( a => a.Id ) );
+                        HashSet<int> groupsIds = new HashSet<int>( personList.Where( a => a.GivingGroupId.HasValue ).Select( a => a.GivingGroupId.Value ).Distinct() );
+
+                        foreach ( var row in dataTable.Rows.OfType<DataRow>().ToList() )
+                        {
+                            var personId = row["PersonId"];
+                            var groupId = row["GroupId"];
+                            if ( personId != null && personId is int )
+                            {
+                                if ( !personIds.Contains( ( int ) personId ) )
+                                {
+                                    dataTable.Rows.Remove( row );
+                                }
+                            }
+                            else if ( groupId != null && groupId is int )
+                            {
+                                if ( !groupsIds.Contains( ( int ) groupId ) )
+                                {
+                                    dataTable.Rows.Remove( row );
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             return result;
@@ -134,7 +196,7 @@ namespace Rock.Rest.Controllers
         [Authenticate, Secured]
         [HttpPost]
         [System.Web.Http.Route( "api/FinancialTransactions/GetContributionTransactions/{groupId}" )]
-        public DataSet GetContributionTransactions( int groupId, [FromBody]Rock.Net.RestParameters.ContributionStatementOptions options )
+        public DataSet GetContributionTransactions( int groupId, [FromBody]ContributionStatementOptions options )
         {
             return GetContributionTransactions( groupId, null, options );
         }
@@ -150,11 +212,21 @@ namespace Rock.Rest.Controllers
         [Authenticate, Secured]
         [HttpPost]
         [System.Web.Http.Route( "api/FinancialTransactions/GetContributionTransactions/{groupId}/{personId}" )]
-        public DataSet GetContributionTransactions( int groupId, int? personId, [FromBody]Rock.Net.RestParameters.ContributionStatementOptions options )
+        public DataSet GetContributionTransactions( int groupId, int? personId, [FromBody]ContributionStatementOptions options )
         {
-            var qry = Get()
-                .Where( a => a.TransactionDateTime >= options.StartDate )
-                .Where( a => a.TransactionDateTime < ( options.EndDate ?? DateTime.MaxValue ) );
+            var qry = Get().Where( a => a.TransactionDateTime >= options.StartDate );
+
+            if ( options.EndDate.HasValue )
+            {
+                qry = qry.Where( a => a.TransactionDateTime < options.EndDate.Value );
+            }
+
+            var transactionTypeContribution = Rock.Web.Cache.DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.TRANSACTION_TYPE_CONTRIBUTION.AsGuid() );
+            if ( transactionTypeContribution != null )
+            {
+                int transactionTypeContributionId = transactionTypeContribution.Id;
+                qry = qry.Where( a => a.TransactionTypeValueId == transactionTypeContributionId );
+            }
 
             if ( personId.HasValue )
             {
@@ -164,7 +236,7 @@ namespace Rock.Rest.Controllers
             else
             {
                 // get transactions for all the persons in the specified group that have specified that group as their GivingGroup
-                GroupMemberService groupMemberService = new GroupMemberService( (RockContext)Service.Context );
+                GroupMemberService groupMemberService = new GroupMemberService( ( RockContext ) Service.Context );
                 var personIdList = groupMemberService.GetByGroupId( groupId ).Where( a => a.Person.GivingGroupId == groupId ).Select( s => s.PersonId ).ToList();
 
                 qry = qry.Where( a => personIdList.Contains( a.AuthorizedPersonAlias.PersonId ) );
@@ -172,19 +244,19 @@ namespace Rock.Rest.Controllers
 
             if ( options.AccountIds != null )
             {
-                qry = qry.Where( a => options.AccountIds.Contains( a.TransactionDetails.FirstOrDefault().AccountId ) );
+                qry = qry.Where( a => a.TransactionDetails.Any( x => options.AccountIds.Contains( x.AccountId ) ) );
             }
 
             var selectQry = qry.Select( a => new
             {
                 a.TransactionDateTime,
-                CurrencyTypeValueName = a.CurrencyTypeValue.Value,
+                CurrencyTypeValueName = a.FinancialPaymentDetail != null ? a.FinancialPaymentDetail.CurrencyTypeValue.Value : string.Empty,
                 a.Summary,
                 Details = a.TransactionDetails.Select( d => new
                 {
                     d.AccountId,
                     AccountName = d.Account.Name,
-                    a.Summary,
+                    d.Summary,
                     d.Amount
                 } ).OrderBy( x => x.AccountName ),
             } ).OrderBy( a => a.TransactionDateTime );
@@ -206,7 +278,15 @@ namespace Rock.Rest.Controllers
                 detailTable.Columns.Add( "AccountName" );
                 detailTable.Columns.Add( "Summary" );
                 detailTable.Columns.Add( "Amount", typeof( decimal ) );
-                foreach ( var detail in fieldItems.Details )
+                var transactionDetails = fieldItems.Details.ToList();
+
+                // remove any Accounts that were not included (in case there was a mix of included and not included accounts in the transaction)
+                if ( options.AccountIds != null )
+                {
+                    transactionDetails = transactionDetails.Where( a => options.AccountIds.Contains( a.AccountId ) ).ToList();
+                }
+
+                foreach ( var detail in transactionDetails )
                 {
                     var detailArray = new object[] {
                         detail.AccountId,
@@ -222,7 +302,7 @@ namespace Rock.Rest.Controllers
                     fieldItems.TransactionDateTime,
                     fieldItems.CurrencyTypeValueName,
                     fieldItems.Summary,
-                    fieldItems.Details.Sum(a => a.Amount),
+                    transactionDetails.Sum(a => a.Amount),
                     detailTable
                 };
 
@@ -235,6 +315,122 @@ namespace Rock.Rest.Controllers
             dataSet.Tables.Add( dataTable );
 
             return dataSet;
+        }
+
+        //[HttpGet]
+        //[System.Web.Http.Route( "api/FinancialTransactions/ChargeStep3/{GatewayId}/{TokenId}" )]
+        //public FinancialTransaction ChargeStep3( int gatewayId, string tokenId )
+        //{
+        //    SetProxyCreation( true );
+        //    var rockContext = (RockContext)Service.Context;
+        //    var financialGateway = new FinancialGatewayService( rockContext ).Get( gatewayId );
+        //    if ( financialGateway == null )
+        //    {
+        //        throw new HttpResponseException( Request.CreateErrorResponse( HttpStatusCode.NotFound, "Gateway does not exist!" ) );
+        //    }
+
+        //    var gateway = financialGateway.GetGatewayComponent();
+        //    if ( gateway == null )
+        //    {
+        //        throw new HttpResponseException( Request.CreateErrorResponse( HttpStatusCode.NotFound, "Gateway component could not be loaded!" ) );
+        //    }
+
+        //    var paymentInfo = new PaymentInfo();
+        //    paymentInfo.AdditionalParameters.Add( "token-id", tokenId );
+
+        //    string errorMessage = string.Empty;
+
+        //    var transaction = gateway.ChargeStep3( financialGateway, paymentInfo, out errorMessage );
+        //    if ( transaction == null || !string.IsNullOrWhiteSpace( errorMessage ) )
+        //    {
+        //        throw new HttpResponseException( Request.CreateErrorResponse( HttpStatusCode.BadRequest, errorMessage ) );
+        //    }
+
+        //    return transaction;
+        //}
+
+        /// <summary>
+        /// Gets transactions by people with the supplied givingId.
+        /// </summary>
+        /// <param name="givingId">The giving ID.</param>
+        /// <returns></returns>
+        /// <exception cref="System.Web.Http.HttpResponseException"></exception>
+        [Authenticate, Secured]
+        [HttpGet]
+        [EnableQuery]
+        [System.Web.Http.Route( "api/FinancialTransactions/GetByGivingId/{givingId}" )]
+        public IQueryable<FinancialTransaction> GetByGivingId( string givingId )
+        {
+            if ( string.IsNullOrWhiteSpace( givingId ) || !( givingId.StartsWith( "P" ) || givingId.StartsWith( "G" ) ) )
+            {
+                var response = new HttpResponseMessage( HttpStatusCode.BadRequest );
+                response.Content = new StringContent( "The supplied givingId is not valid" );
+                throw new HttpResponseException( response );
+            }
+
+            return Get().Where( t => t.AuthorizedPersonAlias.Person.GivingId == givingId );
+        }
+
+        /// <summary>
+        ///
+        /// </summary>
+        public class ContributionStatementOptions
+        {
+            /// <summary>
+            /// Gets or sets the start date.
+            /// </summary>
+            /// <value>
+            /// The start date.
+            /// </value>
+            public DateTime StartDate { get; set; }
+
+            /// <summary>
+            /// Gets or sets the end date.
+            /// </summary>
+            /// <value>
+            /// The end date.
+            /// </value>
+            public DateTime? EndDate { get; set; }
+
+            /// <summary>
+            /// Gets or sets the account ids.
+            /// </summary>
+            /// <value>
+            /// The account ids.
+            /// </value>
+            public List<int> AccountIds { get; set; }
+
+            /// <summary>
+            /// Gets or sets the person id.
+            /// </summary>
+            /// <value>
+            /// The person id.
+            /// </value>
+            public int? PersonId { get; set; }
+
+            /// <summary>
+            /// Gets or sets the Person DataViewId to filter the statements to
+            /// </summary>
+            /// <value>
+            /// The data view identifier.
+            /// </value>
+            public int? DataViewId { get; set; }
+
+            /// <summary>
+            /// Gets or sets a value indicating whether [include individuals with no address].
+            /// </summary>
+            /// <value>
+            /// <c>true</c> if [include individuals with no address]; otherwise, <c>false</c>.
+            /// </value>
+            public bool IncludeIndividualsWithNoAddress { get; set; }
+
+            /// <summary>
+            /// Gets or sets a value indicating whether [order by postal code].
+            /// </summary>
+            /// <value>
+            ///   <c>true</c> if [order by postal code]; otherwise, <c>false</c>.
+            /// </value>
+            public bool OrderByPostalCode { get; set; }
         }
     }
 }

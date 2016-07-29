@@ -5,13 +5,13 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 // <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,9 +27,9 @@ using System.Collections.Generic;
 namespace Rock.Client
 {
     /// <summary>
-    /// Simple Client Model for AttendanceCode
+    /// Base client model for AttendanceCode that only includes the non-virtual fields. Use this for PUT/POSTs
     /// </summary>
-    public partial class AttendanceCode
+    public partial class AttendanceCodeEntity
     {
         /// <summary />
         public int Id { get; set; }
@@ -38,13 +38,41 @@ namespace Rock.Client
         public string Code { get; set; }
 
         /// <summary />
+        public Guid? ForeignGuid { get; set; }
+
+        /// <summary />
+        public string ForeignKey { get; set; }
+
+        /// <summary />
         public DateTime IssueDateTime { get; set; }
 
         /// <summary />
         public Guid Guid { get; set; }
 
         /// <summary />
-        public string ForeignId { get; set; }
+        public int? ForeignId { get; set; }
 
+        /// <summary>
+        /// Copies the base properties from a source AttendanceCode object
+        /// </summary>
+        /// <param name="source">The source.</param>
+        public void CopyPropertiesFrom( AttendanceCode source )
+        {
+            this.Id = source.Id;
+            this.Code = source.Code;
+            this.ForeignGuid = source.ForeignGuid;
+            this.ForeignKey = source.ForeignKey;
+            this.IssueDateTime = source.IssueDateTime;
+            this.Guid = source.Guid;
+            this.ForeignId = source.ForeignId;
+
+        }
+    }
+
+    /// <summary>
+    /// Client model for AttendanceCode that includes all the fields that are available for GETs. Use this for GETs (use AttendanceCodeEntity for POST/PUTs)
+    /// </summary>
+    public partial class AttendanceCode : AttendanceCodeEntity
+    {
     }
 }

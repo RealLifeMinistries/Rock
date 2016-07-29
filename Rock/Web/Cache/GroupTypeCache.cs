@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -238,6 +238,15 @@ namespace Rock.Web.Cache
         public bool? EnableLocationSchedules { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether [enable alternate placements].
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if [enable alternate placements]; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool EnableAlternatePlacements { get; set; }
+
+        /// <summary>
         /// Gets or sets the group type purpose value identifier.
         /// </summary>
         /// <value>
@@ -381,6 +390,7 @@ namespace Rock.Web.Cache
                     {
                         locationTypeValues.Add( DefinedValueCache.Read( id ) );
                     }
+
                     return locationTypeValues;
                 }
 
@@ -489,10 +499,9 @@ namespace Rock.Web.Cache
         private static GroupTypeCache LoadById2( int id, RockContext rockContext )
         {
             var groupTypeService = new GroupTypeService( rockContext );
-            var groupTypeModel = groupTypeService.Get( id );
+            var groupTypeModel = groupTypeService.Queryable().Include(a => a.Roles).FirstOrDefault(a => a.Id == id );
             if ( groupTypeModel != null )
             {
-                groupTypeModel.LoadAttributes( rockContext );
                 return new GroupTypeCache( groupTypeModel );
             }
 
@@ -616,6 +625,7 @@ namespace Rock.Web.Cache
         /// The unique identifier.
         /// </value>
         public Guid Guid { get; set; }
+        
         /// <summary>
         /// Gets or sets the name.
         /// </summary>
@@ -687,6 +697,17 @@ namespace Rock.Web.Cache
             IsLeader = role.IsLeader;
             CanView = role.CanView;
             CanEdit = role.CanEdit;
+        }
+
+        /// <summary>
+        /// Returns a <see cref="System.String" /> that represents this instance.
+        /// </summary>
+        /// <returns>
+        /// A <see cref="System.String" /> that represents this instance.
+        /// </returns>
+        public override string ToString()
+        {
+            return this.Name;
         }
     }
 }

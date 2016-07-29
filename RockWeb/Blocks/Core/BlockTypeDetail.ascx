@@ -13,7 +13,6 @@
                 <asp:ValidationSummary ID="valSummaryTop" runat="server" HeaderText="Please Correct the Following" CssClass="alert alert-danger" />
                 <Rock:NotificationBox ID="nbWarningMessage" runat="server" NotificationBoxType="Warning" />
 
-
                 <fieldset>
                     <Rock:NotificationBox ID="nbEditModeMessage" runat="server" NotificationBoxType="Info" />
 
@@ -21,13 +20,14 @@
                     <Rock:DataTextBox ID="tbDescription" runat="server" SourceTypeName="Rock.Model.BlockType, Rock" PropertyName="Description" TextMode="MultiLine" Rows="4" />
                     <Rock:DataTextBox ID="tbPath" runat="server" SourceTypeName="Rock.Model.BlockType, Rock" PropertyName="Path" CssClass="input-xlarge" />
                     <Rock:RockLiteral ID="lblStatus" runat="server" Label="Status" />
-                    <Rock:RockBulletedList ID="lstPages" runat="server" Label="Pages that use this block type"/>
+                    <Rock:RockLiteral ID="lPages" runat="server" Label="Pages that use this block type" />
                 </fieldset>
 
                 <div class="actions">
                     <asp:LinkButton ID="btnSave" runat="server" AccessKey="s" Text="Save" CssClass="btn btn-primary" OnClick="btnSave_Click" />
                     <asp:LinkButton ID="btnCancel" runat="server" AccessKey="c" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="btnCancel_Click" />
                 </div>
+
             </div>
 
         </asp:Panel>

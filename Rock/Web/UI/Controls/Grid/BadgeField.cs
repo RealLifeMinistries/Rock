@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,17 +36,11 @@ namespace Rock.Web.UI.Controls
         /// <value>
         /// The minimum value to be considered Important.
         /// </value>
+        [Obsolete( "Use DangerMin instead." )]
         public int ImportantMin
         {
-            get
-            {
-                int? i = ViewState["ImportantMin"] as int?;
-                return ( i == null ) ? int.MaxValue : i.Value;
-            }
-            set
-            {
-                ViewState["ImportantMin"] = value;
-            }
+            get { return DangerMin; }
+            set { DangerMin = value; }
         }
 
         /// <summary>
@@ -55,16 +49,48 @@ namespace Rock.Web.UI.Controls
         /// <value>
         /// The maximum value to be considered Important.
         /// </value>
+        [Obsolete( "Use DangerMax instead." )]
         public int ImportantMax
+        {
+            get { return DangerMax; }
+            set { DangerMax = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the danger minimum value rule.
+        /// </summary>
+        /// <value>
+        /// The minimum value to be considered Danger.
+        /// </value>
+        public int DangerMin
         {
             get
             {
-                int? i = ViewState["ImportantMax"] as int?;
+                int? i = ViewState["DangerMin"] as int?;
                 return ( i == null ) ? int.MaxValue : i.Value;
             }
             set
             {
-                ViewState["ImportantMax"] = value;
+                ViewState["DangerMin"] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the danger max.
+        /// </summary>
+        /// <value>
+        /// The maximum value to be considered Danger.
+        /// </value>
+        public int DangerMax
+        {
+            get
+            {
+                int? i = ViewState["DangerMax"] as int?;
+                return ( i == null ) ? int.MaxValue : i.Value;
+            }
+            set
+            {
+                ViewState["DangerMax"] = value;
             }
         }
 
@@ -183,6 +209,44 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the Hide minimum value rule.
+        /// </summary>
+        /// <value>
+        /// The minimum value to be considered Hide.
+        /// </value>
+        public int HideMin
+        {
+            get
+            {
+                int? i = ViewState["HideMin"] as int?;
+                return ( i == null ) ? int.MaxValue : i.Value;
+            }
+            set
+            {
+                ViewState["HideMin"] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the Hide maximum value rule.
+        /// </summary>
+        /// <value>
+        /// The maximum value to be considered Hide.
+        /// </value>
+        public int HideMax
+        {
+            get
+            {
+                int? i = ViewState["HideMax"] as int?;
+                return ( i == null ) ? int.MaxValue : i.Value;
+            }
+            set
+            {
+                ViewState["HideMax"] = value;
+            }
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="BadgeField" /> class.
         /// </summary>
         public BadgeField()
@@ -211,6 +275,11 @@ namespace Rock.Web.UI.Controls
                 SetBadgeType( this, eventArg );
             }
 
+            if ( eventArg.BadgeType == "Hide" )
+            {
+                return string.Empty;
+            }
+
             string css = "badge";
             if( !string.IsNullOrWhiteSpace( eventArg.BadgeType ) )
             {
@@ -229,9 +298,10 @@ namespace Rock.Web.UI.Controls
 
             int count = (int)e.FieldValue;
 
-            if ( ImportantMin <= count && count <= ImportantMax )
+            // Remove ImportantMin and ImportanMax once after deprecation period.
+            if ( DangerMin <= count && count <= DangerMax ) 
             {
-                e.BadgeType = "Important";
+                e.BadgeType = "Danger";
             }
             else if ( WarningMin <= count && count <= WarningMax )
             {
@@ -244,6 +314,10 @@ namespace Rock.Web.UI.Controls
             else if ( InfoMin <= count && count <= InfoMax )
             {
                 e.BadgeType = "Info";
+            }
+            else if ( HideMin <= count && count <= HideMax )
+            {
+                e.BadgeType = "Hide";
             }
         }
         

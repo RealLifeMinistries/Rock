@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
+using System.Data.Entity;
 using System.Linq;
 using System.Runtime.Caching;
 
@@ -30,6 +31,7 @@ namespace Rock.Workflow.Action.CheckIn
     /// <summary>
     /// Finds people with a relationship to members of family
     /// </summary>
+    [ActionCategory( "Check-In" )]
     [Description( "Finds people with a relationship to members of family" )]
     [Export( typeof( ActionComponent ) )]
     [ExportMetadata( "ComponentName", "Find Relationships" )]
@@ -55,7 +57,8 @@ namespace Rock.Workflow.Action.CheckIn
             {
                 roles = new List<int>();
 
-                foreach ( var role in new GroupTypeRoleService( rockContext ).Queryable()
+                foreach ( var role in new GroupTypeRoleService( rockContext )
+                    .Queryable().AsNoTracking()
                     .Where( r => r.GroupType.Guid.Equals( new Guid( Rock.SystemGuid.GroupType.GROUPTYPE_KNOWN_RELATIONSHIPS ) ) ) )
                 {
                     role.LoadAttributes( rockContext );
@@ -82,28 +85,29 @@ namespace Rock.Workflow.Action.CheckIn
                     return true;
                 }
 
-                var family = checkInState.CheckIn.Families.Where( f => f.Selected ).FirstOrDefault();
+                var family = checkInState.CheckIn.CurrentFamily;
                 if ( family != null )
                 {
-                    var service = new GroupMemberService( rockContext );
+                    var groupMemberService = new GroupMemberService( rockContext );
 
                     var familyMemberIds = family.People.Select( p => p.Person.Id ).ToList();
 
                     // Get the Known Relationship group id's for each person in the family
-                    var relationshipGroups = service.Queryable()
+                    var relationshipGroups = groupMemberService
+                        .Queryable().AsNoTracking()
                         .Where( g =>
                             g.GroupRole.Guid.Equals( new Guid( Rock.SystemGuid.GroupRole.GROUPROLE_KNOWN_RELATIONSHIPS_OWNER ) ) &&
                             familyMemberIds.Contains( g.PersonId ) )
-                        .Select( g => g.GroupId )
-                        .ToList();
+                        .Select( g => g.GroupId );
 
                     // Get anyone in any of those groups that has a role with the canCheckIn attribute set
-                    foreach ( var person in service.Queryable()
+                    foreach ( var person in groupMemberService
+                        .Queryable().AsNoTracking()
                         .Where( g =>
                             relationshipGroups.Contains( g.GroupId ) &&
                             roles.Contains( g.GroupRoleId ) )
                         .Select( g => g.Person )
-                        .Distinct().ToList() )
+                        .ToList() )
                     {
                         if ( !family.People.Any( p => p.Person.Id == person.Id ) )
                         {

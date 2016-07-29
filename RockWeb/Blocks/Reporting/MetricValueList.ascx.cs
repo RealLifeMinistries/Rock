@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,6 +40,7 @@ namespace RockWeb.Blocks.Reporting
     {
         #region fields
 
+        private IQueryable<IEntity> entityLookupQry = null;
         private Dictionary<int, string> _entityNameLookup;
 
         /// <summary>
@@ -74,11 +75,6 @@ namespace RockWeb.Blocks.Reporting
             gMetricValues.DataKeyNames = new string[] { "Id" };
             gMetricValues.Actions.AddClick += gMetricValues_Add;
             gMetricValues.GridRebind += gMetricValues_GridRebind;
-
-            // Block Security and special attributes (RockPage takes care of View)
-            bool canAddEditDelete = IsUserAuthorized( Authorization.EDIT );
-            gMetricValues.Actions.ShowAdd = canAddEditDelete;
-            gMetricValues.IsDeleteEnabled = canAddEditDelete;
         }
 
         /// <summary>
@@ -159,7 +155,7 @@ namespace RockWeb.Blocks.Reporting
             }
             else if ( e.Key == EntityPreferenceKey )
             {
-                e.Key = hfEntityTypeName.Value;
+                e.Name = hfEntityTypeName.Value;
                 var parts = e.Value.Split( '|' );
                 if ( parts.Length >= 2 )
                 {
@@ -199,7 +195,12 @@ namespace RockWeb.Blocks.Reporting
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         protected void gMetricValues_Add( object sender, EventArgs e )
         {
-            NavigateToLinkedPage( "DetailPage", "MetricValueId", 0, "MetricCategoryId", hfMetricCategoryId.ValueAsInt() );
+            var qryParams = new Dictionary<string, string>();
+            qryParams.Add( "MetricValueId", 0.ToString() );
+            qryParams.Add( "MetricCategoryId", hfMetricCategoryId.Value );
+            qryParams.Add( "ExpandedIds", PageParameter( "ExpandedIds" ) );
+            
+            NavigateToLinkedPage( "DetailPage", qryParams );
         }
 
         /// <summary>
@@ -209,7 +210,12 @@ namespace RockWeb.Blocks.Reporting
         /// <param name="e">The <see cref="RowEventArgs" /> instance containing the event data.</param>
         protected void gMetricValues_Edit( object sender, RowEventArgs e )
         {
-            NavigateToLinkedPage( "DetailPage", "MetricValueId", e.RowKeyId, "MetricCategoryId", hfMetricCategoryId.ValueAsInt() );
+            var qryParams = new Dictionary<string, string>();
+            qryParams.Add( "MetricValueId", e.RowKeyId.ToString() );
+            qryParams.Add( "MetricCategoryId", hfMetricCategoryId.Value );
+            qryParams.Add( "ExpandedIds", PageParameter( "ExpandedIds" ) );
+
+            NavigateToLinkedPage( "DetailPage", qryParams );
         }
 
         /// <summary>
@@ -257,10 +263,10 @@ namespace RockWeb.Blocks.Reporting
         {
             if ( e.Row.DataItem != null )
             {
-                var entityColumn = gMetricValues.Columns.OfType<BoundField>().FirstOrDefault( a => a.DataField == "EntityId" );
-                if ( entityColumn.Visible )
+                var lEntityTypeName = e.Row.FindControl( "lEntityTypeName" ) as Literal;
+                if ( lEntityTypeName != null )
                 {
-                    e.Row.Cells[gMetricValues.Columns.IndexOf( entityColumn )].Text = GetSeriesName( e.Row.DataItem.GetPropertyValue( "EntityId" ) as int? );
+                    lEntityTypeName.Text = GetSeriesName( e.Row.DataItem.GetPropertyValue( "EntityId" ) as int? );
                 }
             }
         }
@@ -275,10 +281,22 @@ namespace RockWeb.Blocks.Reporting
         {
             if ( _entityNameLookup != null && seriesId.HasValue )
             {
-                if ( _entityNameLookup.ContainsKey( seriesId.Value ) )
+                if ( !_entityNameLookup.ContainsKey( seriesId.Value ) )
                 {
-                    return _entityNameLookup[seriesId.Value];
+                    string value = string.Empty;
+                    if ( seriesId.HasValue )
+                    {
+                        var entityItem = entityLookupQry.Where( a => a.Id == seriesId.Value ).FirstOrDefault();
+                        if ( entityItem != null )
+                        {
+                            value = entityItem.ToString();
+                        }
+                    }
+
+                    _entityNameLookup.AddOrIgnore( seriesId.Value, value );
                 }
+
+                return _entityNameLookup[seriesId.Value];
             }
 
             return null;
@@ -307,9 +325,9 @@ namespace RockWeb.Blocks.Reporting
 
             qry = qry.Where( a => a.MetricId == metricId );
 
-            var entityColumn = gMetricValues.Columns.OfType<BoundField>().FirstOrDefault( a => a.DataField == "EntityId" );
+            var entityTypeNameColumn = gMetricValues.Columns.OfType<RockLiteralField>().FirstOrDefault( a => a.ID == "lEntityTypeName" );
             var metric = new MetricService( rockContext ).Get( metricId ?? 0 );
-            entityColumn.Visible = metric != null && metric.EntityTypeId.HasValue;
+            entityTypeNameColumn.Visible = metric != null && metric.EntityTypeId.HasValue;
 
             if ( metric != null )
             {
@@ -318,12 +336,12 @@ namespace RockWeb.Blocks.Reporting
                 var entityTypeCache = EntityTypeCache.Read( metric.EntityTypeId ?? 0 );
                 if ( entityTypeCache != null )
                 {
-                    entityColumn.HeaderText = entityTypeCache.FriendlyName;
-                    IQueryable<IEntity> entityQry = null;
+                    entityTypeNameColumn.HeaderText = entityTypeCache.FriendlyName;
+                    
                     if ( entityTypeCache.GetEntityType() == typeof( Rock.Model.Group ) )
                     {
                         // special case for Group since there could be a very large number (especially if you include families), so limit to GroupType.ShowInGroupList
-                        entityQry = new GroupService( rockContext ).Queryable().Where( a => a.GroupType.ShowInGroupList );
+                        entityLookupQry = new GroupService( rockContext ).Queryable().Where( a => a.GroupType.ShowInGroupList );
                     }
                     else
                     {
@@ -332,16 +350,7 @@ namespace RockWeb.Blocks.Reporting
                         Type modelServiceType = genericServiceType.MakeGenericType( modelType );
                         var serviceInstance = Activator.CreateInstance( modelServiceType, new object[] { rockContext } ) as IService;
                         MethodInfo qryMethod = serviceInstance.GetType().GetMethod( "Queryable", new Type[] { } );
-                        entityQry = qryMethod.Invoke( serviceInstance, new object[] { } ) as IQueryable<IEntity>;
-                    }
-
-                    if ( entityQry != null )
-                    {
-                        var entityList = entityQry.ToList();
-                        foreach ( var e in entityList )
-                        {
-                            _entityNameLookup.AddOrReplace( e.Id, e.ToString() );
-                        }
+                        entityLookupQry = qryMethod.Invoke( serviceInstance, new object[] { } ) as IQueryable<IEntity>;
                     }
                 }
             }
@@ -380,12 +389,14 @@ namespace RockWeb.Blocks.Reporting
 
             if ( sortProperty != null )
             {
-                gMetricValues.DataSource = qry.Sort( sortProperty ).ToList();
+                qry = qry.Sort( sortProperty );
             }
             else
             {
-                gMetricValues.DataSource = qry.OrderBy( s => s.Order ).ThenBy( s => s.MetricValueDateTime ).ThenBy( s => s.YValue ).ThenBy( s => s.XValue ).ToList();
+                qry = qry.OrderBy( s => s.Order ).ThenByDescending( s => s.MetricValueDateTime ).ThenBy( s => s.YValue ).ThenBy( s => s.XValue ).ThenByDescending( s => s.ModifiedDateTime );
             }
+
+            gMetricValues.SetLinqDataSource( qry );
 
             gMetricValues.DataBind();
         }
@@ -428,6 +439,20 @@ namespace RockWeb.Blocks.Reporting
 
             hfMetricId.Value = metricId.ToString();
             hfMetricCategoryId.Value = metricCategoryId.ToString();
+
+            gMetricValues.Actions.ShowAdd = false;
+            gMetricValues.IsDeleteEnabled = false;
+
+            if ( metricId.HasValue && metricId.Value > 0 )
+            {
+                var metric = new MetricService( new RockContext() ).Get( metricId.Value );
+                if ( UserCanEdit || ( metric != null && metric.IsAuthorized( Authorization.EDIT, CurrentPerson ) ) )
+                {
+                    // Block Security and special attributes (RockPage takes care of View)
+                    gMetricValues.Actions.ShowAdd = true;
+                    gMetricValues.IsDeleteEnabled = true;
+                }
+            }
         }
 
         #endregion

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,12 +29,24 @@ namespace Rock
     public static class Reflection
     {
         /// <summary>
+        /// Finds the first matching type in Rock or any of the assemblies that reference Rock
+        /// </summary>
+        /// <param name="baseType">Type of the base.</param>
+        /// <param name="typeName">Name of the type.</param>
+        /// <returns></returns>
+        public static Type FindType( Type baseType, string typeName )
+        {
+            return FindTypes( baseType, typeName ).Select( a => a.Value ).FirstOrDefault();
+        }
+
+        /// <summary>
         /// Finds the all the types that implement or inherit from the baseType.  The baseType
         /// will not be included in the result
         /// </summary>
         /// <param name="baseType">base type.</param>
+        /// <param name="typeName">typeName can be specified to filter it to a specific type name</param>
         /// <returns></returns>
-        public static SortedDictionary<string, Type> FindTypes( Type baseType )
+        public static SortedDictionary<string, Type> FindTypes( Type baseType, string typeName = null )
         {
             SortedDictionary<string, Type> types = new SortedDictionary<string, Type>();
 
@@ -99,16 +111,15 @@ namespace Rock
             foreach ( KeyValuePair<string, Assembly> assemblyEntry in assemblies )
             {
                 var typeEntries = SearchAssembly( assemblyEntry.Value, baseType );
-
                 foreach ( KeyValuePair<string, Type> typeEntry in typeEntries )
                 {
-                    if ( !types.Keys.Contains( typeEntry.Key ) )
+                    if ( string.IsNullOrWhiteSpace( typeName ) || typeEntry.Key == typeName )
                     {
-                        types.Add( typeEntry.Key, typeEntry.Value );
+                        types.AddOrIgnore( typeEntry.Key, typeEntry.Value );
                     }
                 }
             }
-
+            
             return types;
         }
 

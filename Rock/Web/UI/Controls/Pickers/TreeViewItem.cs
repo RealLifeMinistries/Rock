@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,6 +21,35 @@ namespace Rock.Web.UI.Controls
     /// </summary>
     public class TreeViewItem
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        public enum GetCountsType
+        {
+            /// <summary>
+            /// none
+            /// </summary>
+            None = 0,
+
+            /// <summary>
+            /// child groups
+            /// </summary>
+            ChildGroups = 1,
+
+            /// <summary>
+            /// group members
+            /// </summary>
+            GroupMembers = 2
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TreeViewItem"/> class.
+        /// </summary>
+        public TreeViewItem()
+        {
+            IsActive = true;
+        }
+
         /// <summary>
         /// Gets or sets the id.
         /// </summary>
@@ -60,5 +89,21 @@ namespace Rock.Web.UI.Controls
         /// The image url.
         /// </value>
         public string IconSmallUrl { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether this instance is active.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance is active; otherwise, <c>false</c>.
+        /// </value>
+        public bool IsActive { get; set; }
+
+        /// <summary>
+        /// Gets or sets the count information depending on the setting for GetCountsType
+        /// </summary>
+        /// <value>
+        /// The count information.
+        /// </value>
+        public int? CountInfo { get; set; }
     }
 }

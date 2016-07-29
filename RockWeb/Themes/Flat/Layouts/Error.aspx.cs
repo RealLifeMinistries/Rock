@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -74,15 +74,14 @@ namespace RockWeb.Themes.Flat.Layouts
         private void ProcessException( Exception ex, string exLevel )
         {
             lErrorInfo.Text += "<div class=\"alert alert-danger\">";
-            lErrorInfo.Text += "<h4>" + exLevel + ex.GetType().Name + " in " + ex.Source + "</h3>";
-            lErrorInfo.Text += "<p><strong>Message</strong><br>" + ex.Message + "</p>";
-            lErrorInfo.Text += "<p><strong>Stack Trace</strong><br><pre>" + ex.StackTrace + "</pre></p>";
+            lErrorInfo.Text += "<h4>" + exLevel + ex.GetType().Name + " in " + HttpUtility.HtmlEncode( ex.Source ) + "</h3>";
+            lErrorInfo.Text += "<p><strong>Message</strong><br>" + HttpUtility.HtmlEncode( ex.Message ) + "</p>";
+            lErrorInfo.Text += "<p><strong>Stack Trace</strong><br><pre>" + HttpUtility.HtmlEncode( ex.StackTrace ) + "</pre></p>";
             lErrorInfo.Text += "</div>";
 
             // check for inner exception
             if ( ex.InnerException != null )
             {
-                //lErrorInfo.Text += "<p /><p />";
                 ProcessException( ex.InnerException, "-" + exLevel );
             }
         }

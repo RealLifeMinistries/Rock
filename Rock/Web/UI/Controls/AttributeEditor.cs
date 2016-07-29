@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,6 +55,7 @@ namespace Rock.Web.UI.Controls
         private RockTextBox _tbIconCssClass;
         private RockCheckBox _cbRequired;
         private RockCheckBox _cbShowInGrid;
+        private RockCheckBox _cbAllowSearch;
 
         private RockDropDownList _ddlFieldType;
         private PlaceHolder _phQualifiers;
@@ -124,7 +125,7 @@ namespace Rock.Web.UI.Controls
             {
                 ViewState["AttributeEntityTypeId"] = value;
                 EnsureChildControls();
-                _cpCategories.EntityTypeQualifierValue = value.HasValue ? value.ToString() : string.Empty;
+                _cpCategories.EntityTypeQualifierValue = value.HasValue && value.Value != 0 ? value.ToString() : string.Empty;
             }
         }
 
@@ -321,6 +322,46 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets a value indicating whether [allow search visible].
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [allow search visible]; otherwise, <c>false</c>.
+        /// </value>
+        public bool AllowSearchVisible
+        {
+            get
+            {
+                EnsureChildControls();
+                return _cbAllowSearch.Visible;
+            }
+            set
+            {
+                EnsureChildControls();
+                _cbAllowSearch.Visible = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether [allow search].
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [allow search]; otherwise, <c>false</c>.
+        /// </value>
+        public bool AllowSearch
+        {
+            get
+            {
+                EnsureChildControls();
+                return _cbAllowSearch.Checked;
+            }
+            set
+            {
+                EnsureChildControls();
+                _cbAllowSearch.Checked = value;
+            }
+        }
+
+        /// <summary>
         /// Gets or sets the field type id.
         /// </summary>
         /// <value>
@@ -445,6 +486,11 @@ namespace Rock.Web.UI.Controls
         /// <param name="e">An <see cref="T:System.EventArgs" /> object that contains the event data.</param>
         protected override void OnInit( EventArgs e )
         {
+            EnsureChildControls();
+
+            _ddlFieldType.DataSource = FieldTypeCache.All();
+            _ddlFieldType.DataBind();
+
             base.OnInit( e );
         }
 
@@ -516,7 +562,7 @@ namespace Rock.Web.UI.Controls
                 _cvKey.ServerValidate += cvKey_ServerValidate;
                 _cvKey.Display = ValidatorDisplay.Dynamic;
                 _cvKey.CssClass = "validation-error help-inline";
-                _cvKey.ErrorMessage = "There is already an existing property with the key value you entered.  Please select a different key value.";
+                _cvKey.ErrorMessage = "There is already an existing property with the key value you entered or the key has illegal characters. Please select a different key value and use only letters, numbers and underscores.";
                 Controls.Add( _cvKey );
 
                 _tbIconCssClass = new RockTextBox();
@@ -537,20 +583,22 @@ namespace Rock.Web.UI.Controls
                 _cbShowInGrid.Help = "If selected, this attribute will be included in a grid.";
                 Controls.Add( _cbShowInGrid );
 
+                _cbAllowSearch = new RockCheckBox();
+                _cbAllowSearch.ID = "cbAllowSearch";
+                _cbAllowSearch.Label = "Allow Search";
+                _cbAllowSearch.Text = "Yes";
+                _cbAllowSearch.Help = "If selected, this attribute can be search on.";
+                _cbAllowSearch.Visible = false;  // Default is to not show this option
+                Controls.Add( _cbAllowSearch );
+
                 _ddlFieldType = new RockDropDownList();
                 _ddlFieldType.ID = "ddlFieldType";
                 _ddlFieldType.Label = "Field Type";
                 _ddlFieldType.AutoPostBack = true;
                 _ddlFieldType.SelectedIndexChanged += _ddlFieldType_SelectedIndexChanged;
+                _ddlFieldType.DataValueField = "Id";
+                _ddlFieldType.DataTextField = "Name";
                 Controls.Add( _ddlFieldType );
-
-                if ( !Page.IsPostBack )
-                {
-                    _ddlFieldType.DataValueField = "Id";
-                    _ddlFieldType.DataTextField = "Name";
-                    _ddlFieldType.DataSource = FieldTypeCache.All();
-                    _ddlFieldType.DataBind();
-                }
 
                 _phQualifiers = new PlaceHolder();
                 _phQualifiers.ID = "phQualifiers";
@@ -631,6 +679,7 @@ namespace Rock.Web.UI.Controls
             _tbIconCssClass.ValidationGroup = validationGroup;
             _cbRequired.ValidationGroup = validationGroup;
             _cbShowInGrid.ValidationGroup = validationGroup;
+            _cbAllowSearch.ValidationGroup = validationGroup;
             _ddlFieldType.ValidationGroup = validationGroup;
             foreach ( var control in _phQualifiers.Controls )
             {
@@ -679,7 +728,11 @@ namespace Rock.Web.UI.Controls
             _tbName.RenderControl( writer );
             writer.RenderEndTag();
 
+            writer.AddAttribute( HtmlTextWriterAttribute.Class, "col-md-6" );
+            writer.RenderBeginTag( HtmlTextWriterTag.Div );
             writer.RenderEndTag();
+
+            writer.RenderEndTag();  // row
 
             // row 2
             writer.AddAttribute( HtmlTextWriterAttribute.Class, "row" );
@@ -690,7 +743,7 @@ namespace Rock.Web.UI.Controls
             _tbDescription.RenderControl( writer );
             writer.RenderEndTag();
 
-            writer.RenderEndTag();
+            writer.RenderEndTag();  // row
 
             // row 3
             writer.AddAttribute( HtmlTextWriterAttribute.Class, "row" );
@@ -703,8 +756,24 @@ namespace Rock.Web.UI.Controls
             _tbKey.RenderControl( writer );
             _cvKey.RenderControl( writer );
             _tbIconCssClass.RenderControl( writer );
+
+
+            writer.AddAttribute( HtmlTextWriterAttribute.Class, "row" );
+            writer.RenderBeginTag( HtmlTextWriterTag.Div );
+
+            writer.AddAttribute( HtmlTextWriterAttribute.Class, "col-sm-6" );
+            writer.RenderBeginTag( HtmlTextWriterTag.Div );
             _cbRequired.RenderControl( writer );
+            writer.RenderEndTag();
+
+            writer.AddAttribute( HtmlTextWriterAttribute.Class, "col-sm-6" );
+            writer.RenderBeginTag( HtmlTextWriterTag.Div );
             _cbShowInGrid.RenderControl( writer );
+            _cbAllowSearch.RenderControl( writer );
+            writer.RenderEndTag();
+
+            writer.RenderEndTag();
+            
             writer.RenderEndTag();
 
             // row 3 col 2
@@ -769,7 +838,7 @@ namespace Rock.Web.UI.Controls
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         void _ddlFieldType_SelectedIndexChanged( object sender, EventArgs e )
         {
-            Qualifiers = new Dictionary<string, ConfigurationValue>();
+            // When someone changes the field type, we clear the default value since it's no longer relevant.
             DefaultValue = string.Empty;
         }
 
@@ -822,6 +891,7 @@ namespace Rock.Web.UI.Controls
                 this.FieldTypeId = attribute.FieldTypeId;
                 this.Required = attribute.IsRequired;
                 this.ShowInGrid = attribute.IsGridColumn;
+                this.AllowSearch = attribute.AllowSearch;
 
                 var qualifiers = new Dictionary<string, ConfigurationValue>();
                 if ( attribute.AttributeQualifiers != null )
@@ -867,6 +937,7 @@ namespace Rock.Web.UI.Controls
                 attribute.IsMultiValue = false;
                 attribute.IsRequired = this.Required;
                 attribute.IsGridColumn = this.ShowInGrid;
+                attribute.AllowSearch = this.AllowSearch;
 
                 attribute.Categories.Clear();
                 new CategoryService( new RockContext() ).Queryable().Where( c => this.CategoryIds.Contains( c.Id ) ).ToList().ForEach( c =>
@@ -960,7 +1031,7 @@ namespace Rock.Web.UI.Controls
 
         if (keyValue == '') {
 
-            keyValue = $('#' + nameControlId).val().replace(/\s+/g, '');
+            keyValue = $('#' + nameControlId).val().replace(/[^a-zA-Z0-9_.\-]/g, '');
             var newKeyValue = keyValue;
         
             var i = 1;
@@ -976,7 +1047,7 @@ namespace Rock.Web.UI.Controls
         var keyControl = $('#' + sender.controltovalidate);
         var reservedKeyJson = keyControl.closest('fieldset').find('.js-existing-key-names').val();
         var reservedKeyNames = eval('(' + reservedKeyJson + ')');
-        args.IsValid = ( $.inArray( keyControl.val(), reservedKeyNames ) < 0 );
+        args.IsValid = ( $.inArray( keyControl.val(), reservedKeyNames ) < 0 && ! keyControl.val().match(/[^a-zA-Z0-9_.\-]/g) );
     }
 ";
             ScriptManager.RegisterStartupScript( this, this.GetType(), "AttributeEditor", script, true );

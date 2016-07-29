@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Web.UI;
 using System.Web.UI.WebControls;
+using Rock.Reporting;
 using Rock.Web.UI.Controls;
 
 namespace Rock.Field.Types
@@ -51,6 +52,25 @@ namespace Rock.Field.Types
             }
 
             return base.FormatValue( parentControl, formattedValue, null, condensed );
+        }
+
+        /// <summary>
+        /// Returns the value that should be used for sorting, using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        public override object SortValue( Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues )
+        {
+            int? intValue = value.AsIntegerOrNull();
+            if ( intValue.HasValue )
+            {
+                System.DayOfWeek dayOfWeek = (System.DayOfWeek)intValue.Value;
+                return dayOfWeek;
+            }
+
+            return (System.DayOfWeek)0;
         }
 
         #endregion
@@ -122,25 +142,32 @@ namespace Rock.Field.Types
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
-        /// <param name="required"></param>
+        /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        public override Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
         {
             var lbl = new Label();
             lbl.ID = string.Format( "{0}_lIs", id );
             lbl.AddCssClass( "data-view-filter-label" );
             lbl.Text = "Is";
+
+            // hide the compare control when in SimpleFilter mode
+            lbl.Visible = filterMode != FilterMode.SimpleFilter;
+            
             return lbl;
         }
+
 
         /// <summary>
         /// Gets the filter compare value.
         /// </summary>
         /// <param name="control">The control.</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override string GetFilterCompareValue( Control control )
+        public override string GetFilterCompareValue( Control control, FilterMode filterMode )
         {
-            return "1";  // Equal to
+            return "1"; // Equal To
         }
 
         /// <summary>
@@ -148,8 +175,9 @@ namespace Rock.Field.Types
         /// </summary>
         /// <param name="value">The value.</param>
         /// <param name="propertyType">Type of the property.</param>
+        /// <param name="isNullableType">if set to <c>true</c> [is nullable type].</param>
         /// <returns></returns>
-        public override object ConvertValueToPropertyType( string value, Type propertyType )
+        public override object ConvertValueToPropertyType( string value, Type propertyType, bool isNullableType )
         {
             int? intValue = value.AsIntegerOrNull();
             if ( intValue.HasValue )

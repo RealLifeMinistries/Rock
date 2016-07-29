@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,6 +50,23 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the form group class.
+        /// </summary>
+        /// <value>
+        /// The form group class.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        Description( "The CSS class to add to the form-group div." )
+        ]
+        public string FormGroupCssClass
+        {
+            get { return ViewState["FormGroupCssClass"] as string ?? string.Empty; }
+            set { ViewState["FormGroupCssClass"] = value; }
+        }
+
+        /// <summary>
         /// Gets or sets the help text.
         /// </summary>
         /// <value>
@@ -75,6 +92,35 @@ namespace Rock.Web.UI.Controls
                 }
             }
         }
+
+        /// <summary>
+        /// Gets or sets the warning text.
+        /// </summary>
+        /// <value>
+        /// The warning text.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        DefaultValue( "" ),
+        Description( "The warning block." )
+        ]
+        public string Warning
+        {
+            get
+            {
+                return WarningBlock != null ? WarningBlock.Text : string.Empty;
+            }
+
+            set
+            {
+                if ( WarningBlock != null )
+                {
+                    WarningBlock.Text = value;
+                }
+            }
+        }
+
         /// <summary>
         /// Gets or sets a value indicating whether this <see cref="RockTextBox"/> is required.
         /// </summary>
@@ -137,6 +183,14 @@ namespace Rock.Web.UI.Controls
         public HelpBlock HelpBlock { get; set; }
 
         /// <summary>
+        /// Gets or sets the warning block.
+        /// </summary>
+        /// <value>
+        /// The warning block.
+        /// </value>
+        public WarningBlock WarningBlock { get; set; }
+
+        /// <summary>
         /// Gets or sets the required field validator.
         /// </summary>
         /// <value>
@@ -171,7 +225,6 @@ namespace Rock.Web.UI.Controls
         private HtmlGenericControl _divControl;
         private HtmlGenericControl _btnSelect;
         private HiddenField _hfSelectedItemId;
-        private HiddenField _hfSelectedItemText;
         private HtmlGenericControl _listControl;
 
         #endregion
@@ -188,6 +241,34 @@ namespace Rock.Web.UI.Controls
         {
             get { return ViewState["Title"] as string ?? string.Empty; }
             set { ViewState["Title"] = value; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public enum ButtonSelectionStyle
+        {
+            /// <summary>
+            /// Title
+            /// </summary>
+            Title,
+
+            /// <summary>
+            /// Checkmark
+            /// </summary>
+            Checkmark
+        }
+
+        /// <summary>
+        /// Gets or sets the selection style. Choose 'Title' to have it set text of the dropdown, or 'Checkmark' to put a checkmark next to the selected item
+        /// </summary>
+        /// <value>
+        /// The selection style.
+        /// </value>
+        public ButtonSelectionStyle SelectionStyle
+        {
+            get { return ViewState["SelectionStyle"] as ButtonSelectionStyle? ?? ButtonSelectionStyle.Title; }
+            set { ViewState["SelectionStyle"] = value; }
         }
 
         /// <summary>
@@ -256,6 +337,7 @@ namespace Rock.Web.UI.Controls
             RequiredFieldValidator = new HiddenFieldValidator();
             RequiredFieldValidator.ValidationGroup = this.ValidationGroup;
             HelpBlock = new HelpBlock();
+            WarningBlock = new WarningBlock();
         }
 
         /// <summary>
@@ -314,9 +396,13 @@ namespace Rock.Web.UI.Controls
                 var text =  $el.html();
                 var textHtml = $el.html() + "" <span class='fa fa-caret-down'></span>"";
                 var idvalue = $el.attr('data-id');
-                $('#ButtonDropDown_btn_{0}').html(textHtml);
+                if ({2}) {{
+                    $('#ButtonDropDown_btn_{0}').html(textHtml);
+                }} else {{
+                    $el.closest('.dropdown-menu').find('.js-selectionicon').removeClass('fa-check');                    
+                    $el.find('.js-selectionicon').addClass('fa-check');
+                }}
                 $('#hfSelectedItemId_{0}').val(idvalue);
-                $('#hfSelectedItemText_{0}').val(text);
                 {1}
             }});";
 
@@ -326,7 +412,12 @@ namespace Rock.Web.UI.Controls
                 postbackScript = string.Format( "__doPostBack('{1}', '{0}=' + idvalue);", this.ID, postbackControlId );
             }
 
-            string script = string.Format( scriptFormat, this.ID, postbackScript );
+            string script = string.Format(
+                scriptFormat,
+                this.ID, // {0}
+                postbackScript, // {1}
+                ( this.SelectionStyle == ButtonSelectionStyle.Title ).Bit() // {2}
+            );
 
             ScriptManager.RegisterStartupScript( this, this.GetType(), "buttondropdownlist-script-" + this.ID, script, true );
         }
@@ -341,7 +432,7 @@ namespace Rock.Web.UI.Controls
             RockControlHelper.CreateChildControls( this, Controls );
 
             _divControl = new HtmlGenericControl( "div" );
-            _divControl.Attributes["class"] = "btn-group";
+            _divControl.Attributes["class"] = "btn-group " + this.FormGroupCssClass;
             _divControl.ClientIDMode = ClientIDMode.Static;
             _divControl.ID = string.Format( "ButtonDropDown_{0}", this.ID );
 
@@ -349,16 +440,12 @@ namespace Rock.Web.UI.Controls
             _hfSelectedItemId.ClientIDMode = ClientIDMode.Static;
             _hfSelectedItemId.ID = string.Format( "hfSelectedItemId_{0}", this.ID );
 
-            _hfSelectedItemText = new HiddenField();
-            _hfSelectedItemText.ClientIDMode = ClientIDMode.Static;
-            _hfSelectedItemText.ID = string.Format( "hfSelectedItemText_{0}", this.ID );
-
             _btnSelect = new HtmlGenericControl( "button" );
             _divControl.Controls.Add( _btnSelect );
             _btnSelect.ClientIDMode = ClientIDMode.Static;
             _btnSelect.ID = string.Format( "ButtonDropDown_btn_{0}", this.ID );
             _btnSelect.Attributes["type"] = "button";
-            _btnSelect.Attributes["class"] = "btn btn-default dropdown-toggle";
+            _btnSelect.Attributes["class"] = "btn btn-default dropdown-toggle " + this.CssClass;
             _btnSelect.Attributes["data-toggle"] = "dropdown";
 
             _listControl = new HtmlGenericControl( "ul" );
@@ -367,7 +454,6 @@ namespace Rock.Web.UI.Controls
 
             Controls.Add( _divControl );
             Controls.Add( _hfSelectedItemId );
-            Controls.Add( _hfSelectedItemText );
 
             RequiredFieldValidator.InitialValue = string.Empty;
             RequiredFieldValidator.ControlToValidate = _hfSelectedItemId.ID;
@@ -394,19 +480,24 @@ namespace Rock.Web.UI.Controls
             writer.AddAttribute( "class", "controls" );
             writer.RenderBeginTag( HtmlTextWriterTag.Div );
 
-            string selectedText = SelectedItem != null ? SelectedItem.Text : Title;
+            string selectedText = ( ( this.SelectionStyle == ButtonSelectionStyle.Title ) && SelectedItem != null ) ? SelectedItem.Text : Title;
             _btnSelect.Controls.Clear();
             _btnSelect.Controls.Add( new LiteralControl { Text = string.Format( "{0} <span class='fa fa-caret-down'></span>", selectedText ) } );
 
             foreach ( var item in this.Items.OfType<ListItem>() )
             {
-                string controlHtmlFormat = "<li><a href='#' data-id='{0}'>{1}</a></li>";
-                _listControl.Controls.Add( new LiteralControl { Text = string.Format( controlHtmlFormat, item.Value, item.Text ) } );
+                string faChecked = ( this.SelectionStyle == ButtonSelectionStyle.Checkmark ) && ( SelectedValue == item.Value ) ? "fa-check" : string.Empty;
+                string html = string.Format(
+                        "<li><a href='#' data-id='{0}'><i class='js-selectionicon fa fa-fw {2}'></i> {1}</a></li>",
+                        item.Value,
+                        item.Text,
+                        faChecked );
+
+                _listControl.Controls.Add( new LiteralControl { Text = html } );
             }
             _divControl.RenderControl( writer );
 
             _hfSelectedItemId.RenderControl( writer );
-            _hfSelectedItemText.RenderControl( writer );
 
             writer.RenderEndTag();
         }

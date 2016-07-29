@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Web.UI;
-using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
 using Rock.Data;
 using Rock.Model;
@@ -36,7 +35,6 @@ namespace Rock.Field.Types
     [Serializable]
     public class DefinedValueFieldType : FieldType, IEntityFieldType
     {
-
         #region Configuration
 
         private const string DEFINED_TYPE_KEY = "definedtype";
@@ -79,7 +77,7 @@ namespace Rock.Field.Types
                 ddl.Items.Add( new ListItem( definedType.Name, definedType.Id.ToString() ) );
             }
 
-            // Add checkbox for deciding if the defined values list is renedered as a drop
+            // Add checkbox for deciding if the defined values list is rendered as a drop
             // down list or a checkbox list.
             var cb = new RockCheckBox();
             controls.Add( cb );
@@ -108,9 +106,9 @@ namespace Rock.Field.Types
         public override Dictionary<string, ConfigurationValue> ConfigurationValues( List<Control> controls )
         {
             Dictionary<string, ConfigurationValue> configurationValues = new Dictionary<string, ConfigurationValue>();
-            configurationValues.Add( DEFINED_TYPE_KEY, new ConfigurationValue( "Defined Type", "The Defined Type to select values from", "" ) );
-            configurationValues.Add( ALLOW_MULTIPLE_KEY, new ConfigurationValue( "Allow Multiple Values", "When set, allows multiple defined type values to be selected.", "" ) );
-            configurationValues.Add( DISPLAY_DESCRIPTION, new ConfigurationValue( "Display Descriptions", "When set, the defined value descriptions will be displayed instead of the values.", "" ) );
+            configurationValues.Add( DEFINED_TYPE_KEY, new ConfigurationValue( "Defined Type", "The Defined Type to select values from", string.Empty ) );
+            configurationValues.Add( ALLOW_MULTIPLE_KEY, new ConfigurationValue( "Allow Multiple Values", "When set, allows multiple defined type values to be selected.", string.Empty ) );
+            configurationValues.Add( DISPLAY_DESCRIPTION, new ConfigurationValue( "Display Descriptions", "When set, the defined value descriptions will be displayed instead of the values.", string.Empty ) );
 
             if ( controls != null )
             {
@@ -121,7 +119,7 @@ namespace Rock.Field.Types
 
                 if ( controls.Count > 1 && controls[1] != null && controls[1] is CheckBox )
                 {
-                    configurationValues[ ALLOW_MULTIPLE_KEY ].Value = ( (CheckBox)controls[1] ).Checked.ToString();
+                    configurationValues[ALLOW_MULTIPLE_KEY].Value = ( (CheckBox)controls[1] ).Checked.ToString();
                 }
 
                 if ( controls.Count > 2 && controls[2] != null && controls[2] is CheckBox )
@@ -187,16 +185,12 @@ namespace Rock.Field.Types
                 }
 
                 var names = new List<string>();
-                foreach ( string guidValue in value.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ) )
+                foreach ( Guid guid in value.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).AsGuidList() )
                 {
-                    Guid guid = Guid.Empty;
-                    if ( Guid.TryParse( guidValue, out guid ) )
+                    var definedValue = Rock.Web.Cache.DefinedValueCache.Read( guid );
+                    if ( definedValue != null )
                     {
-                        var definedValue = Rock.Web.Cache.DefinedValueCache.Read( guid );
-                        if ( definedValue != null )
-                        {
-                            names.Add( useDescription ? definedValue.Description : definedValue.Value );
-                        }
+                        names.Add( useDescription ? definedValue.Description : definedValue.Value );
                     }
                 }
 
@@ -204,7 +198,41 @@ namespace Rock.Field.Types
             }
 
             return base.FormatValue( parentControl, formattedValue, null, condensed );
+        }
 
+        /// <summary>
+        /// Returns the value that should be used for sorting, using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        public override object SortValue( System.Web.UI.Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues )
+        {
+            string formattedValue = string.Empty;
+
+            if ( !string.IsNullOrWhiteSpace( value ) )
+            {
+                bool useDescription = false;
+                if ( configurationValues != null &&
+                     configurationValues.ContainsKey( DISPLAY_DESCRIPTION ) &&
+                     configurationValues[DISPLAY_DESCRIPTION].Value.AsBoolean() )
+                {
+                    useDescription = true;
+                }
+
+                // if there are multiple defined values, just pick the first one as the sort value
+                Guid guid = value.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).AsGuidList().FirstOrDefault();
+                var definedValue = Rock.Web.Cache.DefinedValueCache.Read( guid );
+                if ( definedValue != null )
+                {
+                    // sort by Order then Description/Value (using a padded string)
+                    var sortValue = definedValue.Order.ToString().PadLeft( 10 ) + "," + ( useDescription ? definedValue.Description : definedValue.Value );
+                    return sortValue;
+                }
+            }
+
+            return base.SortValue( parentControl, value, configurationValues );
         }
 
         #endregion
@@ -223,36 +251,23 @@ namespace Rock.Field.Types
         {
             ListControl editControl;
 
-            if ( configurationValues != null && configurationValues.ContainsKey( ALLOW_MULTIPLE_KEY ) && configurationValues[ ALLOW_MULTIPLE_KEY ].Value.AsBoolean() )
+            bool useDescription = configurationValues != null && configurationValues.ContainsKey( DISPLAY_DESCRIPTION ) && configurationValues[DISPLAY_DESCRIPTION].Value.AsBoolean();
+            int? definedTypeId = configurationValues != null && configurationValues.ContainsKey( DEFINED_TYPE_KEY ) ? configurationValues[DEFINED_TYPE_KEY].Value.AsIntegerOrNull() : null;
+
+            if ( configurationValues != null && configurationValues.ContainsKey( ALLOW_MULTIPLE_KEY ) && configurationValues[ALLOW_MULTIPLE_KEY].Value.AsBoolean() )
             {
-                editControl = new Rock.Web.UI.Controls.RockCheckBoxList { ID = id, RepeatDirection = RepeatDirection.Horizontal }; 
+                editControl = new DefinedValuesPicker { ID = id, DisplayDescriptions = useDescription, DefinedTypeId = definedTypeId };
                 editControl.AddCssClass( "checkboxlist-group" );
             }
             else
             {
-                editControl = new Rock.Web.UI.Controls.RockDropDownList { ID = id }; 
+                editControl = new DefinedValuePicker { ID = id, DisplayDescriptions = useDescription, DefinedTypeId = definedTypeId };
                 editControl.Items.Add( new ListItem() );
             }
-
-            if ( configurationValues != null && configurationValues.ContainsKey( DEFINED_TYPE_KEY ) )
+                
+            if ( definedTypeId.HasValue )
             {
-                int definedTypeId = 0;
-                if ( Int32.TryParse( configurationValues[DEFINED_TYPE_KEY].Value, out definedTypeId ) )
-                {
-                    Rock.Model.DefinedValueService definedValueService = new Model.DefinedValueService( new RockContext() );
-                    var definedValues = definedValueService.GetByDefinedTypeId( definedTypeId );
-                    if ( definedValues.Any() )
-                    {
-
-                        bool useDescription = configurationValues.ContainsKey( DISPLAY_DESCRIPTION ) && configurationValues[DISPLAY_DESCRIPTION].Value.AsBoolean();
-
-                        foreach ( var definedValue in definedValues )
-                        {
-                            editControl.Items.Add( new ListItem( useDescription ? definedValue.Description : definedValue.Value, definedValue.Id.ToString() ) );
-                        }
-                    }
-                    return editControl;
-                }
+                return editControl;
             }
 
             return null;
@@ -266,36 +281,32 @@ namespace Rock.Field.Types
         /// <returns></returns>
         public override string GetEditValue( Control control, Dictionary<string, ConfigurationValue> configurationValues )
         {
-            var ids = new List<string>();
+            var definedValueIdList = new List<int>();
 
             if ( control != null && control is ListControl )
             {
-                if ( control is Rock.Web.UI.Controls.RockDropDownList )
+                if ( control is DefinedValuePicker )
                 {
-                    ids.Add( ( (ListControl)control ).SelectedValue );
+                    definedValueIdList.Add( ( (ListControl)control ).SelectedValue.AsInteger() );
                 }
-                else if ( control is Rock.Web.UI.Controls.RockCheckBoxList )
+                else if ( control is DefinedValuesPicker )
                 {
                     var cblControl = control as Rock.Web.UI.Controls.RockCheckBoxList;
 
-                    ids.AddRange( cblControl.Items.Cast<ListItem>()
+                    definedValueIdList.AddRange( cblControl.Items.Cast<ListItem>()
                         .Where( i => i.Selected )
-                        .Select( i => i.Value ) );
+                        .Select( i => i.Value ).AsIntegerList() );
                 }
             }
 
-            var guids = new List<string>();
+            var guids = new List<Guid>();
 
-            foreach ( string id in ids )
+            foreach ( int definedValueId in definedValueIdList )
             {
-                int definedValueId = int.MinValue;
-                if ( int.TryParse( id, out definedValueId ) )
+                var definedValue = Rock.Web.Cache.DefinedValueCache.Read( definedValueId );
+                if ( definedValue != null )
                 {
-                    var definedValue = Rock.Web.Cache.DefinedValueCache.Read( definedValueId );
-                    if ( definedValue != null )
-                    {
-                        guids.Add( definedValue.Guid.ToString() );
-                    }
+                    guids.Add( definedValue.Guid );
                 }
             }
 
@@ -315,16 +326,12 @@ namespace Rock.Field.Types
                 if ( control != null && control is ListControl )
                 {
                     var ids = new List<string>();
-                    foreach ( string guidValue in value.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ) )
+                    foreach ( Guid guid in value.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).AsGuidList() )
                     {
-                        Guid guid = Guid.Empty;
-                        if ( Guid.TryParse( guidValue, out guid ) )
+                        var definedValue = Rock.Web.Cache.DefinedValueCache.Read( guid );
+                        if ( definedValue != null )
                         {
-                            var definedValue = Rock.Web.Cache.DefinedValueCache.Read( guid );
-                            if ( definedValue != null )
-                            {
-                                ids.Add( definedValue.Id.ToString() );
-                            }
+                            ids.Add( definedValue.Id.ToString() );
                         }
                     }
 
@@ -347,13 +354,14 @@ namespace Rock.Field.Types
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
         /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        public override Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
         {
             bool allowMultiple = configurationValues != null && configurationValues.ContainsKey( ALLOW_MULTIPLE_KEY ) && configurationValues[ALLOW_MULTIPLE_KEY].Value.AsBoolean();
             if ( allowMultiple )
             {
-                return base.FilterCompareControl( configurationValues, id, required );
+                return base.FilterCompareControl( configurationValues, id, required, filterMode );
             }
             else
             {
@@ -361,6 +369,9 @@ namespace Rock.Field.Types
                 lbl.ID = string.Format( "{0}_lIs", id );
                 lbl.AddCssClass( "data-view-filter-label" );
                 lbl.Text = "Is";
+                
+                // hide the compare control when in SimpleFilter mode
+                lbl.Visible = filterMode != FilterMode.SimpleFilter;
                 return lbl;
             }
         }
@@ -385,8 +396,9 @@ namespace Rock.Field.Types
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
         /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override Control FilterValueControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        public override Control FilterValueControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
         {
             bool allowMultiple = configurationValues != null && configurationValues.ContainsKey( ALLOW_MULTIPLE_KEY ) && configurationValues[ALLOW_MULTIPLE_KEY].Value.AsBoolean();
 
@@ -395,19 +407,29 @@ namespace Rock.Field.Types
             {
                 overrideConfigValues.Add( keyVal.Key, keyVal.Value );
             }
-            overrideConfigValues.AddOrReplace( ALLOW_MULTIPLE_KEY, new ConfigurationValue( (!allowMultiple).ToString() ) );
 
-            return base.FilterValueControl( overrideConfigValues, id, required );
+            overrideConfigValues.AddOrReplace( ALLOW_MULTIPLE_KEY, new ConfigurationValue( ( !allowMultiple ).ToString() ) );
+
+            return base.FilterValueControl( overrideConfigValues, id, required, filterMode );
         }
 
+        /// <summary>
+        /// Determines whether this filter has a filter control
+        /// </summary>
+        /// <returns></returns>
+        public override bool HasFilterControl()
+        {
+            return true;
+        }
 
         /// <summary>
         /// Gets the filter value.
         /// </summary>
         /// <param name="filterControl">The filter control.</param>
         /// <param name="configurationValues">The configuration values.</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override List<string> GetFilterValues( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues )
+        public override List<string> GetFilterValues( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues, FilterMode filterMode )
         {
             var values = new List<string>();
 
@@ -419,7 +441,7 @@ namespace Rock.Field.Types
                 {
                     if ( allowMultiple )
                     {
-                        var filterValues = base.GetFilterValues( filterControl, configurationValues );
+                        var filterValues = base.GetFilterValues( filterControl, configurationValues, filterMode );
                         if ( filterValues != null )
                         {
                             filterValues.ForEach( v => values.Add( v ) );
@@ -430,19 +452,31 @@ namespace Rock.Field.Types
                         values.Add( GetEditValue( filterControl.Controls[1].Controls[0], configurationValues ) );
                     }
                 }
-                catch { }
+                catch
+                {
+                    // intentionally ignore
+                }
             }
 
             return values;
         }
 
         /// <summary>
-        /// Sets the filter compare value.
+        /// Gets the filter value value.
         /// </summary>
         /// <param name="control">The control.</param>
-        /// <param name="value">The value.</param>
-        public override void SetFilterCompareValue( Control control, string value )
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        public override string GetFilterValueValue( Control control, Dictionary<string, ConfigurationValue> configurationValues )
         {
+            string value = base.GetFilterValueValue( control, configurationValues );
+            bool allowMultiple = configurationValues != null && configurationValues.ContainsKey( ALLOW_MULTIPLE_KEY ) && configurationValues[ALLOW_MULTIPLE_KEY].Value.AsBoolean();
+            if ( allowMultiple && string.IsNullOrWhiteSpace( value ) )
+            {
+                return null;
+            }
+
+            return value;
         }
 
         /// <summary>
@@ -462,16 +496,12 @@ namespace Rock.Field.Types
             }
 
             var values = new List<string>();
-            foreach ( string guidValue in value.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ) )
+            foreach ( Guid guid in value.Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).AsGuidList() )
             {
-                Guid guid = Guid.Empty;
-                if ( Guid.TryParse( guidValue, out guid ) )
+                var definedValue = Rock.Web.Cache.DefinedValueCache.Read( guid );
+                if ( definedValue != null )
                 {
-                    var definedValue = Rock.Web.Cache.DefinedValueCache.Read( guid );
-                    if ( definedValue != null )
-                    {
-                        values.Add( useDescription ? definedValue.Description : definedValue.Value );
-                    }
+                    values.Add( useDescription ? definedValue.Description : definedValue.Value );
                 }
             }
 
@@ -497,7 +527,8 @@ namespace Rock.Field.Types
             }
 
             string titleJs = System.Web.HttpUtility.JavaScriptStringEncode( title );
-            return string.Format( "var selectedItems = ''; $('input:checked', $selectedContent).each(function() {{ selectedItems += selectedItems == '' ? '' : ' or '; selectedItems += '\\'' + $(this).parent().text() + '\\'' }}); result = '{0} is ' + selectedItems ", titleJs );
+            var format = "return Rock.reporting.formatFilterForDefinedValueField('{0}', $selectedContent);";
+            return string.Format( format, titleJs );
         }
 
         /// <summary>
@@ -531,12 +562,14 @@ namespace Rock.Field.Types
                 foreach ( string value in selectedValues )
                 {
                     string tempValue = value;
+
                     // if this is not for an attribute value, look up the id for the defined value
-                    if ( propertyName != "Value" || propertyType != typeof(string) )
+                    if ( propertyName != "Value" || propertyType != typeof( string ) )
                     {
                         var dv = DefinedValueCache.Read( value.AsGuid() );
                         tempValue = dv != null ? dv.Id.ToString() : string.Empty;
                     }
+
                     if ( !string.IsNullOrWhiteSpace( tempValue ) )
                     {
                         object obj = Convert.ChangeType( tempValue, type );
@@ -551,9 +584,8 @@ namespace Rock.Field.Types
             return null;
         }
 
-
         /// <summary>
-        /// Geta a filter expression for an attribute value.
+        /// Gets a filter expression for an attribute value.
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="filterValues">The filter values.</param>
@@ -572,12 +604,12 @@ namespace Rock.Field.Types
             {
                 MemberExpression propertyExpression = Expression.Property( parameterExpression, "Value" );
                 ConstantExpression constantExpression = Expression.Constant( selectedValues, typeof( List<string> ) );
-                return Expression.Call( constantExpression, typeof( List<string> ).GetMethod( "Contains", new Type[] { typeof(string) } ), propertyExpression );
+                return Expression.Call( constantExpression, typeof( List<string> ).GetMethod( "Contains", new Type[] { typeof( string ) } ), propertyExpression );
             }
 
             return null;
         }
-            
+
         #endregion
 
         #region Entity Methods
@@ -608,6 +640,7 @@ namespace Rock.Field.Types
             {
                 item = DefinedValueCache.Read( id.Value );
             }
+
             string guidValue = item != null ? item.Guid.ToString() : string.Empty;
             SetEditValue( control, configurationValues, guidValue );
         }
@@ -641,6 +674,5 @@ namespace Rock.Field.Types
         }
 
         #endregion
-
     }
 }

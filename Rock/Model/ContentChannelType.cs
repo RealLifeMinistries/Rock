@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -64,6 +64,20 @@ namespace Rock.Model
         [DataMember]
         public ContentChannelDateType DateRangeType { get; set; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether time should be included with the single or date range values
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [include time]; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool IncludeTime
+        {
+            get { return _includeTime; }
+            set { _includeTime = value; }
+        }
+        private bool _includeTime = true;
+        
         /// <summary>
         /// Gets or sets a value indicating whether [disable priority].
         /// </summary>

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -72,6 +72,34 @@ namespace Rock.Web.UI.Controls
                 }
             }
         }
+
+        /// <summary>
+        /// Gets or sets the warning text.
+        /// </summary>
+        /// <value>
+        /// The warning text.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        DefaultValue( "" ),
+        Description( "The warning block." )
+        ]
+        public string Warning
+        {
+            get
+            {
+                return WarningBlock != null ? WarningBlock.Text : string.Empty;
+            }
+            set
+            {
+                if ( WarningBlock != null )
+                {
+                    WarningBlock.Text = value;
+                }
+            }
+        }
+
         /// <summary>
         /// Gets or sets a value indicating whether this <see cref="RockTextBox"/> is required.
         /// </summary>
@@ -89,6 +117,24 @@ namespace Rock.Web.UI.Controls
             get { return ViewState["Required"] as bool? ?? false; }
             set { ViewState["Required"] = value; }
         }
+
+        /// <summary>
+        /// Gets or sets the form group class.
+        /// </summary>
+        /// <value>
+        /// The form group class.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        Description( "The CSS class to add to the form-group div." )
+        ]
+        public string FormGroupCssClass
+        {
+            get { return ViewState["FormGroupCssClass"] as string ?? string.Empty; }
+            set { ViewState["FormGroupCssClass"] = value; }
+        }
+
 
         /// <summary>
         /// Gets or sets the required error message.  If blank, the LabelName name will be used
@@ -132,6 +178,14 @@ namespace Rock.Web.UI.Controls
         /// The help block.
         /// </value>
         public HelpBlock HelpBlock { get; set; }
+
+        /// <summary>
+        /// Gets or sets the warning block.
+        /// </summary>
+        /// <value>
+        /// The warning block.
+        /// </value>
+        public WarningBlock WarningBlock { get; set; }
 
         /// <summary>
         /// Gets or sets the required field validator.
@@ -184,8 +238,66 @@ namespace Rock.Web.UI.Controls
             }
         }
 
+        /// <summary>
+        /// Gets or sets the CSS class for the checkbox "div" (see Rock.Web.UI.Adapters.CheckboxAdaptor)
+        /// </summary>
+        /// <value>
+        /// The container CSS class.
+        /// </value>
+        public string ContainerCssClass
+        {
+            get
+            {
+                return this.ViewState["ContainerCssClass"] as string ?? string.Empty;
+            }
+
+            set
+            {
+                this.ViewState["ContainerCssClass"] = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the CSS class for the checkbox &lt;input&gt;
+        /// </summary>
+        /// <value>
+        /// The checkbox &lt;input&gt; CSS class.
+        /// </value>
+        public override string CssClass
+        {
+            get
+            {
+                return base.CssClass;
+            }
+            set
+            {
+                base.CssClass = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the selected icon CSS class. If specified along with UnSelectedIcon, the default checkbox is hidden, and an icon is displayed instead
+        /// </summary>
+        public string SelectedIconCssClass
+        {
+            get { return ViewState["SelectedIconCssClass"] as string ?? string.Empty; }
+            set { ViewState["SelectedIconCssClass"] = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the un-selected icon CSS class. If specified along with SelectedIcon, the default checkbox is hidden, and an icon is displayed instead
+        /// </summary>
+        public string UnSelectedIconCssClass
+        {
+            get { return ViewState["UnSelectedIconCssClass"] as string ?? string.Empty; }
+            set { ViewState["UnSelectedIconCssClass"] = value; }
+        }
+
         // Needed for rendering help block with no label value
         private string TemporaryHelpValue = string.Empty;
+
+        // Needed for rendering warning block with no label value
+        private string TemporaryWarningValue = string.Empty;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RockCheckBox"/> class.
@@ -194,6 +306,7 @@ namespace Rock.Web.UI.Controls
             : base()
         {
             HelpBlock = new HelpBlock();
+            WarningBlock = new WarningBlock();
         }
 
         /// <summary>
@@ -225,6 +338,7 @@ namespace Rock.Web.UI.Controls
             {
                 bool renderLabel = ( !string.IsNullOrEmpty( Label ) );
                 bool renderHelp = ( HelpBlock != null && !string.IsNullOrWhiteSpace( Help ) );
+                bool renderWarning = ( WarningBlock != null && !string.IsNullOrWhiteSpace( Warning ) );
 
                 // If rendering help text with no label, the CheckBoxAdapter will need to render the help, so it needs to be temporarily 
                 // blanked out so that the RockControlHelper does not render it
@@ -232,6 +346,14 @@ namespace Rock.Web.UI.Controls
                 if (!renderLabel && renderHelp)
                 {
                     Help = string.Empty;
+                }
+
+                // If rendering warning text with no label, the CheckBoxAdapter will need to render the warning, so it needs to be temporarily 
+                // blanked out so that the RockControlHelper does not render it
+                TemporaryWarningValue = Warning;
+                if ( !renderLabel && renderWarning )
+                {
+                    Warning = string.Empty;
                 }
 
                 RockControlHelper.RenderControl( this, writer );
@@ -247,11 +369,40 @@ namespace Rock.Web.UI.Controls
             if (Enabled)
             {
                 Help = TemporaryHelpValue;
-                base.RenderControl(writer);
+                Warning = TemporaryWarningValue;
+
+                if ( !string.IsNullOrWhiteSpace( SelectedIconCssClass ) && !string.IsNullOrWhiteSpace( UnSelectedIconCssClass ) )
+                {
+                    string postbackJS = string.Empty;
+                    if ( this.AutoPostBack  )
+                    {
+                        postbackJS = this.Page.ClientScript.GetPostBackEventReference( new PostBackOptions( this ) );
+                    }
+
+                    base.Style.Add( HtmlTextWriterStyle.Display, "none" );
+                    writer.WriteLine( string.Format(
+                        "<div class='rock-checkbox-icon {5}'><i onclick=\"$('#{0}').prop('checked', !$('#{0}').prop('checked')); $(this).toggleClass('{1}').toggleClass('{2}'); {6} \" class=\"{3}\"></i> {4}</div>", 
+                            this.ClientID, // {0}
+                            SelectedIconCssClass, // {1}
+                            UnSelectedIconCssClass, // {2}
+                            this.Checked ? SelectedIconCssClass : UnSelectedIconCssClass, // {3}
+                            this.Text, // {4}
+                            this.ContainerCssClass, // {5}
+                            postbackJS // {6}
+                            ) );
+                }
+                else
+                {
+                    base.Style.Remove( HtmlTextWriterStyle.Display );
+                }
+
+                base.RenderControl( writer );
             }
             else
             {
-                writer.WriteLine(string.Format("<div><i class=\"{0}\"></i> {1}</div>", this.Checked ? "fa fa-check-square-o" : "fa fa-square-o", this.Text));
+                string selectedCss = string.IsNullOrWhiteSpace( SelectedIconCssClass ) ? "fa fa-check-square-o" : SelectedIconCssClass;
+                string unselectedCss = string.IsNullOrWhiteSpace( UnSelectedIconCssClass ) ? "fa fa-square-o" : UnSelectedIconCssClass;
+                writer.WriteLine( string.Format( "<div><i class=\"{0}\"></i> {1}</div>", this.Checked ? selectedCss : unselectedCss, this.Text ) );
             }
         }
     }

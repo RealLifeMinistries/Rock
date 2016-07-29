@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,11 @@
 //
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 
 using Rock.Model;
+using Rock.Web.Cache;
 
 namespace Rock.CheckIn
 {
@@ -35,19 +37,7 @@ namespace Rock.CheckIn
         /// The type of the group.
         /// </value>
         [DataMember]
-        public GroupType GroupType { get; set; }
-
-        /// <summary>
-        /// Next time that a location/group/schedule will be active for
-        /// this group type.  If the group type has locations, this time
-        /// will be in the past, if there are no locations, this time would
-        /// be in the future
-        /// </summary>
-        /// <value>
-        /// The next active time.
-        /// </value>
-        [DataMember]
-        public DateTime NextActiveTime { get; set; }
+        public GroupTypeCache GroupType { get; set; }
 
         /// <summary>
         /// All groups with active schedules
@@ -59,6 +49,37 @@ namespace Rock.CheckIn
         public List<KioskGroup> KioskGroups { get; set; }
 
         /// <summary>
+        /// Gets a value indicating whether check in is active
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is active; otherwise, <c>false</c>.
+        /// </value>
+        public bool IsCheckInActive
+        {
+            get
+            {
+                return KioskGroups != null && KioskGroups.Any( s => s.IsCheckInActive );
+            }
+        }
+
+        /// <summary>
+        /// Next time that a location/group/schedule will be active for
+        /// this group type.  If the group type has locations, this time
+        /// will be in the past, if there are no locations, this time would
+        /// be in the future
+        /// </summary>
+        /// <value>
+        /// The next active time.
+        /// </value>
+        public DateTime NextActiveTime
+        {
+            get
+            {
+                return KioskGroups.Min( s => (DateTime?)s.NextActiveDateTime ) ?? DateTime.MaxValue;
+            }
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="KioskGroupType" /> class.
         /// </summary>
         public KioskGroupType()
@@ -68,14 +89,23 @@ namespace Rock.CheckIn
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="KioskGroupType"/> class.
+        /// </summary>
+        /// <param name="groupTypeid">The group typeid.</param>
+        public KioskGroupType( int groupTypeid )
+            : base()
+        {
+            GroupType = GroupTypeCache.Read( groupTypeid );
+            KioskGroups = new List<KioskGroup>();
+        }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="KioskGroupType" /> class.
         /// </summary>
         /// <param name="groupType">Type of the group.</param>
         public KioskGroupType( GroupType groupType )
-            : base()
+            : this( groupType != null ? groupType.Id : 0 )
         {
-            GroupType = groupType.Clone( false );
-            KioskGroups = new List<KioskGroup>();
         }
 
         /// <summary>

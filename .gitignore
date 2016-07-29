@@ -25,3 +25,6 @@ StyleCop.Cache
 RockWeb/Cache/*
 RockWeb/App_Data/PackageStaging
 /scaffolding.config
+*.sln.GhostDoc.xml
+.vs/config/applicationhost.config
+.vs/config/applicationhost.config

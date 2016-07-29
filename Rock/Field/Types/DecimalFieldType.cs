@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,6 +31,53 @@ namespace Rock.Field.Types
     {
 
         #region Formatting 
+
+        /// <summary>
+        /// Formats the value.
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <param name="condensed">if set to <c>true</c> [condensed].</param>
+        /// <returns></returns>
+        public override string FormatValue( System.Web.UI.Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues, bool condensed )
+        {
+            decimal? decimalValue = value.AsDecimalOrNull();
+            if ( decimalValue.HasValue )
+            {
+                // from http://stackoverflow.com/a/216705/1755417 (to trim trailing zeros)
+                return base.FormatValue( parentControl, decimalValue.Value.ToString("G29"), configurationValues, condensed );
+            }
+            else
+            {
+                return base.FormatValue( parentControl, value, configurationValues, condensed );
+            }
+        }
+
+        /// <summary>
+        /// Returns the value using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        public override object ValueAsFieldType( System.Web.UI.Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues )
+        {
+            return value.AsDecimalOrNull();
+        }
+
+        /// <summary>
+        /// Returns the value that should be used for sorting, using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        public override object SortValue( System.Web.UI.Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues )
+        {
+            // return ValueAsFieldType which returns the value as a Decimal
+            return this.ValueAsFieldType( parentControl, value, configurationValues );
+        }
 
         /// <summary>
         /// Gets the align value that should be used when displaying value
@@ -102,7 +149,7 @@ namespace Rock.Field.Types
         }
 
         /// <summary>
-        /// Geta a filter expression for an attribute value.
+        /// Gets a filter expression for an attribute value.
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="filterValues">The filter values.</param>
@@ -113,12 +160,49 @@ namespace Rock.Field.Types
             if ( filterValues.Count == 1 )
             {
                 MemberExpression propertyExpression = Expression.Property( parameterExpression, "ValueAsNumeric" );
-                ConstantExpression constantExpression = Expression.Constant( filterValues[0].AsDecimal(), typeof( decimal ) );
                 ComparisonType comparisonType = ComparisonType.EqualTo;
-                return ComparisonHelper.ComparisonExpression( comparisonType, propertyExpression, constantExpression );
+                return ComparisonHelper.ComparisonExpression( comparisonType, propertyExpression, AttributeConstantExpression( filterValues[0] ) );
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Gets the name of the attribute value field that should be bound to (Value, ValueAsDateTime, or ValueAsNumeric)
+        /// </summary>
+        /// <value>
+        /// The name of the attribute value field.
+        /// </value>
+        public override string AttributeValueFieldName
+        {
+            get
+            {
+                return "ValueAsNumeric";
+            }
+        }
+
+        /// <summary>
+        /// Attributes the constant expression.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns></returns>
+        public override ConstantExpression AttributeConstantExpression( string value )
+        {
+            return Expression.Constant( value.AsDecimal(), typeof( decimal ) );
+        }
+
+        /// <summary>
+        /// Gets the type of the attribute value field.
+        /// </summary>
+        /// <value>
+        /// The type of the attribute value field.
+        /// </value>
+        public override Type AttributeValueFieldType
+        {
+            get
+            {
+                return typeof( decimal? );
+            }
         }
 
         #endregion

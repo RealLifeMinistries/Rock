@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,6 +53,23 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the form group class.
+        /// </summary>
+        /// <value>
+        /// The form group class.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        Description( "The CSS class to add to the form-group div." )
+        ]
+        public string FormGroupCssClass
+        {
+            get { return ViewState["FormGroupCssClass"] as string ?? string.Empty; }
+            set { ViewState["FormGroupCssClass"] = value; }
+        }
+
+        /// <summary>
         /// Gets or sets the help text.
         /// </summary>
         /// <value>
@@ -76,6 +93,34 @@ namespace Rock.Web.UI.Controls
                 if ( HelpBlock != null )
                 {
                     HelpBlock.Text = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the warning text.
+        /// </summary>
+        /// <value>
+        /// The warning text.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        DefaultValue( "" ),
+        Description( "The warning block." )
+        ]
+        public string Warning
+        {
+            get
+            {
+                return WarningBlock != null ? WarningBlock.Text : string.Empty;
+            }
+
+            set
+            {
+                if ( WarningBlock != null )
+                {
+                    WarningBlock.Text = value;
                 }
             }
         }
@@ -148,6 +193,14 @@ namespace Rock.Web.UI.Controls
         /// The help block.
         /// </value>
         public HelpBlock HelpBlock { get; set; }
+
+        /// <summary>
+        /// Gets or sets the warning block.
+        /// </summary>
+        /// <value>
+        /// The warning block.
+        /// </value>
+        public WarningBlock WarningBlock { get; set; }
 
         /// <summary>
         /// Gets or sets the required field validator.
@@ -401,6 +454,7 @@ namespace Rock.Web.UI.Controls
             RequiredFieldValidator = new RequiredFieldValidator();
             RequiredFieldValidator.ValidationGroup = this.ValidationGroup;
             HelpBlock = new HelpBlock();
+            WarningBlock = new WarningBlock();
 
             TextMode = TextBoxMode.MultiLine;
             Rows = 10;
@@ -438,6 +492,8 @@ namespace Rock.Web.UI.Controls
             }
         }
 
+        private static string _fingerPrintVersion = null;
+
         /// <summary>
         /// Renders the base control.
         /// </summary>
@@ -452,6 +508,12 @@ if (!$('#ckeditorJsLib').length) {{
     // by default, jquery adds a cache-busting parameter on dynamically added script tags. set the ajaxSetup cache:true to prevent this
     $.ajaxSetup({{ cache: true }});
     $('head').prepend(""<script id='ckeditorJsLib' src='{12}' />"");
+}}
+
+var pluginTimestamp = '_v{14}'
+if ( !(CKEDITOR.timestamp.indexOf(pluginTimestamp) >=0) )
+{{
+    CKEDITOR.timestamp = CKEDITOR.timestamp + pluginTimestamp;
 }}
 
 // allow i tags to be empty (for font awesome)
@@ -530,6 +592,7 @@ CKEDITOR.replace('{0}', {{
             }
 
             List<string> enabledPlugins = new List<string>();
+            enabledPlugins.Add( "justify" );
             if ( MergeFields.Any() )
             {
                 enabledPlugins.Add( "rockmergefield" );
@@ -574,6 +637,34 @@ CKEDITOR.replace('{0}', {{
 
             string ckEditorLib = ( (RockPage)this.Page ).ResolveRockUrl( "~/Scripts/ckeditor/ckeditor.js", true );
 
+            try
+            {
+                //// ckeditor dynamically loads plugin js files, so our normal fingerprinting won't work and could cause the cache to be stale
+                //// so, get a fingerprint from the latest plug .js file and use that in addition to the regular ckeditor timestamp
+                if ( _fingerPrintVersion == null )
+                {
+                    var ckpluginsFolderName = System.Web.Hosting.HostingEnvironment.MapPath( "~/Scripts/ckeditor/plugins" );
+
+                    if ( System.IO.Directory.Exists( ckpluginsFolderName ) )
+                    {
+                        var lastUpdatedFile = new System.IO.DirectoryInfo( ckpluginsFolderName ).EnumerateFiles( "*.js", System.IO.SearchOption.AllDirectories ).OrderByDescending( a => a.LastWriteTime ).FirstOrDefault();
+                        if ( lastUpdatedFile != null )
+                        {
+                            _fingerPrintVersion = lastUpdatedFile.LastWriteTime.Ticks.ToString();
+                        }
+                        else
+                        {
+                            _fingerPrintVersion = "0";
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // ignore exception and just
+                _fingerPrintVersion = "0";
+            }
+
             string ckeditorInitScript = string.Format( ckeditorInitScriptFormat,
                 this.ClientID,                                                  // {0}
                 this.Toolbar.ConvertToString(),                                 // {1}
@@ -588,7 +679,8 @@ CKEDITOR.replace('{0}', {{
                 this.MergeFields.AsDelimited( "," ),                            // {10}
                 this.AdditionalConfigurations,                                  // {11}
                 ckEditorLib,                                                    // {12}
-                ( (RockPage)this.Page ).Site.Theme                              // {13}
+                ( (RockPage)this.Page ).Site.Theme,                             // {13}
+                _fingerPrintVersion                                              // {14}
                 );
 
             ScriptManager.RegisterStartupScript( this, this.GetType(), "ckeditor_init_script_" + this.ClientID, ckeditorInitScript, true );

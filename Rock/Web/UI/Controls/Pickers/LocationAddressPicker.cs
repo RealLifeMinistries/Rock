@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -47,6 +47,23 @@ namespace Rock.Web.UI.Controls
         {
             get { return ViewState["Label"] as string ?? string.Empty; }
             set { ViewState["Label"] = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the form group class.
+        /// </summary>
+        /// <value>
+        /// The form group class.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        Description( "The CSS class to add to the form-group div." )
+        ]
+        public string FormGroupCssClass
+        {
+            get { return ViewState["FormGroupCssClass"] as string ?? string.Empty; }
+            set { ViewState["FormGroupCssClass"] = value; }
         }
 
         /// <summary>
@@ -93,6 +110,34 @@ namespace Rock.Web.UI.Controls
                 }
             }
         }
+
+        /// <summary>
+        /// Gets or sets the warning text.
+        /// </summary>
+        /// <value>
+        /// The warning text.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        DefaultValue( "" ),
+        Description( "The warning block." )
+        ]
+        public string Warning
+        {
+            get
+            {
+                return WarningBlock != null ? WarningBlock.Text : string.Empty;
+            }
+            set
+            {
+                if ( WarningBlock != null )
+                {
+                    WarningBlock.Text = value;
+                }
+            }
+        }
+
         /// <summary>
         /// Gets or sets a value indicating whether this <see cref="RockTextBox"/> is required.
         /// </summary>
@@ -165,6 +210,14 @@ namespace Rock.Web.UI.Controls
         /// The help block.
         /// </value>
         public HelpBlock HelpBlock { get; set; }
+
+        /// <summary>
+        /// Gets or sets the warning block.
+        /// </summary>
+        /// <value>
+        /// The warning block.
+        /// </value>
+        public WarningBlock WarningBlock { get; set; }
 
         /// <summary>
         /// Gets or sets the required field validator.
@@ -411,6 +464,14 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Gets or sets the select dbGeography.
+        /// </summary>
+        /// <value>
+        /// The select dbGeography.
+        /// </value>
+        public event EventHandler SelectGeography;
+
+        /// <summary>
         /// Handles the Click event of the _btnSelect control.
         /// </summary>
         /// <param name="sender">The source of the event.</param>
@@ -422,6 +483,11 @@ namespace Rock.Web.UI.Controls
             Location = location;
             _btnPickerLabel.InnerHtml = string.Format( "<i class='fa fa-user'></i>{0}<b class='fa fa-caret-down pull-right'></b>", this.AddressSummaryText );
             ShowDropDown = false;
+
+            if ( SelectGeography != null )
+            {
+                SelectGeography( sender, e );
+            }
         }
 
         /// <summary>

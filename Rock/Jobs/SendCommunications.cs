@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 //
 using System;
 using System.Collections.Generic;
+using System.Data.Entity;
 using System.Linq;
 using System.Web;
 using System.IO;
@@ -51,24 +52,58 @@ namespace Rock.Jobs
         public virtual void Execute( IJobExecutionContext context )
         {
             JobDataMap dataMap = context.JobDetail.JobDataMap;
-            var beginWindow = RockDateTime.Now.AddDays( 0 - dataMap.GetInt( "ExpirationPeriod" ));
-            var endWindow = RockDateTime.Now.AddMinutes( 0 - dataMap.GetInt( "DelayPeriod" ));
+            var beginWindow = RockDateTime.Now.AddDays( 0 - dataMap.GetInt( "ExpirationPeriod" ) );
+            var endWindow = RockDateTime.Now.AddMinutes( 0 - dataMap.GetInt( "DelayPeriod" ) );
+            var nowDate = RockDateTime.Now;
 
-            foreach ( var comm in new CommunicationService( new RockContext() ).Queryable()
-                .Where( c => 
+            var rockContext = new RockContext();
+            var qryPendingRecipients = new CommunicationRecipientService( rockContext ).Queryable().Where( a => a.Status == CommunicationRecipientStatus.Pending );
+
+            var qry = new CommunicationService( rockContext ).Queryable()
+                .Where( c =>
                     c.Status == CommunicationStatus.Approved &&
-                    c.Recipients.Where( r => r.Status == CommunicationRecipientStatus.Pending).Any() &&
+                    qryPendingRecipients.Where( r => r.CommunicationId == c.Id ).Any() &&
                     (
-                        ( !c.FutureSendDateTime.HasValue && c.CreatedDateTime.HasValue && c.CreatedDateTime.Value.CompareTo(beginWindow) >= 0 && c.CreatedDateTime.Value.CompareTo(endWindow) <= 0 ) ||
-                        ( c.FutureSendDateTime.HasValue && c.FutureSendDateTime.Value.CompareTo(beginWindow) >= 0 && c.FutureSendDateTime.Value.CompareTo(endWindow) <= 0 )
-                    ) ).ToList() )
+                        ( !c.FutureSendDateTime.HasValue && c.CreatedDateTime.HasValue && c.CreatedDateTime.Value.CompareTo( beginWindow ) >= 0 && c.CreatedDateTime.Value.CompareTo( endWindow ) <= 0 ) ||
+                        ( c.FutureSendDateTime.HasValue && c.FutureSendDateTime.Value.CompareTo( beginWindow ) >= 0 && c.FutureSendDateTime.Value.CompareTo( nowDate ) <= 0 )
+                    ) );
+
+            var exceptionMsgs = new List<string>();
+            int communicationsSent = 0;
+
+            foreach ( var comm in qry.AsNoTracking().ToList() )
             {
-                var medium = comm.Medium;
-                if ( medium != null )
+                try
                 {
-                    medium.Send( comm );
+                    var medium = comm.Medium;
+                    if ( medium != null && medium.IsActive )
+                    {
+                        medium.Send( comm );
+                        communicationsSent++;
+                    }
+                }
+
+                catch ( Exception ex )
+                {
+                    exceptionMsgs.Add( string.Format( "Exception occurred sending communication ID:{0}:{1}    {2}", comm.Id, Environment.NewLine, ex.Messages().AsDelimited( Environment.NewLine + "   " ) ) );
+                    ExceptionLogService.LogException( ex, System.Web.HttpContext.Current );
                 }
             }
+
+            if ( communicationsSent > 0 )
+            {
+                context.Result = string.Format( "Sent {0} {1}", communicationsSent, "communication".PluralizeIf( communicationsSent > 1 ) );
+            }
+            else
+            {
+                context.Result = "No communications to send";
+            }
+
+            if ( exceptionMsgs.Any() )
+            {
+                throw new Exception( "One or more exceptions occurred sending communications..." + Environment.NewLine + exceptionMsgs.AsDelimited( Environment.NewLine ) );
+            }
+
         }
     }
 }

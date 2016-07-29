@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,7 +33,7 @@ namespace RockWeb.Blocks.Reporting.Dashboard
     [EntityField( "Series Partition", "Select the series partition entity (Campus, Group, etc) to be used to limit the metric values for the selected metrics.", "Either select a specific {0} or leave {0} blank to get it from the page context.", Key = "Entity", Order = 3 )]
     [MetricCategoriesField( "Metric", "Select the metric(s) to be made available to liquid", Key = "MetricCategories", Order = 4 )]
     [BooleanField( "Round Values", "Round Y values to the nearest whole number. For example, display 25.00 as 25.", true, Order = 5 )]
-    [CodeEditorField( "Liquid Template", "The text (or html) to display as a dashboard widget", CodeEditorMode.Liquid, CodeEditorTheme.Rock, 200, Order = 6, DefaultValue =
+    [CodeEditorField( "Liquid Template", "The text (or html) to display as a dashboard widget", CodeEditorMode.Lava, CodeEditorTheme.Rock, 200, Order = 6, DefaultValue =
 @"
 {% for metric in Metrics %}
     <h1>{{ metric.Title }}</h1>
@@ -69,7 +69,7 @@ namespace RockWeb.Blocks.Reporting.Dashboard
             {
                 string result = ResolveUrl( "~/api/Metrics/GetHtmlForBlock/" ) + this.BlockId.ToString();
                 string[] entityValues = ( GetAttributeValue( "Entity" ) ?? "" ).Split( '|' );
-                if ( entityValues.Length == 2 )
+                if ( entityValues.Length == 2 && !string.IsNullOrEmpty(entityValues[1]))
                 {
                     var entityType = EntityTypeCache.Read( entityValues[0].AsGuid() );
                     if ( entityType != null )

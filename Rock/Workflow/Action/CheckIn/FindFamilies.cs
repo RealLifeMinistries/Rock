@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,10 +32,10 @@ namespace Rock.Workflow.Action.CheckIn
     /// <summary>
     /// Finds families based on a given search critieria (i.e. phone, barcode, etc)
     /// </summary>
-    [Description("Finds families based on a given search critieria (i.e. phone, barcode, etc)")]
-    [Export(typeof(ActionComponent))]
+    [ActionCategory( "Check-In" )]
+    [Description( "Finds families based on a given search critieria (i.e. phone, barcode, etc)" )]
+    [Export( typeof( ActionComponent ) )]
     [ExportMetadata( "ComponentName", "Find Families" )]
-    [IntegerField( "Max Results", "The maximum number of families to return ( Default is 100, a value of 0 will not limit results ).", false, 100 )]
     public class FindFamilies : CheckInActionComponent
     {
         /// <summary>
@@ -50,7 +50,7 @@ namespace Rock.Workflow.Action.CheckIn
         public override bool Execute( RockContext rockContext, Model.WorkflowAction action, Object entity, out List<string> errorMessages )
         {
             var checkInState = GetCheckInState( entity, out errorMessages );
-            if ( checkInState != null )
+            if ( checkInState != null && checkInState.CheckIn.SearchType != null )
             {
                 var personService = new PersonService( rockContext );
                 var memberService = new GroupMemberService( rockContext );
@@ -66,25 +66,37 @@ namespace Rock.Workflow.Action.CheckIn
                     // Find the families with any member who has a phone number that contains selected value
                     var familyQry = memberService
                         .Queryable().AsNoTracking()
-                        .Where( m => 
+                        .Where( m =>
                             m.Group.GroupType.Guid.Equals( familyGroupTypeGuid ) &&
-                            m.Person.RecordTypeValueId == personRecordTypeId &&
-                            m.Person.PhoneNumbers.Any( n => n.Number.Contains( numericPhone ) ) )
+                            m.Person.RecordTypeValueId == personRecordTypeId );
+
+                    if ( checkInState.CheckInType == null || checkInState.CheckInType.PhoneSearchType == PhoneSearchType.EndsWith )
+                    {
+                        familyQry = familyQry.Where( m =>
+                            m.Person.PhoneNumbers.Any( n => n.Number.EndsWith( numericPhone ) ) );
+                    }
+                    else
+                    {
+                        familyQry = familyQry.Where( m =>
+                            m.Person.PhoneNumbers.Any( n => n.Number.Contains( numericPhone ) ) );
+                    }
+
+                    var familyIdQry = familyQry
                         .Select( m => m.GroupId )
                         .Distinct();
 
-                    int maxResults = GetAttributeValue( action, "MaxResults" ).AsInteger();
+                    int maxResults = checkInState.CheckInType != null ? checkInState.CheckInType.MaxSearchResults : 100;
                     if ( maxResults > 0 )
                     {
-                        familyQry = familyQry.Take( maxResults );
+                        familyIdQry = familyIdQry.Take( maxResults );
                     }
 
-                    var familyIds = familyQry.ToList();
+                    var familyIds = familyIdQry.ToList();
 
                     // Load the family members
                     var familyMembers = memberService
                         .Queryable( "Group,GroupRole,Person" ).AsNoTracking()
-                        .Where( m => familyIds.Contains(m.GroupId) )
+                        .Where( m => familyIds.Contains( m.GroupId ) )
                         .ToList();
 
                     // Add each family
@@ -92,8 +104,8 @@ namespace Rock.Workflow.Action.CheckIn
                     {
                         // Get each of the members for this family
                         var thisFamilyMembers = familyMembers
-                            .Where( m => 
-                                m.GroupId == familyId && 
+                            .Where( m =>
+                                m.GroupId == familyId &&
                                 m.Person.NickName != null )
                             .ToList();
 
@@ -122,7 +134,7 @@ namespace Rock.Workflow.Action.CheckIn
                 }
                 else if ( checkInState.CheckIn.SearchType.Guid.Equals( new Guid( SystemGuid.DefinedValue.CHECKIN_SEARCH_TYPE_NAME ) ) )
                 {
-                    foreach ( var person in personService.GetByFullName( checkInState.CheckIn.SearchValue, false ) )
+                    foreach ( var person in personService.GetByFullName( checkInState.CheckIn.SearchValue, false ).AsNoTracking() )
                     {
                         foreach ( var group in person.Members.Where( m => m.Group.GroupType.Guid.Equals( familyGroupTypeGuid ) ).Select( m => m.Group ).ToList() )
                         {

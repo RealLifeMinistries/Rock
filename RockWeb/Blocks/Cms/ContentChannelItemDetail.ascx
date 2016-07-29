@@ -17,7 +17,8 @@
                 </h1>
                 <div class="panel-labels">
                     <Rock:HighlightLabel ID="hlContentChannel" runat="server" LabelType="Type" />
-                    <Rock:HighlightLabel ID="hlStatus" runat="server"  />
+                    <Rock:HighlightLabel ID="hlStatus" runat="server" />
+                    <asp:PlaceHolder ID="phOccurrences" runat="server" />
                 </div>
             </div>
 
@@ -33,20 +34,27 @@
                         <div class="col-md-6">
                         <Rock:DataTextBox ID="tbTitle" runat="server" SourceTypeName="Rock.Model.ContentChannelItem, Rock" PropertyName="Title" />
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <div class="form-group" id="divStatus" runat="server">
-                                <label class="control-label">Status</label>
+                                
                                 <div class="form-control-static">
                                     <asp:HiddenField ID="hfStatus" runat="server" />
-                                    <asp:Panel ID="pnlStatus" runat="server" CssClass="toggle-container">
-                                        <div class="btn-group btn-toggle">
-                                            <a class="btn btn-xs <%=PendingCss%>" data-status="1" data-active-css="btn-default">Pending</a>
-                                            <a class="btn btn-xs <%=ApprovedCss%>" data-status="2" data-active-css="btn-success">Approved</a>
-                                            <a class="btn btn-xs <%=DeniedCss%>" data-status="3" data-active-css="btn-danger">Denied</a>
+                                    <asp:Panel ID="pnlStatus" runat="server">
+                                        <label class="control-label">Status</label>
+
+                                        <div class="toggle-container">
+                                            <div class="btn-group btn-toggle">
+                                                <a class="btn btn-xs <%=PendingCss%>" data-status="1" data-active-css="btn-warning">Pending</a>
+                                                <a class="btn btn-xs <%=ApprovedCss%>" data-status="2" data-active-css="btn-success">Approved</a>
+                                                <a class="btn btn-xs <%=DeniedCss%>" data-status="3" data-active-css="btn-danger">Denied</a>
+                                            </div>
                                         </div>
                                     </asp:Panel>
                                 </div>
                             </div>
+                        </div>
+                        <div class="col-md-3">
+                            <Rock:RockLiteral ID="lCreatedBy" runat="server" Label="Created By"></Rock:RockLiteral>
                         </div>
                     </div>
 
@@ -60,22 +68,27 @@
 
                     <div class="row">
                         <div class="col-md-6">
+                            <Rock:DatePicker ID="dpStart" runat="server" Label="Start" Required="true" Visible="false" />
                             <Rock:DateTimePicker ID="dtpStart" runat="server" Label="Start" Required="true" />
-                            <Rock:NumberBox ID="nbPriority" runat="server" Label="Priority" />
                         </div>
                         <div class="col-md-6">
+                            <Rock:DatePicker ID="dpExpire" runat="server" Label="Expire" Required="true" Visible="false" />
                             <Rock:DateTimePicker ID="dtpExpire" runat="server" Label="Expire" />
                         </div>
                     </div>
 
                     <div class="row">
-                        <div class="col-md-12">
+                        <div class="col-md-6">
+                            <Rock:NumberBox ID="nbPriority" runat="server" Label="Priority" />
                             <asp:PlaceHolder ID="phAttributes" runat="server" EnableViewState="false" />
+                        </div>
+                        <div class="col-md-6">
                         </div>
                     </div>
 
                     <div class="actions">
                         <asp:LinkButton ID="lbSave" runat="server" Text="Save" CssClass="btn btn-primary" OnClick="lbSave_Click" />
+                        <asp:LinkButton ID="lbDelete" runat="server" Text="Delete" CssClass="btn btn-link" OnClick="lbDelete_Click" />
                         <asp:LinkButton ID="lbCancel" runat="server" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="lbCancel_Click" />
                     </div>
 
@@ -84,6 +97,10 @@
             </div>
 
         </asp:Panel>
-        
+
+        <script>
+            $('.js-date-rollover').tooltip();
+        </script>
+
     </ContentTemplate>
 </asp:UpdatePanel>

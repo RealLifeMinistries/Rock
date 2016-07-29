@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -136,23 +136,19 @@ namespace Rock.Model
             {
                 bool result = true;
 
-                if ( ActionType != null &&
-                    ActionType.CriteriaAttributeGuid.HasValue )
+                if ( ActionType != null && ActionType.CriteriaAttributeGuid.HasValue )
                 {
                     result = false;
 
                     string criteria = GetWorklowAttributeValue( ActionType.CriteriaAttributeGuid.Value ) ?? string.Empty;
+                    string value = ActionType.CriteriaValue;
 
-                    Guid guid = ActionType.CriteriaValue.AsGuid();
-                    if ( guid.IsEmpty() )
+                    if ( IsValueAnAttribute( value ) )
                     {
-                        return criteria.CompareTo( ActionType.CriteriaValue, ActionType.CriteriaComparisonType );
+                        value = GetWorklowAttributeValue( ActionType.CriteriaValue.AsGuid() );
                     }
-                    else
-                    {
-                        string value = GetWorklowAttributeValue( guid );
-                        return criteria.CompareTo( value, ActionType.CriteriaComparisonType );
-                    }
+
+                    return criteria.CompareTo( value, ActionType.CriteriaComparisonType );
                 }
 
                 return result;
@@ -169,7 +165,7 @@ namespace Rock.Model
         {
             get
             {
-                return this.Activity;
+                return this.Activity != null ? this.Activity : base.ParentAuthority;
             }
         }
 
@@ -194,7 +190,7 @@ namespace Rock.Model
             ActionComponent workflowAction = this.ActionType.WorkflowAction;
             if ( workflowAction == null )
             {
-                throw new SystemException( string.Format( "The '{0}' component does not exist, or is not active", workflowAction));
+                throw new SystemException( string.Format( "The '{0}' component does not exist, or is not active", this.ActionType.EntityType ) );
             }
 
             this.ActionType.LoadAttributes( rockContext );
@@ -204,6 +200,14 @@ namespace Rock.Model
                 bool success = workflowAction.Execute( rockContext, this, entity, out errorMessages );
 
                 this.LastProcessedDateTime = RockDateTime.Now;
+
+                if ( errorMessages.Any() )
+                {
+                    foreach ( string errorMsg in errorMessages )
+                    {
+                        AddLogEntry( "Error Occurred: " + errorMsg, true );
+                    }
+                }
 
                 AddLogEntry( string.Format( "Processing Complete (Success:{0})", success.ToString() ) );
 
@@ -261,12 +265,56 @@ namespace Rock.Model
                     {
                         value = attribute.FieldType.Field.FormatValue( null, value, attribute.QualifierValues, condensed );
                     }
-
-                    return value;
                 }
+
+                return value ?? string.Empty;
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Determines whether [is unique identifier value an attribute] [the specified unique identifier value].
+        /// </summary>
+        /// <param name="guidValue">The unique identifier value.</param>
+        /// <returns></returns>
+        public virtual bool IsValueAnAttribute( string guidValue )
+        {
+            Guid? guid = guidValue.AsGuidOrNull();
+            if ( guid.HasValue )
+            {
+                // Check to see if attribute exists with selected guid
+                var attribute = AttributeCache.Read( guid.Value );
+
+                // If so, check to see if the current workflow or activity contains that attribute
+                if ( attribute != null && Activity != null )
+                {
+                    // Check for workflow attribute
+                    if ( Activity.Workflow != null )
+                    {
+                        if ( Activity.Workflow.Attributes == null )
+                        {
+                            Activity.Workflow.LoadAttributes();
+                        }
+                        if ( Activity.Workflow.Attributes.ContainsKey( attribute.Key ) )
+                        {
+                            return true;
+                        }
+                    }
+
+                    // Check for activity attribute
+                    if ( Activity.Attributes == null )
+                    {
+                        Activity.LoadAttributes();
+                    }
+                    if ( Activity.Attributes.ContainsKey( attribute.Key ) )
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

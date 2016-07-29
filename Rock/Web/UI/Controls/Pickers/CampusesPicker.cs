@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,8 @@ using Rock.Web.Cache;
 namespace Rock.Web.UI.Controls
 {
     /// <summary>
-    /// 
+    /// Select multiple campuses
+    /// NOTE: Campuses must be set first (it doesn't automatically load campuses). Hint: Use CampusCache.All()
     /// </summary>
     public class CampusesPicker : RockCheckBoxList
     {
@@ -54,7 +55,6 @@ namespace Rock.Web.UI.Controls
                     campusItem.Text = campus.Name;
                     this.Items.Add( campusItem );
                 }
-
             }
         }
 
@@ -68,7 +68,7 @@ namespace Rock.Web.UI.Controls
         {
             get
             {
-                return this.Items.OfType<ListItem>().Select( a => int.Parse( a.Value ) ).ToList();
+                return this.Items.OfType<ListItem>().Select( a => a.Value ).AsIntegerList();
             }
         }
 
@@ -82,16 +82,16 @@ namespace Rock.Web.UI.Controls
         {
             get
             {
-                return this.Items.OfType<ListItem>().Where( l => l.Selected ).Select( a => int.Parse( a.Value ) ).ToList();
+                return this.Items.OfType<ListItem>().Where( l => l.Selected ).Select( a => a.Value ).AsIntegerList();
             }
+
             set
             {
                 foreach ( ListItem campusItem in this.Items )
                 {
-                    campusItem.Selected = value.Exists( a => a.Equals( int.Parse( campusItem.Value ) ) );
+                    campusItem.Selected = value.Exists( a => a.Equals( campusItem.Value.AsInteger() ) );
                 }
             }
         }
-
     }
 }

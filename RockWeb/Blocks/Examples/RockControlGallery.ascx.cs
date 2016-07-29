@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,8 @@ using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
 using Rock;
 using Rock.Attribute;
+using Rock.Data;
+using Rock.Model;
 using Rock.Web.UI;
 using Rock.Web.UI.Controls;
 
@@ -73,7 +75,7 @@ namespace RockWeb.Blocks.Examples
                     example.Controls.Add( new LiteralControl( string.Format( "<pre class='prettyprint'>{0}</pre>", Server.HtmlEncode( list[i] ) ) ) );
                 }
 
-                if ( example.TagName == "h1" || example.TagName == "h2" || example.TagName == "h3" )
+                if ( example.NamingContainer == this && (example.TagName == "h1" || example.TagName == "h2" || example.TagName == "h3") )
                 {
                     example.Attributes["class"] = "rollover-container";
                     example.Controls.AddAt( 0, new LiteralControl( string.Format( "<a name='{0}' class='anchor rollover-item' href='#{0}'><i class='fa fa-link rlink icon-link'></i></a>", BuildAnchorForHref( (HtmlGenericControl)example ) ) ) );
@@ -174,12 +176,29 @@ namespace RockWeb.Blocks.Examples
                 bddlExample.Items.Add( new ListItem( "Mustard", "654" ) );
                 bddlExample.SelectedValue = "44";
 
+                bddlExampleCheckmark.Items.Clear();
+                bddlExampleCheckmark.Items.Add( new ListItem( "Small", "44" ) );
+                bddlExampleCheckmark.Items.Add( new ListItem( "Medium", "88" ) );
+                bddlExampleCheckmark.Items.Add( new ListItem( "Large", "150" ) );
+                bddlExampleCheckmark.Items.Add( new ListItem( "Software Developer", "654" ) );
+
                 ddlDataExample.Items.AddRange( bddlExample.Items.OfType<ListItem>().ToArray() );
 
                 cblExample.Items.AddRange( bddlExample.Items.OfType<ListItem>().ToArray() );
                 cblExampleHorizontal.Items.AddRange( bddlExample.Items.OfType<ListItem>().ToArray() );
                 rblExample.Items.AddRange( bddlExample.Items.OfType<ListItem>().ToArray() );
                 rblExampleHorizontal.Items.AddRange( bddlExample.Items.OfType<ListItem>().ToArray() );
+
+                campsExample.Campuses = Rock.Web.Cache.CampusCache.All();
+                
+                var rockContext = new RockContext();
+                var allGroupTypes = new GroupTypeService( rockContext ).Queryable().OrderBy( a => a.Name ).ToList();
+                gpGroupType.GroupTypes = allGroupTypes;
+                gpGroupTypes.GroupTypes = allGroupTypes;
+
+                sdrpExample.SlidingDateRangeMode = SlidingDateRangePicker.SlidingDateRangeType.Last;
+                sdrpExample.TimeUnit = SlidingDateRangePicker.TimeUnitType.Week;
+                sdrpExample.NumberOfTimeUnits = 16;
 
                 BindGrid();
             }
@@ -380,6 +399,12 @@ namespace RockWeb.Blocks.Examples
         {
             string physicalFileName = this.Request.MapPath( fuprExampleContentFile.UploadedContentFilePath );
             lblPhysicalFileName.Text = "Uploaded File: " + physicalFileName;
+        }
+        
+        protected void lbTestSlider_Click( object sender, EventArgs e )
+        {
+            var val1 = rsSlider.SelectedValue;
+            var val2 = rsSlider2.SelectedValue;
         }
 }
 }

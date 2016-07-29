@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,6 @@ using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
 
-using Rock.Data;
 using Rock.Model;
 using Rock.Reporting;
 using Rock.Web.UI.Controls;
@@ -35,7 +34,6 @@ namespace Rock.Field
     [Serializable]
     public abstract class FieldType : IFieldType
     {
-
         #region Constructors
 
         /// <summary>
@@ -47,7 +45,7 @@ namespace Rock.Field
 
         #endregion
 
-        #region Configuration 
+        #region Configuration
 
         /// <summary>
         /// Returns a list of the configuration keys
@@ -128,6 +126,32 @@ namespace Rock.Field
         {
             return FormatValue( parentControl, value, configurationValues, condensed );
         }
+         
+        /// <summary>
+        /// Returns the value using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        public virtual object ValueAsFieldType(  Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues )
+        {
+            // by default, get the field type's value
+            return value;
+        }
+
+        /// <summary>
+        /// Returns the value that should be used for sorting, using the most appropriate datatype
+        /// </summary>
+        /// <param name="parentControl">The parent control.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <returns></returns>
+        public virtual object SortValue( Control parentControl, string value, Dictionary<string, ConfigurationValue> configurationValues )
+        {
+            // by default, get the formatted condensed value that would be displayed to the user
+            return FormatValue( parentControl, value, configurationValues, true );
+        }
 
         #endregion
 
@@ -207,48 +231,100 @@ namespace Rock.Field
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
         /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public virtual Control FilterControl ( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        public virtual Control FilterControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
         {
             HtmlGenericControl row = new HtmlGenericControl( "div" );
             row.ID = id;
             row.AddCssClass( "row" );
             row.AddCssClass( "field-criteria" );
 
-            var compareControl = FilterCompareControl( configurationValues, id, required );
-            var valueControl = FilterValueControl( configurationValues, id, required );
+            var compareControl = FilterCompareControl( configurationValues, id, required, filterMode );
+            var valueControl = FilterValueControl( configurationValues, id, required, filterMode );
 
-            bool isLabel = compareControl is Label;
+            string col1Class = string.Empty;
+            string col2Class = "col-md-12";
 
             if ( compareControl != null )
             {
                 HtmlGenericControl col1 = new HtmlGenericControl( "div" );
                 col1.ID = string.Format( "{0}_col1", id );
                 row.Controls.Add( col1 );
-                col1.AddCssClass( isLabel ? "col-md-2" : "col-md-4" );
+                if ( !compareControl.Visible )
+                {
+                    col1Class = string.Empty;
+                    col2Class = "col-md-12";
+                }
+                else if ( compareControl is Label )
+                {
+                    col1Class = "col-md-2";
+                    col2Class = "col-md-10";
+                }
+                else
+                {
+                    col1Class = "col-md-4";
+                    col2Class = "col-md-8";
+                }
+
+                col1.AddCssClass( col1Class );
                 col1.Controls.Add( compareControl );
             }
 
             HtmlGenericControl col2 = new HtmlGenericControl( "div" );
             col2.ID = string.Format( "{0}_col2", id );
             row.Controls.Add( col2 );
-            col2.AddCssClass( isLabel ? "col-md-10" : "col-md-8" );
+            col2.AddCssClass( col2Class );
             col2.Controls.Add( valueControl );
 
             return row;
         }
 
-
         /// <summary>
-        /// Gets the filter compare control.
+        /// Creates the control needed to filter (query) values using this field type using a FilterMode of AdvancedFilter
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
         /// <param name="required">if set to <c>true</c> [required].</param>
         /// <returns></returns>
-        public virtual Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
-        { 
+        public virtual Control FilterControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        {
+            return FilterControl( configurationValues, id, required, FilterMode.AdvancedFilter );
+        }
+
+        /// <summary>
+        /// Determines whether this filter has a filter control
+        /// </summary>
+        /// <returns></returns>
+        public virtual bool HasFilterControl()
+        {
+            return true;
+        }
+
+        /// <summary>
+        /// Gets the filter compare control with the specified FilterMode
+        /// </summary>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <param name="id">The identifier.</param>
+        /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
+        /// <returns></returns>
+        public virtual Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
+        {
             RockDropDownList ddlCompare = ComparisonHelper.ComparisonControl( FilterComparisonType, required );
+
+            if ( FilterComparisonType == ComparisonHelper.BinaryFilterComparisonTypes && filterMode == FilterMode.SimpleFilter )
+            {
+                // hide the compare control for SimpleFilter mode if it is just EqualTo/NotEqualTo
+                ddlCompare.Visible = false;
+            }
+
+            if ( FilterComparisonType == ComparisonHelper.ContainsFilterComparisonTypes && filterMode == FilterMode.SimpleFilter )
+            {
+                // hide the compare control for SimpleFilter mode if it is just Contains/NotContains
+                ddlCompare.Visible = false;
+            }
+
             ddlCompare.ID = string.Format( "{0}_ddlCompare", id );
             ddlCompare.AddCssClass( "js-filter-compare" );
             return ddlCompare;
@@ -266,13 +342,14 @@ namespace Rock.Field
         }
 
         /// <summary>
-        /// Gets the filter value control.
+        /// Gets the filter value control with the specified FilterMode
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
         /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public virtual Control FilterValueControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        public virtual Control FilterValueControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
         {
             var control = EditControl( configurationValues, id );
             control.ID = string.Format( "{0}_ctlCompareValue", id );
@@ -280,6 +357,7 @@ namespace Rock.Field
             {
                 ( (WebControl)control ).AddCssClass( "js-filter-control" );
             }
+
             return control;
         }
 
@@ -288,8 +366,9 @@ namespace Rock.Field
         /// </summary>
         /// <param name="filterControl">The filter control.</param>
         /// <param name="configurationValues">The configuration values.</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public virtual List<string> GetFilterValues( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues )
+        public virtual List<string> GetFilterValues( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues, FilterMode filterMode )
         {
             var values = new List<string>();
 
@@ -297,8 +376,8 @@ namespace Rock.Field
             {
                 try
                 {
-                    string compare = GetFilterCompareValue( filterControl.Controls[0].Controls[0] );
-                    if (compare != null )
+                    string compare = GetFilterCompareValue( filterControl.Controls[0].Controls[0], filterMode );
+                    if ( compare != null )
                     {
                         values.Add( compare );
                     }
@@ -309,7 +388,10 @@ namespace Rock.Field
                         values.Add( value );
                     }
                 }
-                catch { }
+                catch
+                {
+                    // intentionally ignore error
+                }
             }
 
             return values;
@@ -319,12 +401,36 @@ namespace Rock.Field
         /// Gets the filter compare value.
         /// </summary>
         /// <param name="control">The control.</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public virtual string GetFilterCompareValue( Control control )
+        public virtual string GetFilterCompareValue( Control control, FilterMode filterMode )
         {
             var ddlCompare = control as RockDropDownList;
             if ( ddlCompare != null )
             {
+                bool filterValueControlVisible = true;
+                var filterField = control.FirstParentControlOfType<FilterField>();
+                if ( filterField != null && filterField.HideFilterCriteria )
+                {
+                    filterValueControlVisible = false;
+                }
+
+                // if the CompareControl is hidden, but the ValueControl is visible, pick the appropriate ComparisonType
+                if ( !ddlCompare.Visible && filterValueControlVisible )
+                {
+                    if ( FilterComparisonType == ComparisonHelper.BinaryFilterComparisonTypes && filterMode == FilterMode.SimpleFilter )
+                    {
+                        // in FilterMode.SimpleFilter, if the compare only support EqualTo/NotEqual to, and the compare is hidden, return EqualTo
+                        return ComparisonType.EqualTo.ConvertToInt().ToString();
+                    }
+
+                    if ( FilterComparisonType == ComparisonHelper.ContainsFilterComparisonTypes && filterMode == FilterMode.SimpleFilter )
+                    {
+                        // in FilterMode.SimpleFilter, if the compare only support EqualTo/NotEqual to, and the compare is hidden, return Contains
+                        return ComparisonType.Contains.ConvertToInt().ToString();
+                    }
+                }
+
                 return ddlCompare.SelectedValue;
             }
 
@@ -348,7 +454,7 @@ namespace Rock.Field
         /// <param name="filterControl">The filter control.</param>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="filterValues">The filter values.</param>
-        public virtual void SetFilterValues ( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues, List<string> filterValues )
+        public virtual void SetFilterValues( Control filterControl, Dictionary<string, ConfigurationValue> configurationValues, List<string> filterValues )
         {
             if ( filterControl != null )
             {
@@ -358,7 +464,10 @@ namespace Rock.Field
                     string value = filterValues.Count > 1 ? filterValues[1] : filterValues.Count > 0 ? filterValues[0] : string.Empty;
                     SetFilterValueValue( filterControl.Controls[1].Controls[0], configurationValues, value );
                 }
-                catch { }
+                catch
+                {
+                    // intentionally ignore error
+                }
             }
         }
 
@@ -397,19 +506,18 @@ namespace Rock.Field
         {
             if ( filterValues != null && filterValues.Any() )
             {
-                // If just one value, then it is likely just a value
                 if ( filterValues.Count == 1 )
                 {
+                    // If just one value, then it is likely just a value
                     string filterValue = FormatFilterValueValue( configurationValues, filterValues[0] );
                     if ( !string.IsNullOrWhiteSpace( filterValue ) )
                     {
                         return "is " + filterValue;
                     }
                 }
-
-                // If two more values, then it is a comparison and a value
                 else if ( filterValues.Count >= 2 )
                 {
+                    // If two more values, then it is a comparison and a value
                     string comparisonValue = filterValues[0];
                     if ( comparisonValue != "0" )
                     {
@@ -420,7 +528,16 @@ namespace Rock.Field
                         }
                         else
                         {
-                            return string.Format( "{0} {1}", comparisonType.ConvertToString(), FormatFilterValueValue( configurationValues, filterValues[1] ) );
+                            var filterValueValue = FormatFilterValueValue( configurationValues, filterValues[1] );
+                            if ( ( comparisonType == ComparisonType.Contains || comparisonType == ComparisonType.DoesNotContain ) && string.IsNullOrEmpty( filterValueValue ) )
+                            {
+                                // if doing a 'Contains or NotContains', but the CompareValue is empty, there is nothing filtered, so just return String.Empty
+                                return string.Empty;
+                            }
+                            else
+                            {
+                                return string.Format( "{0} {1}", comparisonType.ConvertToString(), filterValueValue );
+                            }
                         }
                     }
                 }
@@ -459,7 +576,7 @@ namespace Rock.Field
         public virtual string GetFilterFormatScript( Dictionary<string, ConfigurationValue> configurationValues, string title )
         {
             string titleJs = System.Web.HttpUtility.JavaScriptStringEncode( title );
-            return string.Format( "result = '{0} ' + $('select', $selectedContent).find(':selected').text() + ( $('input', $selectedContent).filter(':visible').length ?  (' \\'' +  $('input', $selectedContent).filter(':visible').val()  + '\\'') : '' )", titleJs );
+            return string.Format( "return Rock.reporting.formatFilterDefault('{0}', $selectedContent);", titleJs );
         }
 
         /// <summary>
@@ -487,11 +604,14 @@ namespace Rock.Field
                         type = Nullable.GetUnderlyingType( type );
                     }
 
-                    object value = ConvertValueToPropertyType( filterValues[1], type );
-                    if ( value != null )
+                    object value = ConvertValueToPropertyType( filterValues[1], type, isNullableType );
+                    ComparisonType comparisonType = comparisonValue.ConvertToEnum<ComparisonType>( ComparisonType.EqualTo );
+
+                    bool valueNotNeeded = ( ComparisonType.IsBlank | ComparisonType.IsNotBlank ).HasFlag( comparisonType );
+
+                    if ( value != null || valueNotNeeded)
                     {
-                        ComparisonType comparisonType = comparisonValue.ConvertToEnum<ComparisonType>( ComparisonType.EqualTo );
-                        ConstantExpression constantExpression = Expression.Constant( value, type );
+                        ConstantExpression constantExpression = value != null ? Expression.Constant( value, type ) : null;
                         return ComparisonHelper.ComparisonExpression( comparisonType, propertyExpression, constantExpression );
                     }
                 }
@@ -505,14 +625,25 @@ namespace Rock.Field
         /// </summary>
         /// <param name="value">The value.</param>
         /// <param name="propertyType">Type of the property.</param>
+        /// <param name="isNullableType">if set to <c>true</c> [is nullable type].</param>
         /// <returns></returns>
-        public virtual object ConvertValueToPropertyType( string value, Type propertyType )
+        public virtual object ConvertValueToPropertyType( string value, Type propertyType, bool isNullableType )
         {
+            if ( propertyType == typeof( string ) )
+            {
+                return value;
+            }
+
+            if ( string.IsNullOrWhiteSpace( value ) && isNullableType )
+            {
+                return null;
+            }
+
             return Convert.ChangeType( value, propertyType );
         }
 
         /// <summary>
-        /// Geta a filter expression for an attribute value.
+        /// Gets a filter expression for an attribute value.
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="filterValues">The filter values.</param>
@@ -526,14 +657,50 @@ namespace Rock.Field
                 if ( comparisonValue != "0" )
                 {
                     ComparisonType comparisonType = comparisonValue.ConvertToEnum<ComparisonType>( ComparisonType.EqualTo );
-                    MemberExpression propertyExpression = Expression.Property( parameterExpression, "Value" );
-                    ConstantExpression constantExpression = Expression.Constant( filterValues[1], typeof( string ) );
-
-                    return ComparisonHelper.ComparisonExpression( comparisonType, propertyExpression, constantExpression );
+                    MemberExpression propertyExpression = Expression.Property( parameterExpression, this.AttributeValueFieldName );
+                    return ComparisonHelper.ComparisonExpression( comparisonType, propertyExpression, AttributeConstantExpression( filterValues[1] ) );
                 }
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Gets the name of the attribute value field that should be bound to (Value, ValueAsDateTime, or ValueAsNumeric)
+        /// </summary>
+        /// <value>
+        /// The name of the attribute value field.
+        /// </value>
+        public virtual string AttributeValueFieldName
+        {
+            get
+            {
+                return "Value";
+            }
+        }
+
+        /// <summary>
+        /// Attributes the constant expression.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns></returns>
+        public virtual ConstantExpression AttributeConstantExpression( string value )
+        {
+            return Expression.Constant( value, this.AttributeValueFieldType );
+        }
+
+        /// <summary>
+        /// Gets the type of the attribute value field.
+        /// </summary>
+        /// <value>
+        /// The type of the attribute value field.
+        /// </value>
+        public virtual Type AttributeValueFieldType
+        {
+            get
+            {
+                return typeof( string );
+            }
         }
 
         #endregion
@@ -545,7 +712,7 @@ namespace Rock.Field
         /// </summary>
         /// <param name="sender">The sender.</param>
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
-        public void OnQualifierUpdated(object sender, EventArgs e)
+        public void OnQualifierUpdated( object sender, EventArgs e )
         {
             if ( QualifierUpdated != null )
             {
@@ -559,6 +726,5 @@ namespace Rock.Field
         public event EventHandler QualifierUpdated;
 
         #endregion
-
     }
 }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,6 +70,11 @@ namespace Rock.SystemGuid
         public const string DISC_RESULTS_TYPE = "F06DDAD8-6058-4182-AD0A-B523BB7A2D78";
 
         /// <summary>
+        /// Guid for Entity Set Purpose
+        /// </summary>
+        public const string ENTITY_SET_PURPOSE = "618BBF3F-794F-4FF9-9615-9211CDBAF723";
+
+        /// <summary>
         /// Guid for External Application
         /// </summary>
         public const string EXTERNAL_APPLICATION = "1FAC459C-5F62-4E7C-8933-61FF9FE2DFEF";
@@ -118,6 +123,11 @@ namespace Rock.SystemGuid
         /// Guid for GroupType Purpose
         /// </summary>
         public const string GROUPTYPE_PURPOSE = "B23F1E45-BC26-4E82-BEB3-9B191FE5CCC3";
+
+        /// <summary>
+        /// Guid for Default link list
+        /// </summary>
+        public const string LINKLIST_DEFAULT_LIST = "7E7969BD-945C-4472-8A80-889EF5833776";
 
         /// <summary>
         /// Guid for countries
@@ -195,6 +205,16 @@ namespace Rock.SystemGuid
         public const string PERSON_ABILITY_LEVEL_TYPE = "7BEEF4D4-0860-4913-9A3D-857634D1BF7C";
 
         /// <summary>
+        /// Protect My Ministry MVR jurisdiction codes
+        /// </summary>
+        public const string PROTECT_MY_MINISTRY_MVR_JURISDICTION_CODES = "2F8821E8-05B9-4CD5-9FA4-303662AAC85D";
+
+        /// <summary>
+        /// Protect My Ministry background package types
+        /// </summary>
+        public const string PROTECT_MY_MINISTRY_PACKAGES = "BC2FDF9A-93B8-4325-8DE9-2F7B1943BFDF";
+
+        /// <summary>
         /// Guid for the types of map styles
         /// </summary>
         public const string MAP_STYLES = "4EF89471-C049-49ED-AB50-677F689A4E4E";
@@ -213,11 +233,6 @@ namespace Rock.SystemGuid
         /// The REST allowed domains
         /// </summary>
         public const string REST_API_ALLOWED_DOMAINS = "DF7C8DF7-49F9-4858-9E5D-20842AF65AD8";
-
-        /// <summary>
-        /// The workflow note type
-        /// </summary>
-        public const string WORKFLOW_NOTE_TYPE = "FDC7A191-717E-4CA6-9DCF-A2B5BB09C782";
 
         /// <summary>
         /// The school grades defined type which has values that determine which grade gext to display

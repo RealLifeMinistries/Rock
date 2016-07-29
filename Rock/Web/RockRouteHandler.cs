@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +18,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Caching;
+using System.Text.RegularExpressions;
 using System.Web.Compilation;
 using System.Web.Routing;
-
+using Rock.Model;
 using Rock.Web.Cache;
 
 namespace Rock.Web
@@ -79,14 +80,56 @@ namespace Rock.Web
 
                     if ( site != null )
                     {
-                        if ( site.DefaultPageId.HasValue )
+                        // If site has has been enabled for mobile redirect, then we'll need to check what type of device is being used
+                        if ( site.EnableMobileRedirect )
                         {
-                            pageId = site.DefaultPageId.Value.ToString();
+                            bool redirect = false;
+
+                            // get the device type
+                            string u = requestContext.HttpContext.Request.UserAgent;
+
+                            var clientType = PageViewUserAgent.GetClientType( u );
+
+                            // first check if device is a mobile device
+                            if ( clientType == "Mobile" )
+                            {
+                                redirect = true;
+                            }
+
+                            // if not, mobile device and tables should be redirected also, check if device is a tablet
+                            if ( !redirect && site.RedirectTablets )
+                            {
+                                if ( clientType == "Tablet" )
+                                {
+                                    redirect = true;
+                                }
+                            }
+
+                            if ( redirect )
+                            {
+                                if ( site.MobilePageId.HasValue )
+                                {
+                                    pageId = site.MobilePageId.Value.ToString();
+                                }
+                                else if ( !string.IsNullOrWhiteSpace( site.ExternalUrl ) )
+                                {
+                                    requestContext.HttpContext.Response.Redirect( site.ExternalUrl );
+                                    return null;
+                                }
+                            }
                         }
 
-                        if ( site.DefaultPageRouteId.HasValue )
+                        if ( string.IsNullOrWhiteSpace( pageId ) )
                         {
-                            routeId = site.DefaultPageRouteId.Value;
+                            if ( site.DefaultPageId.HasValue )
+                            {
+                                pageId = site.DefaultPageId.Value.ToString();
+                            }
+
+                            if ( site.DefaultPageRouteId.HasValue )
+                            {
+                                routeId = site.DefaultPageRouteId.Value;
+                            }
                         }
                     }
 

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,10 +39,10 @@ namespace RockWeb.Blocks.Core
     [Category( "Core" )]
     [Description( "Displays the details of the given location." )]
 
-    [CodeEditorField( "Map HTML", "The HTML to use for displaying group location maps. Liquid syntax is used to render data from the following data structure: points[type, latitude, longitude], polygons[type, polygon_wkt, google_encoded_polygon]", CodeEditorMode.Liquid, CodeEditorTheme.Rock, 300, false, @"
+    [CodeEditorField( "Map HTML", "The HTML to use for displaying group location maps. Liquid syntax is used to render data from the following data structure: points[type, latitude, longitude], polygons[type, polygon_wkt, google_encoded_polygon]", CodeEditorMode.Lava, CodeEditorTheme.Rock, 300, false, @"
     {% if point or polygon %}
         <div class='group-location-map'>
-            <img src='//maps.googleapis.com/maps/api/staticmap?sensor=false&size=350x200&format=png&style=feature:all|saturation:0|hue:0xe7ecf0&style=feature:road|saturation:-70&style=feature:transit|visibility:off&style=feature:poi|visibility:off&style=feature:water|visibility:simplified|saturation:-60{% if point %}&markers=color:0x779cb1|{{ point.latitude }},{{ point.longitude }}{% endif %}{% if polygon %}&path=fillcolor:0x779cb155|color:0xFFFFFF00|enc:{{ polygon.google_encoded_polygon }}{% endif %}&visual_refresh=true'/>
+            <img class='img-thumbnail' src='//maps.googleapis.com/maps/api/staticmap?sensor=false&size=350x200&format=png&style=feature:all|saturation:0|hue:0xe7ecf0&style=feature:road|saturation:-70&style=feature:transit|visibility:off&style=feature:poi|visibility:off&style=feature:water|visibility:simplified|saturation:-60{% if point %}&markers=color:0x779cb1|{{ point.latitude }},{{ point.longitude }}{% endif %}{% if polygon %}&path=fillcolor:0x779cb155|color:0xFFFFFF00|enc:{{ polygon.google_encoded_polygon }}{% endif %}&visual_refresh=true'/>
         </div>
     {% endif %}
 " )]
@@ -50,6 +50,8 @@ namespace RockWeb.Blocks.Core
 
     public partial class LocationDetail : RockBlock, IDetailBlock
     {
+        private int? _personId = null;
+
         private int? LocationTypeValueId
         {
             get { return ViewState["LocationTypeValueId"] as int?; }
@@ -90,9 +92,12 @@ namespace RockWeb.Blocks.Core
         {
             base.OnLoad( e );
 
+            _personId = PageParameter( "PersonId" ).AsIntegerOrNull();
+
             if ( !Page.IsPostBack )
             {
                 string locationId = PageParameter( "LocationId" );
+
                 if ( !string.IsNullOrWhiteSpace( locationId ) )
                 {
                     ShowDetail( locationId.AsInteger(), PageParameter( "ParentLocationId" ).AsIntegerOrNull() );
@@ -107,8 +112,17 @@ namespace RockWeb.Blocks.Core
                 // Rebuild the attribute controls on postback based on group type
                 if ( pnlDetails.Visible )
                 {
-                    var location = new Location { LocationTypeValueId = LocationTypeValueId ?? 0 };
-                    BuildAttributeEdits( location, false );
+                    int? locationId = PageParameter( "LocationId" ).AsIntegerOrNull();
+                    if ( locationId.HasValue && locationId.Value > 0 )
+                    {
+                        var location = new LocationService(new RockContext()).Get( locationId.Value );
+                        if ( location != null )
+                        {
+                            location.LoadAttributes();
+                            BuildAttributeEdits( location, true );
+                        }
+                    }
+                   
                 }
             }
         }
@@ -152,10 +166,13 @@ namespace RockWeb.Blocks.Core
                     return;
                 }
 
-                FlushCampus( location.Id );
+                int locationId = location.Id;
 
                 locationService.Delete( location );
                 rockContext.SaveChanges();
+
+                FlushCampus( locationId );
+                Rock.CheckIn.KioskDevice.FlushAll();
             }
 
             // reload page, selecting the deleted location's parent
@@ -177,7 +194,7 @@ namespace RockWeb.Blocks.Core
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         protected void btnSave_Click( object sender, EventArgs e )
         {
-            Location location;
+            Location location = null;
 
             var rockContext = new RockContext();
             LocationService locationService = new LocationService( rockContext );
@@ -186,16 +203,19 @@ namespace RockWeb.Blocks.Core
 
             int locationId = int.Parse( hfLocationId.Value );
 
-            if ( locationId == 0 )
-            {
-                location = new Location();
-                location.Name = string.Empty;
-            }
-            else
+            if ( locationId != 0 )
             {
                 location = locationService.Get( locationId );
                 FlushCampus( locationId );
             }
+
+            if ( location == null )
+            { 
+                location = new Location();
+                location.Name = string.Empty;
+            }
+
+            string previousName = location.Name;
 
             int? orphanedImageId = null;
             if ( location.ImageId != imgImage.BinaryFileId )
@@ -229,6 +249,9 @@ namespace RockWeb.Blocks.Core
 
             location.IsGeoPointLocked = cbGeoPointLocked.Checked;
 
+            location.SoftRoomThreshold = nbSoftThreshold.Text.AsIntegerOrNull();
+            location.FirmRoomThreshold = nbFirmThreshold.Text.AsIntegerOrNull();
+
             location.LoadAttributes( rockContext );
             Rock.Attribute.Helper.GetEditValues( phAttributeEdits, location );
 
@@ -237,9 +260,13 @@ namespace RockWeb.Blocks.Core
                 return;
             }
 
-            if ( !location.IsValid )
+            // if the location IsValid is false, and the UI controls didn't report any errors, it is probably because the custom rules of location didn't pass.
+            // So, make sure a message is displayed in the validation summary
+            cvLocation.IsValid = location.IsValid;
+
+            if ( !cvLocation.IsValid )
             {
-                // Controls will render the error messages                    
+                cvLocation.ErrorMessage = location.ValidationResults.Select( a => a.ErrorMessage ).ToList().AsDelimited( "<br />" );
                 return;
             }
 
@@ -267,13 +294,27 @@ namespace RockWeb.Blocks.Core
 
             } );
 
+            // If this is a names location (or was previouisly)
+            if ( !string.IsNullOrWhiteSpace( location.Name ) || ( previousName ?? string.Empty ) != (location.Name ?? string.Empty ) )
+            {
+                // flush the checkin config
+                Rock.CheckIn.KioskDevice.FlushAll();
+            }
 
+            if ( _personId.HasValue )
+            {
+                NavigateToParentPage( new Dictionary<string, string> { { "PersonId", _personId.Value.ToString() } } );
+            }
+            else
+            {
+                Rock.CheckIn.KioskDevice.FlushAll();
 
-            var qryParams = new Dictionary<string, string>();
-            qryParams["LocationId"] = location.Id.ToString();
-            qryParams["ExpandedIds"] = PageParameter( "ExpandedIds" );
+                var qryParams = new Dictionary<string, string>();
+                qryParams["LocationId"] = location.Id.ToString();
+                qryParams["ExpandedIds"] = PageParameter( "ExpandedIds" );
 
-            NavigateToPage( RockPage.Guid, qryParams );
+                NavigateToPage( RockPage.Guid, qryParams );
+            }
         }
 
         /// <summary>
@@ -283,29 +324,36 @@ namespace RockWeb.Blocks.Core
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         protected void btnCancel_Click( object sender, EventArgs e )
         {
-            if ( hfLocationId.Value.Equals( "0" ) )
+            if ( _personId.HasValue )
             {
-                int? parentLocationId = PageParameter( "ParentLocationId" ).AsIntegerOrNull();
-                if ( parentLocationId.HasValue )
-                {
-                    // Cancelling on Add, and we know the parentLocationId, so we are probably in treeview mode, so navigate to the current page
-                    var qryParams = new Dictionary<string, string>();
-                    qryParams["LocationId"] = parentLocationId.ToString();
-                    qryParams["ExpandedIds"] = PageParameter( "ExpandedIds" );
-                    NavigateToPage( RockPage.Guid, qryParams );
-                }
-                else
-                {
-                    // Cancelling on Add.  Return to Grid
-                    NavigateToParentPage();
-                }
+                NavigateToParentPage( new Dictionary<string, string> { { "PersonId", _personId.Value.ToString() } } );
             }
             else
             {
-                // Cancelling on Edit.  Return to Details
-                LocationService locationService = new LocationService( new RockContext() );
-                Location location = locationService.Get( int.Parse( hfLocationId.Value ) );
-                ShowReadonlyDetails( location );
+                if ( hfLocationId.Value.Equals( "0" ) )
+                {
+                    int? parentLocationId = PageParameter( "ParentLocationId" ).AsIntegerOrNull();
+                    if ( parentLocationId.HasValue )
+                    {
+                        // Cancelling on Add, and we know the parentLocationId, so we are probably in treeview mode, so navigate to the current page
+                        var qryParams = new Dictionary<string, string>();
+                        qryParams["LocationId"] = parentLocationId.ToString();
+                        qryParams["ExpandedIds"] = PageParameter( "ExpandedIds" );
+                        NavigateToPage( RockPage.Guid, qryParams );
+                    }
+                    else
+                    {
+                        // Cancelling on Add.  Return to Grid
+                        NavigateToParentPage();
+                    }
+                }
+                else
+                {
+                    // Cancelling on Edit.  Return to Details
+                    LocationService locationService = new LocationService( new RockContext() );
+                    Location location = locationService.Get( int.Parse( hfLocationId.Value ) );
+                    ShowReadonlyDetails( location );
+                }
             }
         }
 
@@ -331,6 +379,8 @@ namespace RockWeb.Blocks.Core
 
             service.Verify( location, true );
 
+            rockContext.SaveChanges();
+
             acAddress.SetValues( location );
             geopPoint.SetValue( location.GeoPoint );
 
@@ -353,6 +403,7 @@ namespace RockWeb.Blocks.Core
             }
             location.LocationTypeValueId = ddlLocationType.SelectedValueAsId();
 
+            phAttributeEdits.Controls.Clear();
             location.LoadAttributes();
             BuildAttributeEdits( location, true );
         }
@@ -418,7 +469,7 @@ namespace RockWeb.Blocks.Core
             {
                 btnEdit.Visible = true;
                 btnDelete.Visible = true;
-                if ( location.Id > 0 )
+                if ( location.Id > 0 && !_personId.HasValue )
                 {
                     ShowReadonlyDetails( location );
                 }
@@ -436,6 +487,10 @@ namespace RockWeb.Blocks.Core
         /// <param name="location">The location.</param>
         private void ShowEditDetails( Location location )
         {
+            divAdvSettings.Visible = !_personId.HasValue;
+            cbIsActive.Visible = !_personId.HasValue;
+            geopFence.Visible = !_personId.HasValue;
+
             if ( location.Id == 0 )
             {
                 lReadOnlyTitle.Text = ActionTitle.Add( Location.FriendlyTypeName ).FormatAsHtmlTitle();
@@ -443,6 +498,11 @@ namespace RockWeb.Blocks.Core
             }
             else
             {
+                if ( _personId.HasValue )
+                {
+                    hlInactive.Visible = false;
+                }
+
                 if ( string.IsNullOrWhiteSpace( location.Name ) )
                 {
                     lReadOnlyTitle.Text = location.ToString().FormatAsHtmlTitle();
@@ -466,6 +526,9 @@ namespace RockWeb.Blocks.Core
             geopFence.SetValue( location.GeoFence );
 
             cbGeoPointLocked.Checked = location.IsGeoPointLocked ?? false;
+
+            nbSoftThreshold.Text = location.SoftRoomThreshold.HasValue ? location.SoftRoomThreshold.Value.ToString() : "";
+            nbFirmThreshold.Text = location.FirmRoomThreshold.HasValue ? location.FirmRoomThreshold.Value.ToString() : "";
 
             Guid mapStyleValueGuid = GetAttributeValue( "MapStyle" ).AsGuid();
             geopPoint.MapStyleValueGuid = mapStyleValueGuid;
@@ -491,12 +554,11 @@ namespace RockWeb.Blocks.Core
             }
 
             location.LoadAttributes( rockContext );
-            BuildAttributeEdits( location, true );
         }
 
         private void BuildAttributeEdits( Location location, bool setValues )
         {
-            Rock.Attribute.Helper.AddEditControls( location, phAttributeEdits, setValues );
+            Rock.Attribute.Helper.AddEditControls( location, phAttributeEdits, setValues, BlockValidationGroup );
         }
 
         /// <summary>
@@ -557,6 +619,16 @@ namespace RockWeb.Blocks.Core
                 descriptionList.Add( "Printer", location.PrinterDevice.Name );
             }
 
+            if ( location.SoftRoomThreshold.HasValue )
+            {
+                descriptionList.Add( "Threshold", location.SoftRoomThreshold.Value.ToString( "N0" ) ); ;
+            }
+
+            if ( location.FirmRoomThreshold.HasValue )
+            {
+                descriptionList.Add( "Threshold (Absolute)", location.FirmRoomThreshold.Value.ToString( "N0" ) ); ;
+            }
+
             string fullAddress = location.GetFullStreetAddress().ConvertCrLfToHtmlBr();
             if ( !string.IsNullOrWhiteSpace( fullAddress ) )
             {
@@ -587,7 +659,7 @@ namespace RockWeb.Blocks.Core
                         string mapLink = System.Text.RegularExpressions.Regex.Replace( mapStyle, @"\{\s*MarkerPoints\s*\}", markerPoints );
                         mapLink = System.Text.RegularExpressions.Regex.Replace( mapLink, @"\{\s*PolygonPoints\s*\}", string.Empty );
                         mapLink += "&sensor=false&size=350x200&zoom=13&format=png";
-                        phMaps.Controls.Add( new LiteralControl ( string.Format( "<div class='group-location-map'><img src='{0}'/></div>", mapLink ) ) );
+                        phMaps.Controls.Add( new LiteralControl ( string.Format( "<div class='group-location-map'><img class='img-thumbnail' src='{0}'/></div>", mapLink ) ) );
                     }
 
                     if ( location.GeoFence != null )
@@ -596,7 +668,7 @@ namespace RockWeb.Blocks.Core
                         string mapLink = System.Text.RegularExpressions.Regex.Replace( mapStyle, @"\{\s*MarkerPoints\s*\}", string.Empty );
                         mapLink = System.Text.RegularExpressions.Regex.Replace( mapLink, @"\{\s*PolygonPoints\s*\}", polygonPoints );
                         mapLink += "&sensor=false&size=350x200&format=png";
-                        phMaps.Controls.Add( new LiteralControl( string.Format( "<div class='group-location-map'><img src='{0}'/></div>", mapLink ) ) );
+                        phMaps.Controls.Add( new LiteralControl( string.Format( "<div class='group-location-map'><img class='img-thumbnail' src='{0}'/></div>", mapLink ) ) );
                     }
                 }
             }
@@ -619,42 +691,6 @@ namespace RockWeb.Blocks.Core
             this.HideSecondaryBlocks( editable );
         }
 
-        public string GetImageTag(int? imageId, int? maxWidth = null, int? maxHeight = null )
-        {
-            var photoUrl = new StringBuilder();
-
-            photoUrl.Append( System.Web.VirtualPathUtility.ToAbsolute( "~/" ) );
-
-            string styleString = string.Empty;
-            
-            if ( imageId.HasValue )
-            {
-                photoUrl.AppendFormat( "GetImage.ashx?id={0}", imageId );
-
-                if ( maxWidth.HasValue )
-                {
-                    photoUrl.AppendFormat( "&maxwidth={0}", maxWidth.Value );
-                }
-                if ( maxHeight.HasValue )
-                {
-                    photoUrl.AppendFormat( "&maxheight={0}", maxHeight.Value );
-                }
-            }
-            else
-            {
-                photoUrl.Append( "Assets/Images/no-picture.svg?" );
-
-                if ( maxWidth.HasValue || maxHeight.HasValue )
-                {
-                    styleString = string.Format( " style='{0}{1}'",
-                        maxWidth.HasValue ? "max-width:" + maxWidth.Value.ToString() + "px; " : "",
-                        maxHeight.HasValue ? "max-height:" + maxHeight.Value.ToString() + "px;" : "" );
-                }
-            }
-
-            return string.Format( "<img src='{0}'{1}/>", photoUrl.ToString(), styleString );
-        }
-
         // Flush any cached campus that uses location
         private void FlushCampus( int locationId )
         {
@@ -664,7 +700,7 @@ namespace RockWeb.Blocks.Core
                 CampusCache.Flush( campus.Id );
             }
         }
-
+            
         #endregion
     }
 }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -53,16 +53,26 @@ namespace Rock.Model
         /// A <see cref="System.Int32"/> representing the BatchId of the <see cref="Rock.Model.FinancialBatch"/> that contains the transaction.
         /// </value>
         [DataMember]
+        [IgnoreCanDelete]
         public int? BatchId { get; set; }
 
         /// <summary>
-        /// Gets or sets EntityTypeId of the <see cref="Rock.Model.EntityType"/> for the financial gateway (service) that processed this transaction.
+        /// Gets or sets the gateway identifier.
         /// </summary>
         /// <value>
-        /// A <see cref="System.Int32" /> representing the EntityTypeId of the <see cref="Rock.Model.EntityType"/> for the financial gateway (service) that processed this transaction.
+        /// The gateway identifier.
         /// </value>
         [DataMember]
-        public int? GatewayEntityTypeId { get; set; }
+        public int? FinancialGatewayId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the financial payment detail identifier.
+        /// </summary>
+        /// <value>
+        /// The financial payment detail identifier.
+        /// </value>
+        [DataMember]
+        public int? FinancialPaymentDetailId { get; set; }
 
         /// <summary>
         /// Gets or sets date and time that the transaction occurred. This is the local server time.
@@ -107,29 +117,6 @@ namespace Rock.Model
         public int TransactionTypeValueId { get; set; }
 
         /// <summary>
-        /// Gets or sets the DefinedValueId of the currency type <see cref="Rock.Model.DefinedValue"/> indicating the currency that the
-        /// transaction was made in.
-        /// </summary>
-        /// <value>
-        /// A <see cref="System.Int32" /> representing the DefinedValueId of the CurrencyType <see cref="Rock.Model.DefinedValue" /> for this transaction.
-        /// </value>
-        [DataMember]
-        [DefinedValue( SystemGuid.DefinedType.FINANCIAL_CURRENCY_TYPE )]
-        public int? CurrencyTypeValueId { get; set; }
-
-        /// <summary>
-        /// Gets or sets the DefinedValueId of the credit card type <see cref="Rock.Model.DefinedValue"/> indicating the credit card brand/type that was used
-        /// to make this transaction. This value will be null for transactions that were not made by credit card.
-        /// </summary>
-        /// <value>
-        /// A <see cref="System.Int32"/> representing the DefinedValueId of the credit card type <see cref="Rock.Model.DefinedValue"/> that was used to make this transaction.
-        /// This value value will be null for transactions that were not made by credit card.
-        /// </value>
-        [DataMember]
-        [DefinedValue( SystemGuid.DefinedType.FINANCIAL_CREDIT_CARD_TYPE )]
-        public int? CreditCardTypeValueId { get; set; }
-
-        /// <summary>
         /// Gets or sets the DefinedValueId of the source type <see cref="Rock.Model.DefinedValue"/> for this transaction. Representing the source (method) of this transaction.
         /// </summary>
         /// <value>
@@ -140,20 +127,22 @@ namespace Rock.Model
         public int? SourceTypeValueId { get; set; }
 
         /// <summary>
-        /// Gets or sets an encrypted version of a scanned check's MICR information.
-        /// Plain Text format is {routingnumber}_{accountnumber}_{checknumber}
+        /// Gets or sets an encrypted version of a scanned check's raw track of the MICR data.
+        /// Note that different scanning hardware might use different special characters for fields such as Transit and On-US.
+        /// Also, encryption of the same values results in different encrypted data, so this field can't be used for check matching
         /// </summary>
         /// <value>
         /// The check micr encrypted.
-        /// A <see cref="System.String"/> representing an encrypted version of a scanned check's MICR information.
+        /// A <see cref="System.String"/> representing an encrypted version of a scanned check's MICR track data
         /// </value>
         [DataMember]
         [HideFromReporting]
         public string CheckMicrEncrypted { get; set; }
 
         /// <summary>
-        /// Gets or sets hash of the Check Routing, AccountNumber, and CheckNumber.  Stored as a SHA1 hash so that it can be matched without being known
+        /// One Way Encryption (SHA1 Hash) of Raw Track of the MICR read. The same raw MICR will result in the same hash.  
         /// Enables detection of duplicate scanned checks
+        /// Note: duplicate detection requires that the duplicate check was scanned using the same scanner type (Ranger vs Magtek)
         /// </summary>
         /// <value>
         /// The check micr hash.
@@ -163,6 +152,28 @@ namespace Rock.Model
         [Index]
         [HideFromReporting]
         public string CheckMicrHash { get; set; }
+
+        /// <summary>
+        /// Gets or sets the micr status (if this Transaction is from a scanned check)
+        /// Fail means that the check scanner detected a bad MICR read, but the user choose to Upload it anyway
+        /// </summary>
+        /// <value>
+        /// The micr status.
+        /// </value>
+        [DataMember]
+        [HideFromReporting]
+        public MICRStatus? MICRStatus { get; set; }
+
+        /// <summary>
+        /// Gets or sets an encrypted version of a scanned check's parsed MICR in the format {routingnumber}_{accountnumber}_{checknumber}
+        /// </summary>
+        /// <value>
+        /// The check micr encrypted.
+        /// A <see cref="System.String"/> representing an encrypted version of a scanned check's parsed MICR data in the format {routingnumber}_{accountnumber}_{checknumber}
+        /// </value>
+        [DataMember]
+        [HideFromReporting]
+        public string CheckMicrParts { get; set; }
 
         /// <summary>
         /// Gets or sets the ScheduledTransactionId of the <see cref="Rock.Model.FinancialScheduledTransaction" /> that triggered
@@ -192,6 +203,37 @@ namespace Rock.Model
         /// </value>
         public DateTime? ProcessedDateTime { get; set; }
 
+        /// <summary>
+        /// Gets the status of the transaction provided by the payment gateway (i.e. Pending, Complete, Failed)
+        /// </summary>
+        /// <value>
+        /// The status.
+        /// </value>
+        [DataMember]
+        [MaxLength( 50 )]
+        public string Status { get; set; }
+
+        /// <summary>
+        /// Gets or sets the status message.
+        /// </summary>
+        /// <value>
+        /// The status message.
+        /// </value>
+        [DataMember]
+        [MaxLength( 200 )]
+        public string StatusMessage { get; set; }
+
+        /// <summary>
+        /// Gets or sets the sunday date.
+        /// </summary>
+        /// <value>
+        /// The sunday date.
+        /// </value>
+        [DataMember]
+        [DatabaseGenerated( DatabaseGeneratedOption.Computed )]
+        [Column( TypeName = "Date" )]
+        public DateTime? SundayDate { get; set; }
+
         #endregion Entity Properties
 
         #region Virtual Properties
@@ -202,6 +244,7 @@ namespace Rock.Model
         /// <value>
         /// The authorized person alias.
         /// </value>
+        [DataMember]
         public virtual PersonAlias AuthorizedPersonAlias { get; set; }
 
         /// <summary>
@@ -213,14 +256,23 @@ namespace Rock.Model
         public virtual FinancialBatch Batch { get; set; }
 
         /// <summary>
-        /// Gets or sets the <see cref="Rock.Model.EntityType"/> of the Payment Gateway service that was used to process this transaction.
+        /// Gets or sets the gateway.
         /// </summary>
         /// <value>
-        /// The <see cref="Rock.Model.EntityType"/> of the payment gateway service that was used.  If this was not an electronic transaction, this value will be null.
+        /// The gateway.
         /// </value>
         [DataMember]
-        public virtual EntityType GatewayEntityType { get; set; }
+        public virtual FinancialGateway FinancialGateway { get; set; }
 
+        /// <summary>
+        /// Gets or sets the financial payment detail.
+        /// </summary>
+        /// <value>
+        /// The financial payment detail.
+        /// </value>
+        [DataMember]
+        public virtual FinancialPaymentDetail FinancialPaymentDetail { get; set; }
+        
         /// <summary>
         /// Gets or sets the transaction type <see cref="Rock.Model.DefinedValue"/> indicating the type of transaction that occurred.
         /// </summary>
@@ -229,27 +281,6 @@ namespace Rock.Model
         /// </value>
         [DataMember]
         public virtual DefinedValue TransactionTypeValue { get; set; }
-
-        /// <summary>
-        /// Gets or sets the currency type <see cref="Rock.Model.DefinedValue"/> indicating the type of currency that was used for this
-        /// transaction.
-        /// </summary>
-        /// <value>
-        /// A <see cref="Rock.Model.DefinedValue"/> indicating the type of currency that was used for the transaction.
-        /// </value>
-        [DataMember]
-        public virtual DefinedValue CurrencyTypeValue { get; set; }
-
-        /// <summary>
-        /// Gets or sets the credit card type <see cref="Rock.Model.DefinedValue"/> indicating the type of credit card that was used for this transaction.
-        /// If this was not a credit card based transaction, this value will be null.
-        /// </summary>
-        /// <value>
-        /// A <see cref="Rock.Model.DefinedValue" /> indicating the type of credit card that was used for this transaction. This value is null
-        /// for transactions that were not made by credit card.
-        /// </value>
-        [DataMember]
-        public virtual DefinedValue CreditCardTypeValue { get; set; }
 
         /// <summary>
         /// Gets or sets the source type <see cref="Rock.Model.DefinedValue"/> indicating where the transaction originated from; the source of the transaction.
@@ -267,7 +298,7 @@ namespace Rock.Model
         /// The <see cref="Rock.Model.FinancialTransactionRefund">refund transaction</see> associated with this transaction. This will be null if the transaction
         /// is not a refund transaction.
         /// </value>
-        public virtual FinancialTransactionRefund Refund { get; set; }
+        public virtual FinancialTransactionRefund RefundDetails { get; set; }
 
         /// <summary>
         /// Gets or sets the <see cref="Rock.Model.FinancialScheduledTransaction">Scheduled Transaction</see> that initiated this transaction.
@@ -298,7 +329,6 @@ namespace Rock.Model
             get { return _transactionDetails ?? ( _transactionDetails = new Collection<FinancialTransactionDetail>() ); }
             set { _transactionDetails = value; }
         }
-
         private ICollection<FinancialTransactionDetail> _transactionDetails;
 
         /// <summary>
@@ -314,8 +344,20 @@ namespace Rock.Model
             get { return _images ?? ( _images = new Collection<FinancialTransactionImage>() ); }
             set { _images = value; }
         }
-
         private ICollection<FinancialTransactionImage> _images;
+
+        /// <summary>
+        /// Gets or sets the refunds.
+        /// </summary>
+        /// <value>
+        /// The refunds.
+        /// </value>
+        public virtual ICollection<FinancialTransactionRefund> Refunds
+        {
+            get { return _refunds ?? ( _refunds = new Collection<FinancialTransactionRefund>() ); }
+            set { _refunds = value; }
+        }
+        private ICollection<FinancialTransactionRefund> _refunds;
 
         /// <summary>
         /// Gets the total amount.
@@ -323,6 +365,8 @@ namespace Rock.Model
         /// <value>
         /// The total amount.
         /// </value>
+        [LavaInclude]
+        [BoundFieldTypeAttribute( typeof( Rock.Web.UI.Controls.CurrencyField ) )]
         public virtual decimal TotalAmount
         {
             get { return TransactionDetails.Sum( d => d.Amount ); }
@@ -371,6 +415,7 @@ namespace Rock.Model
     /// </summary>
     [DataContract]
     [NotMapped]
+    [RockClientInclude("Special Class to use when uploading a FinancialTransaction from a Scanned Check thru the Rest API")]
     public class FinancialTransactionScannedCheck
     {
         /// <summary>
@@ -383,13 +428,22 @@ namespace Rock.Model
         public FinancialTransaction FinancialTransaction { get; set; }
 
         /// <summary>
-        /// Gets or sets the scanned check MICR.
+        /// Gets or sets the scanned check MICR (the raw track data)
         /// </summary>
         /// <value>
         /// The scanned check MICR.
         /// </value>
         [DataMember]
-        public string ScannedCheckMicr { get; set; }
+        public string ScannedCheckMicrData { get; set; }
+
+        /// <summary>
+        /// Gets or sets the scanned check parsed MICR in the format {routingnumber}_{accountnumber}_{checknumber}
+        /// </summary>
+        /// <value>
+        /// The scanned check micr parts.
+        /// </value>
+        [DataMember]
+        public string ScannedCheckMicrParts { get; set; }
     }
 
     #region Entity Configuration
@@ -406,16 +460,57 @@ namespace Rock.Model
         {
             this.HasOptional( t => t.AuthorizedPersonAlias ).WithMany().HasForeignKey( t => t.AuthorizedPersonAliasId ).WillCascadeOnDelete( false );
             this.HasOptional( t => t.Batch ).WithMany( t => t.Transactions ).HasForeignKey( t => t.BatchId ).WillCascadeOnDelete( false );
-            this.HasOptional( t => t.GatewayEntityType ).WithMany().HasForeignKey( t => t.GatewayEntityTypeId ).WillCascadeOnDelete( false );
+            this.HasOptional( t => t.FinancialGateway ).WithMany().HasForeignKey( t => t.FinancialGatewayId ).WillCascadeOnDelete( false );
+            this.HasOptional( t => t.FinancialPaymentDetail ).WithMany().HasForeignKey( t => t.FinancialPaymentDetailId ).WillCascadeOnDelete( false );
             this.HasRequired( t => t.TransactionTypeValue ).WithMany().HasForeignKey( t => t.TransactionTypeValueId ).WillCascadeOnDelete( false );
-            this.HasOptional( t => t.CurrencyTypeValue ).WithMany().HasForeignKey( t => t.CurrencyTypeValueId ).WillCascadeOnDelete( false );
-            this.HasOptional( t => t.CreditCardTypeValue ).WithMany().HasForeignKey( t => t.CreditCardTypeValueId ).WillCascadeOnDelete( false );
             this.HasOptional( t => t.SourceTypeValue ).WithMany().HasForeignKey( t => t.SourceTypeValueId ).WillCascadeOnDelete( false );
-            this.HasOptional( t => t.Refund ).WithRequired().WillCascadeOnDelete( true );
+            this.HasOptional( t => t.RefundDetails ).WithRequired( r => r.FinancialTransaction ).WillCascadeOnDelete( true );
             this.HasOptional( t => t.ScheduledTransaction ).WithMany( s => s.Transactions ).HasForeignKey( t => t.ScheduledTransactionId ).WillCascadeOnDelete( false );
             this.HasOptional( t => t.ProcessedByPersonAlias ).WithMany().HasForeignKey( t => t.ProcessedByPersonAliasId ).WillCascadeOnDelete( false );
         }
     }
 
     #endregion Entity Configuration
+
+    #region Enumerations
+
+    /// <summary>
+    /// The gender of a person
+    /// </summary>
+    public enum MICRStatus
+    {
+        /// <summary>
+        /// Success means the scanned MICR contains no invalid read chars ('!' for Canon and '?' for Magtek)
+        /// </summary>
+        Success = 0,
+
+        /// <summary>
+        /// Fail means the scanned MICR contains at least one invalid read char ('!' for Canon and '?' for Magtek)
+        /// but the user chose to Upload it anyway
+        /// </summary>
+        Fail = 1
+    }
+
+    /// <summary>
+    /// For giving analysis reporting
+    /// </summary>
+    public enum TransactionGraphBy
+    {
+        /// <summary>
+        /// The total
+        /// </summary>
+        Total = 0,
+
+        /// <summary>
+        /// The financial account
+        /// </summary>
+        FinancialAccount = 1,
+
+        /// <summary>
+        /// The campus
+        /// </summary>
+        Campus = 2,
+    }
+
+    #endregion
 }

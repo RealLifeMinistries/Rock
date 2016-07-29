@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity.ModelConfiguration;
 using System.Runtime.Serialization;
 
+using Rock.Chart;
 using Rock.Data;
 
 namespace Rock.Model
@@ -40,6 +41,7 @@ namespace Rock.Model
         /// The type of the metric value.
         /// </value>
         [DataMember]
+        [Previewable]
         public MetricValueType MetricValueType { get; set; }
 
         /// <summary>
@@ -60,6 +62,8 @@ namespace Rock.Model
         /// The y value.
         /// </value>
         [DataMember]
+        [IncludeForReporting]
+        [Previewable]
         public decimal? YValue { get; set; }
 
         /// <summary>
@@ -99,6 +103,7 @@ namespace Rock.Model
         /// </value>
         [Index]
         [DataMember]
+        [Previewable]
         public DateTime? MetricValueDateTime { get; set; }
 
         /// <summary>
@@ -169,7 +174,10 @@ namespace Rock.Model
         /// </summary>
         public override Security.ISecured ParentAuthority
         {
-            get { return this.Metric; }
+            get 
+            {
+                return this.Metric != null ? this.Metric : base.ParentAuthority;
+            }
         }
 
         /// <summary>

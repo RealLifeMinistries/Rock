@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -135,22 +135,29 @@ namespace Rock.Reporting.DataSelect.Person
             string[] selectionValues = selection.Split( '|' );
 
             Location selectedLocation = null;
-            Guid? locationTypeValidGuid = null;
+            int? locationTypeValueId = null;
             if ( selectionValues.Count() >= 2 )
             {
                 // the selected Location 
                 selectedLocation = new LocationService( context ).Get( selectionValues[0].AsGuid() );
 
                 // which address type (home, work, previous) to use as the person's location
-                locationTypeValidGuid = selectionValues[1].AsGuidOrNull();
+                var locationTypeValueGuid = selectionValues[1].AsGuidOrNull();
+                if (locationTypeValueGuid.HasValue)
+                {
+                    var locationTypeValue = DefinedValueCache.Read( locationTypeValueGuid.Value );
+                    if ( locationTypeValue != null )
+                    {
+                        locationTypeValueId = locationTypeValue.Id;
+                    }
+                }
+                
             }
 
             Guid familyGuid = Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid();
             int familyGroupTypeId = new GroupTypeService( context ).Get( familyGuid ).Id;
 
             var groupMemberQuery = new GroupMemberService( context ).Queryable();
-
-            const double milesPerMeter = 1 / 1609.344;
 
             IQueryable<double?> personLocationDistanceQuery;
 
@@ -161,9 +168,9 @@ namespace Rock.Reporting.DataSelect.Person
                         groupMemberQuery
                         .Where( m => m.Group.GroupTypeId == familyGroupTypeId && m.PersonId == p.Id )
                         .SelectMany( m => m.Group.GroupLocations )
-                        .Where( gl => gl.GroupLocationTypeValue.Guid == locationTypeValidGuid )
+                        .Where( gl => gl.GroupLocationTypeValueId == locationTypeValueId )
                         .Where( gl => gl.Location.GeoPoint != null )
-                        .Select( s => DbFunctions.Truncate(s.Location.GeoPoint.Distance( selectedLocation.GeoPoint ) * milesPerMeter, 2) )
+                        .Select( s => DbFunctions.Truncate(s.Location.GeoPoint.Distance( selectedLocation.GeoPoint ) * Location.MilesPerMeter, 2) )
                         .FirstOrDefault() );
             }
             else
@@ -172,7 +179,7 @@ namespace Rock.Reporting.DataSelect.Person
                     .Select( p => (double?)null );
             }
 
-            var selectExpression = SelectExpressionExtractor.Extract<Rock.Model.Person>( personLocationDistanceQuery, entityIdProperty, "p" );
+            var selectExpression = SelectExpressionExtractor.Extract( personLocationDistanceQuery, entityIdProperty, "p" );
 
             return selectExpression;
         }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,8 +17,8 @@
 using System;
 using System.Reflection;
 using System.Web.UI.WebControls;
-
 using Rock.Extension;
+using Rock.Model;
 using Rock.Web.Cache;
 
 namespace Rock.Web.UI.Controls
@@ -66,7 +66,7 @@ namespace Rock.Web.UI.Controls
                                         var entityType = EntityTypeCache.Read( component.Value.Value.GetType() );
                                         if ( entityType != null )
                                         {
-                                            this.Items.Add( new ListItem( component.Value.Key, entityType.Guid.ToString().ToUpper() ) );
+                                            this.Items.Add( new ListItem( component.Value.Key.SplitCase(), entityType.Guid.ToString().ToUpper() ) );
                                         }
                                     }
                                 }
@@ -76,5 +76,30 @@ namespace Rock.Web.UI.Controls
                 }
             }
         }
+
+        /// <summary>
+        /// Gets the selected entity type identifier.
+        /// </summary>
+        /// <value>
+        /// The selected entity type identifier.
+        /// </value>
+        public int? SelectedEntityTypeId
+        {
+            get
+            {
+                Guid? gatewayGuid = this.SelectedValueAsGuid();
+                if ( gatewayGuid.HasValue )
+                {
+                    var gatewayEntity = EntityTypeCache.Read( gatewayGuid.Value );
+                    if ( gatewayEntity != null )
+                    {
+                        return gatewayEntity.Id;
+                    }
+                }
+
+                return null;
+            }
+        }
+
     }
 }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -59,12 +59,16 @@ namespace RockWeb.Blocks.Administration
                     if ( apiDescription != null )
                     {
                         hfUrl.Value = this.ResolveUrl( "~/" + apiDescription.RelativePath );
-                        hbUrlPreview.Text = apiDescription.HttpMethod.ToString().ToUpper() + " " + hfUrl.Value;
+                        lUrlPreview.Text = apiDescription.HttpMethod.ToString().ToUpper() + " " + hfUrl.Value;
                         btnDELETE.Visible = apiDescription.HttpMethod == System.Net.Http.HttpMethod.Delete;
+                        
                         btnGET.Visible = apiDescription.HttpMethod == System.Net.Http.HttpMethod.Get;
+                        rblLoadAttributes.Visible = apiDescription.HttpMethod == System.Net.Http.HttpMethod.Get;
+                        
                         btnPUT.Visible = apiDescription.HttpMethod == System.Net.Http.HttpMethod.Put;
                         btnPOST.Visible = apiDescription.HttpMethod == System.Net.Http.HttpMethod.Post;
                         tbPayload.Visible = apiDescription.HttpMethod == System.Net.Http.HttpMethod.Post || apiDescription.HttpMethod == System.Net.Http.HttpMethod.Put;
+                        
                         foreach ( var param in apiDescription.ParameterDescriptions )
                         {
                             if ( param.Source == System.Web.Http.Description.ApiParameterSource.FromUri )

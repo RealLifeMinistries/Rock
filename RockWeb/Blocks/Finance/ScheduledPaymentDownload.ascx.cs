@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,6 +41,7 @@ namespace RockWeb.Blocks.Finance
 
     [TextField( "Batch Name Prefix", "The batch prefix name to use when creating a new batch", false, "Online Giving", "", 0 )]
     [LinkedPage( "Batch Detail Page", "The page used to display details of a batch.", false, "", "", 1)]
+    [SystemEmailField( "Receipt Email", "The system email to use to send the receipts.", false, "", "", 2 )]
     public partial class ScheduledPaymentDownload : Rock.Web.UI.RockBlock
     {
 
@@ -78,12 +79,12 @@ namespace RockWeb.Blocks.Finance
 
             if ( !Page.IsPostBack )
             {
-                var gateway = GetSelectedGateway();
-                if ( gateway != null )
+                var financialGateway = GetSelectedGateway();
+                if ( financialGateway != null )
                 {
                     var today = RockDateTime.Today;
                     var days = today.DayOfWeek == DayOfWeek.Monday ? new TimeSpan( 3, 0, 0, 0 ) : new TimeSpan( 1, 0, 0, 0 );
-                    var endDateTime = today.Add( gateway.BatchTimeOffset );
+                    var endDateTime = today.Add( financialGateway.GetBatchTimeOffset() );
 
                     drpDates.UpperValue = RockDateTime.Now.CompareTo( endDateTime ) < 0 ? today.AddDays( -1 ) : today;
                     drpDates.LowerValue = drpDates.UpperValue.Value.Subtract( days );
@@ -108,49 +109,57 @@ namespace RockWeb.Blocks.Finance
         protected void btnDownload_Click( object sender, EventArgs e )
         {
             string batchNamePrefix = GetAttributeValue( "BatchNamePrefix" );
+            Guid? receiptEmail = GetAttributeValue( "ReceiptEmail" ).AsGuidOrNull();
 
             DateTime? startDateTime = drpDates.LowerValue;
             DateTime? endDateTime = drpDates.UpperValue;
 
-            if (startDateTime.HasValue && endDateTime.HasValue && endDateTime.Value.CompareTo(startDateTime.Value) >= 0)
+            if ( startDateTime.HasValue && endDateTime.HasValue && endDateTime.Value.CompareTo(startDateTime.Value) >= 0)
             {
-                var gateway = GetSelectedGateway();
-                if (gateway != null)
+                var financialGateway = GetSelectedGateway();
+                if ( financialGateway != null )
                 {
-                    DateTime start = startDateTime.Value;
-                    DateTime end = endDateTime.Value.AddDays( 1 );
-
-                    string errorMessage = string.Empty;
-                    var payments = gateway.GetPayments( start, end, out errorMessage );
-
-                    if ( string.IsNullOrWhiteSpace( errorMessage ) )
+                    var gateway = financialGateway.GetGatewayComponent();
+                    if ( gateway != null )
                     {
-                        var qryParam = new Dictionary<string, string>();
-                        qryParam.Add( "batchId", "9999" );
-                        string batchUrlFormat = LinkedPageUrl( "BatchDetailPage", qryParam ).Replace( "9999", "{0}" );
+                        DateTime start = startDateTime.Value;
+                        DateTime end = endDateTime.Value.AddDays( 1 );
 
-                        string resultSummary = FinancialScheduledTransactionService.ProcessPayments( gateway, batchNamePrefix, payments, batchUrlFormat );
+                        string errorMessage = string.Empty;
+                        var payments = gateway.GetPayments( financialGateway, start, end, out errorMessage );
 
-                        if (!string.IsNullOrWhiteSpace(resultSummary))
+                        if ( string.IsNullOrWhiteSpace( errorMessage ) )
                         {
-                            nbSuccess.Text = string.Format( "<ul>{0}</ul>", resultSummary );
+                            var qryParam = new Dictionary<string, string>();
+                            qryParam.Add( "batchId", "9999" );
+                            string batchUrlFormat = LinkedPageUrl( "BatchDetailPage", qryParam ).Replace( "9999", "{0}" );
+
+                            string resultSummary = FinancialScheduledTransactionService.ProcessPayments( financialGateway, batchNamePrefix, payments, batchUrlFormat, receiptEmail );
+
+                            if ( !string.IsNullOrWhiteSpace( resultSummary ) )
+                            {
+                                nbSuccess.Text = string.Format( "<ul>{0}</ul>", resultSummary );
+                            }
+                            else
+                            {
+                                nbSuccess.Text = string.Format( "There were not any transactions downloaded.", resultSummary );
+
+                            }
+                            nbSuccess.Visible = true;
                         }
                         else
                         {
-                            nbSuccess.Text = string.Format( "There were not any transactions downloaded.", resultSummary );
-                        
+                            ShowError( errorMessage );
                         }
-                        nbSuccess.Visible = true;
-
                     }
                     else
                     {
-                        ShowError( errorMessage );
+                        ShowError( "Selected Payment Gateway does not have a valid payment processor!" );
                     }
                 }
                 else
                 {
-                    ShowError("Please select a valid Payment Gateway!");
+                    ShowError( "Please select a valid Payment Gateway!" );
                 }
             }
             else
@@ -164,13 +173,22 @@ namespace RockWeb.Blocks.Finance
 
         #region Methods
 
-        private GatewayComponent GetSelectedGateway()
+        private FinancialGateway GetSelectedGateway()
         {
-            Guid? gatewayGuid = cpGateway.SelectedValueAsGuid();
-            if ( gatewayGuid.HasValue )
+            int? gatewayId = gpGateway.SelectedValueAsInt();
+            if ( gatewayId.HasValue )
             {
-                return GatewayContainer.GetComponent( gatewayGuid.Value.ToString() );
+                using ( var rockContext = new RockContext() )
+                {
+                    var financialGateway = new FinancialGatewayService( rockContext ).Get( gatewayId.Value );
+                    if ( financialGateway != null )
+                    {
+                        financialGateway.LoadAttributes( rockContext );
+                        return financialGateway;
+                    }
+                }
             }
+
             return null;
         }
 

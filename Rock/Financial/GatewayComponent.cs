@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,107 @@ namespace Rock.Financial
     /// </summary>
     public abstract class GatewayComponent : Component
     {
+
+        /// <summary>
+        /// Gets the attribute value defaults.
+        /// </summary>
+        /// <value>
+        /// The attribute defaults.
+        /// </value>
+        public override Dictionary<string, string> AttributeValueDefaults
+        {
+            get
+            {
+                var defaults = new Dictionary<string, string>();
+                defaults.Add( "Active", "True" );
+                defaults.Add( "Order", "0" );
+                return defaults;
+            }
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GatewayComponent" /> class.
+        /// </summary>
+        public GatewayComponent() : base( false )
+        {
+            // Override default constructor of Component that loads attributes (not needed for gateway components, needs to be done by each financial gateway)
+        }
+
+        /// <summary>
+        /// Loads the attributes for the financial gateway.
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        public void LoadAttributes( FinancialGateway financialGateway )
+        {
+            financialGateway.LoadAttributes();
+        }
+
+        /// <summary>
+        /// Use GetAttributeValue( FinancialGateway financialGateway, string key) instead.  gateway component attribute values are 
+        /// specific to the financial gateway instance (rather than global).  This method will throw an exception
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        /// <exception cref="System.Exception">Gateway Component attributes are saved specific to the financial gateway, which requires that the current financial gateway is included in order to load or retrieve values. Use the GetAttributeValue( FinancialGateway financialGateway, string key ) method instead.</exception>
+        public override string GetAttributeValue( string key )
+        {
+            throw new Exception( "Gateway Component attributes are saved specific to the financial gateway, which requires that the current financial gateway is included in order to load or retrieve values. Use the GetAttributeValue( FinancialGateway financialGateway, string key ) method instead." );
+        }
+
+        /// <summary>
+        /// Always returns 0.  
+        /// </summary>
+        /// <value>
+        /// The order.
+        /// </value>
+        public override int Order
+        {
+            get
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Always returns true. 
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance is active; otherwise, <c>false</c>.
+        /// </value>
+        public override bool IsActive
+        {
+            get
+            {
+                return true; ;
+            }
+        }
+
+        /// <summary>
+        /// Gets the attribute value for the gateway 
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <param name="key">The key.</param>
+        /// <returns></returns>
+        protected string GetAttributeValue( FinancialGateway financialGateway, string key )
+        {
+            if ( financialGateway.AttributeValues == null )
+            {
+                financialGateway.LoadAttributes();
+            }
+
+            var values = financialGateway.AttributeValues;
+            if ( values != null && values.ContainsKey( key ) )
+            {
+                var keyValues = values[key];
+                if ( keyValues != null )
+                {
+                    return keyValues.Value;
+                }
+            }
+
+            return string.Empty;
+        }
+
         /// <summary>
         /// Gets a value indicating whether gateway provider needs first and last name on credit card as two distinct fields.
         /// </summary>
@@ -52,14 +153,39 @@ namespace Rock.Financial
         }
 
         /// <summary>
-        /// Gets the batch time offset.  By default online payments will be grouped into batches with a start time
-        /// of 12:00:00 AM.  However if the the payment gateway groups transactions into batches based on a different
-        /// time, this offset can specified so that Rock will use the same time when creating batches for online
-        /// transactions
+        /// Gets a value indicating whether the gateway requires the name on card for CC processing
         /// </summary>
-        public virtual TimeSpan BatchTimeOffset
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <returns></returns>
+        /// <value>
+        ///   <c>true</c> if [name on card required]; otherwise, <c>false</c>.
+        /// </value>
+        public virtual bool PromptForNameOnCard( FinancialGateway financialGateway )
         {
-            get { return new TimeSpan( 0 ); }
+            return true;
+        }
+
+        /// <summary>
+        /// Prompts the name of for bank account.
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <returns></returns>
+        public virtual bool PromptForBankAccountName( FinancialGateway financialGateway )
+        {
+            return false;
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether [address required].
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <returns></returns>
+        /// <value>
+        ///   <c>true</c> if [address required]; otherwise, <c>false</c>.
+        /// </value>
+        public virtual bool PromptForBillingAddress( FinancialGateway financialGateway )
+        {
+            return true;
         }
 
         /// <summary>
@@ -73,33 +199,65 @@ namespace Rock.Financial
         }
 
         /// <summary>
+        /// Returnes a boolean value indicating if 'Saved Account' functionality is supported for frequency (i.e. one-time vs repeating )
+        /// </summary>
+        /// <param name="isRepeating">if set to <c>true</c> [is repeating].</param>
+        /// <returns></returns>
+        public virtual bool SupportsSavedAccount( bool isRepeating )
+        {
+            return true;
+        }
+
+        /// <summary>
         /// Authorizes the specified payment information.
         /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="paymentInfo">The payment information.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public virtual FinancialTransaction Authorize( PaymentInfo paymentInfo, out string errorMessage )
+        public virtual FinancialTransaction Authorize( FinancialGateway financialGateway, PaymentInfo paymentInfo, out string errorMessage )
         {
             errorMessage = "Gateway does not support Authorizations";
             return null;
         }
-    
+
         /// <summary>
         /// Charges the specified payment info.
         /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="paymentInfo">The payment info.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public abstract FinancialTransaction Charge( PaymentInfo paymentInfo, out string errorMessage );
+        public abstract FinancialTransaction Charge( FinancialGateway financialGateway, PaymentInfo paymentInfo, out string errorMessage );
+
+        /// <summary>
+        /// Credits (Refunds) the specified transaction.
+        /// </summary>
+        /// <param name="origTransaction">The original transaction.</param>
+        /// <param name="amount">The amount.</param>
+        /// <param name="comment">The comment.</param>
+        /// <param name="errorMessage">The error message.</param>
+        /// <returns></returns>
+        public abstract FinancialTransaction Credit( FinancialTransaction origTransaction, decimal amount, string comment, out string errorMessage );
 
         /// <summary>
         /// Adds the scheduled payment.
         /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="schedule">The schedule.</param>
         /// <param name="paymentInfo">The payment info.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public abstract FinancialScheduledTransaction AddScheduledPayment( PaymentSchedule schedule, PaymentInfo paymentInfo, out string errorMessage );
+        public abstract FinancialScheduledTransaction AddScheduledPayment( FinancialGateway financialGateway, PaymentSchedule schedule, PaymentInfo paymentInfo, out string errorMessage );
+
+        /// <summary>
+        /// Flag indicating if gateway supports updating a scheduled payment.
+        /// </summary>
+        /// <returns></returns>
+        public virtual bool UpdateScheduledPaymentSupported
+        {
+            get { return true; }
+        }
 
         /// <summary>
         /// Updates the scheduled payment.
@@ -119,12 +277,30 @@ namespace Rock.Financial
         public abstract bool CancelScheduledPayment( FinancialScheduledTransaction transaction, out string errorMessage );
 
         /// <summary>
+        /// Flag indicating if gateway supports reactivating a scheduled payment.
+        /// </summary>
+        /// <returns></returns>
+        public virtual bool ReactivateScheduledPaymentSupported
+        {
+            get { return true; }
+        }
+
+        /// <summary>
         /// Reactivates the scheduled payment.
         /// </summary>
         /// <param name="transaction">The transaction.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
         public abstract bool ReactivateScheduledPayment( FinancialScheduledTransaction transaction, out string errorMessage );
+
+        /// <summary>
+        /// Flag indicating if gateway supports getting status of a scheduled payment.
+        /// </summary>
+        /// <returns></returns>
+        public virtual bool GetScheduledPaymentStatusSupported
+        {
+            get { return true; }
+        }
 
         /// <summary>
         /// Gets the scheduled payment status.
@@ -137,11 +313,12 @@ namespace Rock.Financial
         /// <summary>
         /// Gets the payments that have been processed for any scheduled transactions
         /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="startDate">The start date.</param>
         /// <param name="endDate">The end date.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public abstract List<Payment> GetPayments( DateTime startDate, DateTime endDate, out string errorMessage );
+        public abstract List<Payment> GetPayments( FinancialGateway financialGateway, DateTime startDate, DateTime endDate, out string errorMessage );
 
         /// <summary>
         /// Gets an optional reference number needed to process future transaction from saved account.

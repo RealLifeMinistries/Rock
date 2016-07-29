@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,9 @@
 // </copyright>
 //
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
@@ -35,6 +37,7 @@ namespace Rock.Web.UI.Controls
 
         #region Fields
 
+        private DropDownList _ddlNoteType;
         private RockTextBox _tbNote;
         private CheckBox _cbAlert;
         private CheckBox _cbPrivate;
@@ -42,6 +45,7 @@ namespace Rock.Web.UI.Controls
         private LinkButton _lbEditNote;
         private LinkButton _lbDeleteNote;
         private SecurityButton _sbSecurity;
+        private DateTimePicker _dtCreateDate;
 
         #endregion
 
@@ -60,7 +64,6 @@ namespace Rock.Web.UI.Controls
                 this.NoteId = value.Id;
                 this.NoteTypeId = value.NoteTypeId;
                 this.EntityId = value.EntityId;
-                this.SourceTypeValueId = value.SourceTypeValueId;
                 this.Caption = value.Caption;
 
                 if (value.CreatedByPersonAlias != null && value.CreatedByPersonAlias.Person != null)
@@ -68,20 +71,95 @@ namespace Rock.Web.UI.Controls
                     this.CreatedByName = value.CreatedByPersonAlias.Person.FullName;
                     this.CreatedByPhotoId = value.CreatedByPersonAlias.Person.PhotoId;
                     this.CreatedByGender = value.CreatedByPersonAlias.Person.Gender;
+                    this.CreatedByPersonId = value.CreatedByPersonAlias.Person.Id;
+                    this.CreatedByAge = value.CreatedByPersonAlias.Person.Age;
                 }
                 else
                 {
                     this.CreatedByName = string.Empty;
                     this.CreatedByPhotoId = null;
                     this.CreatedByGender = Gender.Male;
+                    this.CreatedByPersonId = null;
+                    this.CreatedByAge = null;
                 }
 
                 this.CreatedDateTime = value.CreatedDateTime;
                 this.Text = value.Text;
                 this.IsAlert = value.IsAlert.HasValue && value.IsAlert.Value;
+                this.IsPrivate = value.IsPrivateNote;
             }
         }
 
+        /// <summary>
+        /// Gets or sets the note types.
+        /// </summary>
+        /// <value>
+        /// The note types.
+        /// </value>
+        public List<NoteTypeCache> NoteTypes
+        {
+            get
+            {
+                EnsureChildControls();
+                var result = new List<NoteTypeCache>();
+                foreach( ListItem li in _ddlNoteType.Items )
+                {
+                    int? id = li.Value.AsIntegerOrNull();
+                    if ( id.HasValue )
+                    {
+                        var noteType = NoteTypeCache.Read( id.Value );
+                        {
+                            if ( noteType != null )
+                            {
+                                result.Add( noteType);
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
+            set
+            {
+                EnsureChildControls();
+                _ddlNoteType.DataSource = value;
+                _ddlNoteType.DataBind();
+                _ddlNoteType.Visible = value.Count() > 1;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the note type identifier.
+        /// </summary>
+        /// <value>
+        /// The note type identifier.
+        /// </value>
+        public int? NoteTypeId
+        {
+            get 
+            {
+                int? noteTypeId = ViewState["NoteTypeId"] as int?;
+                if ( !noteTypeId.HasValue && NoteTypes.Any() )
+                {
+                    noteTypeId = NoteTypes.First().Id;
+                }
+                return noteTypeId ?? 0;
+            }
+            set 
+            {
+                ViewState["NoteTypeId"] = value;
+
+                EnsureChildControls();
+                if ( value.HasValue )
+                {
+                    _ddlNoteType.SetValue( value.ToString() );
+                }
+                else
+                {
+                    _ddlNoteType.SelectedIndex = -1;
+                }
+            }
+        }        
+        
         /// <summary>
         /// Gets or sets the note id.
         /// </summary>
@@ -95,18 +173,6 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
-        /// Gets or sets the note type identifier.
-        /// </summary>
-        /// <value>
-        /// The note type identifier.
-        /// </value>
-        public int? NoteTypeId
-        {
-            get { return ViewState["NoteTypeId"] as int?; }
-            set { ViewState["NoteTypeId"] = value; }
-        }
-
-        /// <summary>
         /// Gets or sets the entity identifier.
         /// </summary>
         /// <value>
@@ -116,18 +182,6 @@ namespace Rock.Web.UI.Controls
         {
             get { return ViewState["EntityId"] as int?; }
             set { ViewState["EntityId"] = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the source type value id.
-        /// </summary>
-        /// <value>
-        /// The source type value id.
-        /// </value>
-        public int? SourceTypeValueId
-        {
-            get { return ViewState["SourceTypeValueId"] as int?; }
-            set { ViewState["SourceTypeValueId"] = value; }
         }
 
         /// <summary>
@@ -176,6 +230,30 @@ namespace Rock.Web.UI.Controls
         {
             get { return ViewState["CreatedByPhotoId"] as int?; }
             set { ViewState["CreatedByPhotoId"] = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the created by person identifier.
+        /// </summary>
+        /// <value>
+        /// The created by person identifier.
+        /// </value>
+        public int? CreatedByPersonId
+        {
+            get { return ViewState["CreatedByPersonId"] as int?; }
+            set { ViewState["CreatedByPersonId"] = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the created by age.
+        /// </summary>
+        /// <value>
+        /// The created by age.
+        /// </value>
+        public int? CreatedByAge
+        {
+            get { return ViewState["CreatedByAge"] as int?; }
+            set { ViewState["CreatedByAge"] = value; }
         }
 
         /// <summary>
@@ -333,7 +411,19 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether person icon should used instead of icon representing the source.
+        /// Gets or sets a value indicating whether [show create date input]
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if [show create date input]; otherwise <c>false</c>.
+        /// </value>
+        public bool ShowCreateDateInput
+        {
+            get { return ViewState["ShowCreateDateInput"] as bool? ?? false; }
+            set { ViewState["ShowCreateDateInput"] = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether person icon should used instead of icon representing the note type.
         /// </summary>
         /// <value>
         ///   <c>true</c> if [use person icon]; otherwise, <c>false</c>.
@@ -362,19 +452,33 @@ namespace Rock.Web.UI.Controls
             }
         }
 
+        private string CSSClass
+        {
+            get
+            {
+                if ( NoteTypeId.HasValue )
+                {
+                    var noteType = NoteTypeCache.Read( NoteTypeId.Value );
+                    if ( noteType != null )
+                    {
+                        return noteType.CssClass;
+                    }
+                }
+
+                return string.Empty;
+            }
+        }
+
         private string IconClass
         {
             get
             {
-                if ( SourceTypeValueId.HasValue )
+                if ( NoteTypeId.HasValue )
                 {
-                    var SourceType = DefinedValueCache.Read( SourceTypeValueId.Value );
-                    if ( SourceType != null &&
-                    SourceType.AttributeValues != null &&
-                    SourceType.AttributeValues.ContainsKey( "IconClass" ) &&
-                    SourceType.AttributeValues["IconClass"] != null )
+                    var noteType = NoteTypeCache.Read( NoteTypeId.Value );
+                    if ( noteType != null )
                     {
-                        return SourceType.AttributeValues["IconClass"].Value;
+                        return noteType.IconCssClass;
                     }
                 }
 
@@ -383,22 +487,6 @@ namespace Rock.Web.UI.Controls
 
         }
 
-        private string NoteTypeName
-        {
-            get
-            {
-                if ( SourceTypeValueId.HasValue )
-                {
-                    var SourceType = DefinedValueCache.Read( SourceTypeValueId.Value );
-                    if ( SourceType != null  )
-                    {
-                        return SourceType.Value;
-                    }
-                }
-
-                return string.Empty;
-            }
-        }
 
         #endregion
 
@@ -409,6 +497,7 @@ namespace Rock.Web.UI.Controls
         /// </summary>
         public NoteControl()
         {
+            _ddlNoteType = new DropDownList();
             _tbNote = new RockTextBox();
             _tbNote.Placeholder = "Write a note...";
             _cbAlert = new CheckBox();
@@ -417,6 +506,7 @@ namespace Rock.Web.UI.Controls
             _lbEditNote = new LinkButton();
             _lbDeleteNote = new LinkButton();
             _sbSecurity = new SecurityButton();
+            _dtCreateDate = new DateTimePicker();
         }
 
         #endregion
@@ -447,14 +537,39 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Raises the <see cref="E:System.Web.UI.Control.Load" /> event.
+        /// </summary>
+        /// <param name="e">The <see cref="T:System.EventArgs" /> object that contains the event data.</param>
+        protected override void OnLoad( EventArgs e )
+        {
+            base.OnLoad( e );
+
+            if ( Page.IsPostBack )
+            {
+                EnsureChildControls();
+                if ( CanEdit && _ddlNoteType.Visible )
+                {
+                    NoteTypeId = _ddlNoteType.SelectedValueAsInt();
+                }
+            }
+        }
+
+        /// <summary>
         /// Called by the ASP.NET page framework to notify server controls that use composition-based implementation to create any child controls they contain in preparation for posting back or rendering.
         /// </summary>
         protected override void CreateChildControls()
         {
             base.CreateChildControls();
 
+            _ddlNoteType.ID = this.ID + "_ddlNoteType";
+            _ddlNoteType.CssClass = "form-control input-sm input-width-lg noteentry-notetype";
+            _ddlNoteType.DataValueField = "Id";
+            _ddlNoteType.DataTextField = "Name";
+            Controls.Add( _ddlNoteType );
+
             _tbNote.ID = this.ID + "_tbNewNote";
             _tbNote.TextMode = TextBoxMode.MultiLine;
+            _tbNote.ValidateRequestMode = ValidateRequestMode.Disabled;
             Controls.Add(_tbNote);
 
             _cbAlert.ID = this.ID + "_cbAlert";
@@ -489,6 +604,10 @@ namespace Rock.Web.UI.Controls
             _sbSecurity.Attributes["class"] = "btn btn-security btn-xs security pull-right";
             _sbSecurity.EntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.Note ) ).Id;
 
+            _dtCreateDate.ID = this.ID + "_tbCreateDate";
+            _dtCreateDate.Label = "Note Created Date";
+            Controls.Add(_dtCreateDate);
+
             Controls.Add( _sbSecurity );
         }
 
@@ -498,9 +617,9 @@ namespace Rock.Web.UI.Controls
         /// <param name="writer">The <see cref="T:System.Web.UI.HtmlTextWriter" /> object that receives the control content.</param>
         public override void RenderControl( HtmlTextWriter writer )
         {
-            if ( NoteTypeName != string.Empty )
+            if ( CSSClass != string.Empty )
             {
-                writer.AddAttribute( HtmlTextWriterAttribute.Class, "note note-" + NoteTypeName.ToLower().Replace( " ", "" ) );
+                writer.AddAttribute( HtmlTextWriterAttribute.Class, "note " + CSSClass );
             }
             else
             {
@@ -526,16 +645,25 @@ namespace Rock.Web.UI.Controls
 
             if ( DisplayType == NoteDisplayType.Full && UsePersonIcon )
             {
-                writer.Write( Person.GetPhotoImageTag( CreatedByPhotoId, CreatedByGender, 50, 50 ) );
+                writer.Write( Person.GetPersonPhotoImageTag( CreatedByPersonId, CreatedByPhotoId, null, CreatedByGender, null, 50, 50) );
             }
 
             writer.AddAttribute(HtmlTextWriterAttribute.Class, "noteentry-control");
             writer.RenderBeginTag(HtmlTextWriterTag.Div);
-            
+            _ddlNoteType.RenderControl( writer );
             _tbNote.RenderControl( writer );
             writer.RenderEndTag();
 
-            if ( DisplayType == NoteDisplayType.Full )
+            // The optional create date text box, but only for new notes...
+            if (ShowCreateDateInput && !NoteId.HasValue)
+            {
+                writer.AddAttribute(HtmlTextWriterAttribute.Class, "createDate clearfix");
+                writer.RenderBeginTag(HtmlTextWriterTag.Div);
+                _dtCreateDate.RenderControl(writer);
+                writer.RenderEndTag();  // createDate div
+            }
+
+            if (DisplayType == NoteDisplayType.Full)
             {
                 // Options
                 writer.AddAttribute( HtmlTextWriterAttribute.Class, "settings clearfix" );
@@ -596,7 +724,7 @@ namespace Rock.Web.UI.Controls
                 {
                     if ( UsePersonIcon )
                     {
-                        writer.Write( Person.GetPhotoImageTag( CreatedByPhotoId, CreatedByGender, 50, 50 ) );
+                        writer.Write( Person.GetPersonPhotoImageTag( CreatedByPersonId, CreatedByPhotoId, CreatedByAge, CreatedByGender, null, 50, 50) );
                     }
                     else
                     {
@@ -608,6 +736,15 @@ namespace Rock.Web.UI.Controls
 
                 writer.AddAttribute( HtmlTextWriterAttribute.Class, "details" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
+
+                // first, encode the text to ensure html tags get encoded
+                string renderedText = Text.EncodeHtml();
+
+                // convert any http, etc text into clickable links (do this before applying Markdown)
+                renderedText = renderedText.Linkify();
+                
+                // convert any markdown into HTML, and convert into crlf into <br />
+                renderedText = renderedText.ConvertMarkdownToHtml( true );
 
                 if ( DisplayType == NoteDisplayType.Full )
                 {
@@ -629,11 +766,11 @@ namespace Rock.Web.UI.Controls
                     }
                     writer.RenderEndTag();
 
-                    writer.Write( Text.EncodeHtml().ConvertCrLfToHtmlBr() );
+                    writer.Write( renderedText );
                 }
                 else
                 {
-                    writer.Write( Text.EncodeHtml().ConvertCrLfToHtmlBr() );
+                    writer.Write( renderedText );
                     writer.Write( " - " );
                     if ( !string.IsNullOrWhiteSpace( CreatedByName ) )
                     {
@@ -689,6 +826,11 @@ namespace Rock.Web.UI.Controls
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         protected void lbSaveNote_Click( object sender, EventArgs e )
         {
+            if ( _ddlNoteType.Visible )
+            {
+                NoteTypeId = _ddlNoteType.SelectedValueAsInt() ?? 0;
+            }
+
             var rockPage = this.Page as RockPage;
             if (rockPage != null && NoteTypeId.HasValue)
             {
@@ -703,41 +845,29 @@ namespace Rock.Web.UI.Controls
                     note = service.Get( NoteId.Value );
                 }
 
-                bool newNote = false;
-
                 if ( note == null )
                 {
-                    newNote = true;
-
                     note = new Note();
                     note.IsSystem = false;
-                    note.NoteTypeId = NoteTypeId.Value;
                     note.EntityId = EntityId;
-                    note.SourceTypeValueId = SourceTypeValueId;
                     service.Add( note );
                 }
 
-                note.Caption = IsPrivate ? "You - Personal Note" : string.Empty;
+                note.NoteTypeId = NoteTypeId.Value;
+                if ( string.IsNullOrWhiteSpace( note.Caption ) )
+                {
+                    note.Caption = IsPrivate ? "You - Personal Note" : string.Empty;
+                }
                 note.Text = Text;
                 note.IsAlert = IsAlert;
+                note.IsPrivateNote = IsPrivate;
+
+                if (ShowCreateDateInput)
+                {
+                    note.CreatedDateTime = _dtCreateDate.SelectedDateTime;
+                }
 
                 rockContext.SaveChanges();
-
-                if ( newNote )
-                {
-                    note.AllowPerson( Authorization.EDIT, currentPerson );
-                }
-
-                if ( IsPrivate && !note.IsPrivate( Authorization.VIEW, currentPerson ) )
-                {
-                    note.MakePrivate( Authorization.VIEW, currentPerson );
-                }
-
-                if ( !IsPrivate && note.IsPrivate( Authorization.VIEW, currentPerson ) )
-                {
-                    note.MakeUnPrivate( Authorization.VIEW, currentPerson );
-                }
-
 
                 if ( SaveButtonClick != null )
                 {
@@ -765,7 +895,7 @@ namespace Rock.Web.UI.Controls
                 if ( NoteId.HasValue )
                 {
                     note = service.Get( NoteId.Value );
-                    if ( note != null && note.IsAuthorized( Authorization.EDIT, currentPerson ) )
+                    if ( note != null && note.NoteType.UserSelectable && note.IsAuthorized( Authorization.EDIT, currentPerson ) )
                     {
                         service.Delete( note );
                         rockContext.SaveChanges();

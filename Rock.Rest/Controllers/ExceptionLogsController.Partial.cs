@@ -7,11 +7,11 @@
 // <copyright>
 // Copyright 2013 by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,14 +20,12 @@
 // limitations under the License.
 // </copyright>
 //
-
+using System;
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.Linq;
 using System.Web.Http;
-using System.Web.Routing;
-
-using Rock.Data;
+using Rock.Chart;
 using Rock.Rest.Filters;
 
 namespace Rock.Rest.Controllers
@@ -71,6 +69,19 @@ namespace Rock.Rest.Controllers
 
             var result = allCountsQry.Union( uniqueCountsQry );
             return result;
+        }
+
+        /// <summary>
+        /// Logs the exception.
+        /// </summary>
+        /// <param name="ex">The ex.</param>
+        [Authenticate, Secured]
+        [System.Web.Http.Route( "api/ExceptionLogs/LogException" )]
+        [HttpPost]
+        public void LogException( Exception ex)
+        {
+            var personAlias = this.GetPersonAlias();
+            Rock.Model.ExceptionLogService.LogException( ex, System.Web.HttpContext.Current, null, null, personAlias );
         }
 
         /// <summary>

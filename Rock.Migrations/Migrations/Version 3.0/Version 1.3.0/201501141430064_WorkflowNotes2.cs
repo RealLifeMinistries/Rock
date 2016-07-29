@@ -1,11 +1,11 @@
-// <copyright>
-// Copyright 2013 by the Spark Development Network
+﻿// <copyright>
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -116,14 +116,14 @@ Pastor:Talk to a Pastor'
 
             // Migration Rollups
 
-            Sql(@"
-    UPDATE [HtmlContent]
+            Sql( @"
+      UPDATE [HtmlContent]
     SET [Content] = '<ul class=""list-group list-group-panel"">
 <li class=""list-group-item""><a href=""http://www.rockrms.com/"">Rock RMS Website</a></li>
 <li class=""list-group-item""><a href=""~/page/1"">External Website</a></li>
 </ul>'
-    WHERE [Guid] = '007EA905-D5D3-4DC5-AD0B-2C1E3935E452'
-");
+    WHERE [Guid] = '007EA905-D5D3-4DC5-AD0B-2C1E3935E452' AND [ModifiedDateTime] IS NULL
+" );
 
             Sql( @"
 UPDATE [SystemEmail]
@@ -142,12 +142,12 @@ SET [Body] = '{{ GlobalAttribute.EmailHeader }}
 {% for attribute in Action.FormAttributes %}
 
     
-    {% if attribute.IsVisible and attribute.Value != '' %}
+    {% if attribute.IsVisible and attribute.Value != '''' %}
         <div>
             <strong>{{ attribute.Name }}:</strong>
             <br />
             
-                {% if attribute.Url and attribute.Url != '' %}
+                {% if attribute.Url and attribute.Url != '''' %}
                     <a href=''{{ attribute.Url }}''>{{ attribute.Value }}</a>
                 {% else %}
                     {{ attribute.Value }}

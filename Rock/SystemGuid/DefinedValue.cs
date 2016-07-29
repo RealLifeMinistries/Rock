@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -45,6 +45,11 @@ namespace Rock.SystemGuid
         /// </summary>
         public const string CHECKIN_SEARCH_TYPE_NAME = "071D6DAA-3063-463A-B8A1-7D9A1BE1BB31";
 
+        /// <summary>
+        /// Power Search Type
+        /// </summary>
+        public const string CHECKIN_SEARCH_TYPE_NAME_AND_PHONE = "93773B0A-6E7F-1AA0-4F1D-9A4D6ACE930F";
+
         #endregion
 
         #region Device Type
@@ -63,6 +68,15 @@ namespace Rock.SystemGuid
         /// Printer device type
         /// </summary>
         public const string DEVICE_TYPE_PRINTER = "8284B128-E73B-4863-9FC2-43E6827B65E6";
+
+        #endregion
+
+        #region Entity Set Purpose
+
+        /// <summary>
+        /// Entity Set for the purpose of doing a Person Merge request
+        /// </summary>
+        public const string ENTITY_SET_PURPOSE_PERSON_MERGE_REQUEST = "214EB26F-5493-4540-B2EF-F0887C8FBB9E";
 
         #endregion
 
@@ -229,15 +243,6 @@ namespace Rock.SystemGuid
 
         #endregion
 
-        #region Note Type
-
-        /// <summary>
-        /// Manually entered note.
-        /// </summary>
-        public const string NOTE_TYPE_MANUAL_NOTE = "4318E9AC-B669-4AF7-AF88-EF580FC43C6A";
-
-        #endregion
-
         #region Metrics
 
         /// <summary>
@@ -360,6 +365,11 @@ namespace Rock.SystemGuid
         /// </summary>
         public const string PERSON_CONNECTION_STATUS_PARTICIPANT = "8EBC0CEB-474D-4C1B-A6BA-734C3A9AB061";
 
+        /// <summary>
+        /// Web Prospect Connection Status
+        /// </summary>
+        public const string PERSON_CONNECTION_STATUS_WEB_PROSPECT = "368DD475-242C-49C4-A42C-7278BE690CC2";
+
         #endregion
 
         #region Person Review Reason
@@ -408,18 +418,5 @@ namespace Rock.SystemGuid
 
         #endregion
 
-        #region Workflow Note Type
-
-        /// <summary>
-        /// A user-entered workflow note
-        /// </summary>
-        public const string WORKFLOW_NOTE_TYPE_USER_NOTE = "534489FB-E239-4C51-8F5D-9ECF85E9CDE2";
-
-        /// <summary>
-        /// A system-entered workflow note
-        /// </summary>
-        public const string WORKFLOW_NOTE_TYPE_SYSTEM_NOTE = "414E9F98-4709-4895-AEBA-E41773BB7EB8";
-
-        #endregion
     }
 }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Rock.Model;
 
 namespace Rock.Store
 {
@@ -44,14 +45,6 @@ namespace Rock.Store
         public int Rating { get; set; }
 
         /// <summary>
-        /// Gets or sets the Guid of the Package Category. 
-        /// </summary>
-        /// <value>
-        /// A <see cref="System.Guid"/> representing the Guid of the Package Category.
-        /// </value>
-        public Guid Guid { get; set; }
-
-        /// <summary>
         /// Gets or sets the review text. 
         /// </summary>
         /// <value>
@@ -65,7 +58,23 @@ namespace Rock.Store
         /// <value>
         /// A <see cref="System.DateTime"/> representing the date the rating was added.
         /// </value>
-        public DateTime DateAdded { get; set; }
+        public DateTime AddedDate { get; set; }
+
+        /// <summary>
+        /// Gets or sets the helpful count.
+        /// </summary>
+        /// <value>
+        /// The helpful count.
+        /// </value>
+        public int HelpfulCount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the was helpful count.
+        /// </summary>
+        /// <value>
+        /// The was helpful count.
+        /// </value>
+        public int WasHelpfulCount { get; set; }
 
         /// <summary>
         /// Gets or sets the person id of the reviewer. 
@@ -73,7 +82,7 @@ namespace Rock.Store
         /// <value>
         /// A <see cref="System.Int32"/> representing person id of the reviewer.
         /// </value>
-        public int PersonId { get; set; }
+        public int PersonAliasId { get; set; }
 
         /// <summary>
         /// Gets or sets the reviewer. 
@@ -81,6 +90,6 @@ namespace Rock.Store
         /// <value>
         /// A <see cref="Rock.Model.Person"/> representing the reviewer.
         /// </value>
-        public Rock.Model.Person Person { get; set; }
+        public PersonAlias PersonAlias { get; set; }
     }
 }

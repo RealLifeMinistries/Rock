@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -69,6 +69,46 @@ namespace Rock.Rest.Controllers
         public void FacebookLogin( [FromBody]Rock.Security.ExternalAuthentication.Facebook.FacebookUser facebookUser )
         {
             string userName = Rock.Security.ExternalAuthentication.Facebook.GetFacebookUserName( facebookUser );
+            if ( !string.IsNullOrWhiteSpace( userName ) )
+            {
+                Rock.Security.Authorization.SetAuthCookie( userName, false, false );
+            }
+            else
+            {
+                throw new HttpResponseException( HttpStatusCode.Unauthorized );
+            }
+        }
+
+        /// <summary>
+        /// Use this to Login a user and return an AuthCookie which can be used in subsequent REST calls
+        /// </summary>
+        /// <param name="loginParameters">The login parameters.</param>
+        /// <exception cref="System.Web.Http.HttpResponseException"></exception>
+        [HttpPost]
+        [System.Web.Http.Route("api/Auth/GoogleLogin")]
+        public void GoogleLogin( [FromBody]Rock.Security.ExternalAuthentication.Google.GoogleUser googleUser )
+        {
+            string userName = Rock.Security.ExternalAuthentication.Google.GetGoogleUser(googleUser);
+            if ( !string.IsNullOrWhiteSpace(userName) )
+            {
+                Rock.Security.Authorization.SetAuthCookie(userName, false, false);
+            }
+            else
+            {
+                throw new HttpResponseException(HttpStatusCode.Unauthorized);
+            }
+        }
+
+        /// <summary>
+        /// Use this to Login a user and return an AuthCookie which can be used in subsequent REST calls
+        /// </summary>
+        /// <param name="loginParameters">The login parameters.</param>
+        /// <exception cref="System.Web.Http.HttpResponseException"></exception>
+        [HttpPost]
+        [System.Web.Http.Route( "api/Auth/TwitterLogin" )]
+        public void TwitterLogin( [FromBody]Rock.Security.ExternalAuthentication.Twitter.TwitterUser twitterUser )
+        {
+            string userName = Rock.Security.ExternalAuthentication.Twitter.GetTwitterUser( twitterUser );
             if ( !string.IsNullOrWhiteSpace( userName ) )
             {
                 Rock.Security.Authorization.SetAuthCookie( userName, false, false );

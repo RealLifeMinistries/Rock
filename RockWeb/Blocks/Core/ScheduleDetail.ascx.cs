@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -134,8 +134,11 @@ namespace RockWeb.Blocks.Core
 
             rockContext.SaveChanges();
 
+            Rock.CheckIn.KioskDevice.FlushAll();
+
             var qryParams = new Dictionary<string, string>();
             qryParams["ScheduleId"] = schedule.Id.ToString();
+            qryParams["ExpandedIds"] = PageParameter( "ExpandedIds" );
             NavigateToPage( RockPage.Guid, qryParams );
         }
 
@@ -206,6 +209,7 @@ namespace RockWeb.Blocks.Core
                         qryParams["CategoryId"] = categoryId.ToString();
                     }
 
+                    qryParams["ExpandedIds"] = PageParameter( "ExpandedIds" );
                     NavigateToPage( RockPage.Guid, qryParams );
                 }
             }
@@ -403,8 +407,15 @@ namespace RockWeb.Blocks.Core
                 }
             }
 
+            var friendlyText = schedule.ToFriendlyScheduleText();
+            if ( schedule.HasScheduleWarning() )
+            {
+                friendlyText = string.Format( "<label class='label label-warning'>{0}</label> <i class='fa fa-exclamation-triangle text-warning'></i>", friendlyText );
+            }
+            
             DescriptionList descriptionList = new DescriptionList()
                 .Add( "Description", schedule.Description ?? string.Empty )
+                .Add( "Schedule", friendlyText )
                 .Add( "Next Occurrence", occurrenceText )
                 .Add( "Category", schedule.Category != null ? schedule.Category.Name : string.Empty );
 

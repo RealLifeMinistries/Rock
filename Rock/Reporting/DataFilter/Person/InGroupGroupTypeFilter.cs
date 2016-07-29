@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ using System.Web.UI;
 using System.Web.UI.WebControls;
 using Rock.Data;
 using Rock.Model;
+using Rock.Web.Cache;
 using Rock.Web.UI.Controls;
 
 namespace Rock.Reporting.DataFilter.Person
@@ -97,6 +98,11 @@ function() {
      result = result + ', with role(s): ' + roleCommaList;
   }
 
+  var groupMemberStatus = $('.js-group-member-status option:selected', $content).text();
+  if (groupMemberStatus) {
+     result = result + ', with member status:' + groupMemberStatus;
+  }
+
   return result;
 }
 ";
@@ -120,12 +126,23 @@ function() {
 
                 var groupTypeRoles = new GroupTypeRoleService( new RockContext() ).Queryable().Where( a => groupTypeRoleGuidList.Contains( a.Guid ) ).ToList();
 
+                GroupMemberStatus? groupMemberStatus = null;
+                if ( selectionValues.Length >= 3 )
+                {
+                    groupMemberStatus = selectionValues[2].ConvertToEnumOrNull<GroupMemberStatus>();
+                }
+
                 if ( groupType != null )
                 {
                     result = string.Format( "In group of group type: {0}", groupType.Name );
                     if ( groupTypeRoles.Count() > 0 )
                     {
                         result += string.Format( ", with role(s): {0}", groupTypeRoles.Select( a => a.Name ).ToList().AsDelimited( "," ) );
+                    }
+
+                    if ( groupMemberStatus.HasValue )
+                    {
+                        result += string.Format( ", with member status: {0}", groupMemberStatus.ConvertToString() );
                     }
                 }
             }
@@ -171,7 +188,16 @@ function() {
 
             PopulateGroupRolesCheckList( groupTypePicker.SelectedGroupTypeId ?? 0 );
 
-            return new Control[2] { groupTypePicker, cblRole };
+            RockDropDownList ddlGroupMemberStatus = new RockDropDownList();
+            ddlGroupMemberStatus.CssClass = "js-group-member-status";
+            ddlGroupMemberStatus.ID = filterControl.ID + "_ddlGroupMemberStatus";
+            ddlGroupMemberStatus.Label = "with Group Member Status";
+            ddlGroupMemberStatus.Help = "Select a specific group member status to only include group members with that status. Leaving this blank will return all members.";
+            ddlGroupMemberStatus.BindToEnum<GroupMemberStatus>( true );
+            ddlGroupMemberStatus.SetValue( GroupMemberStatus.Active.ConvertToInt() );
+            filterControl.Controls.Add( ddlGroupMemberStatus );
+
+            return new Control[3] { groupTypePicker, cblRole, ddlGroupMemberStatus };
         }
 
         /// <summary>
@@ -228,16 +254,23 @@ function() {
         /// <returns></returns>
         public override string GetSelection( Type entityType, Control[] controls )
         {
-            int groupTypeId = ( controls[0] as GroupTypePicker ).SelectedValueAsId() ?? 0;
+            var groupTypePicker = ( controls[0] as GroupTypePicker );
+            var cblRoles = ( controls[1] as RockCheckBoxList );
+            var ddlMemberStatus = ( controls[2] as RockDropDownList );
+
+            int groupTypeId = groupTypePicker.SelectedValueAsId() ?? 0;
             Guid? groupTypeGuid = null;
-            var groupType = new GroupTypeService( new RockContext() ).Get( groupTypeId );
+            var groupType = Rock.Web.Cache.GroupTypeCache.Read( groupTypeId );
             if ( groupType != null )
             {
                 groupTypeGuid = groupType.Guid;
             }
 
-            var guidCommaList = ( controls[1] as RockCheckBoxList ).SelectedValues.AsDelimited( "," );
-            return groupTypeGuid.ToString() + "|" + guidCommaList;
+            var rolesGuidCommaList = cblRoles.SelectedValues.AsDelimited( "," );
+
+            var memberStatusValue = ddlMemberStatus.SelectedValue;
+
+            return groupTypeGuid.ToString() + "|" + rolesGuidCommaList + "|" + memberStatusValue;
         }
 
         /// <summary>
@@ -267,6 +300,16 @@ function() {
                 {
                     item.Selected = selectedRoleGuids.Contains( item.Value );
                 }
+
+                RockDropDownList ddlGroupMemberStatus = controls[2] as RockDropDownList;
+                if ( selectionValues.Length >= 3 )
+                {
+                    ddlGroupMemberStatus.SetValue( selectionValues[2] );
+                }
+                else
+                {
+                    ddlGroupMemberStatus.SetValue( string.Empty );
+                }
             }
         }
 
@@ -287,18 +330,30 @@ function() {
                 int groupTypeId = 0;
 
                 Guid groupTypeGuid = selectionValues[0].AsGuid();
-                var groupType = new GroupTypeService( (RockContext)serviceInstance.Context ).Get( groupTypeGuid );
+                var groupType = GroupTypeCache.Read( groupTypeGuid );
                 if ( groupType != null )
                 {
                     groupTypeId = groupType.Id;
                 }
 
-                var groupMemberServiceQry = groupMemberService.Queryable().Where( xx => xx.Group.GroupTypeId == groupTypeId );
+                var groupMemberServiceQry = groupMemberService.Queryable().Where( xx => xx.Group.GroupTypeId == groupTypeId && xx.Group.IsActive == true );
 
                 var groupRoleGuids = selectionValues[1].Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).Select( n => n.AsGuid() ).ToList();
                 if ( groupRoleGuids.Count() > 0 )
                 {
-                    groupMemberServiceQry = groupMemberServiceQry.Where( xx => groupRoleGuids.Contains( xx.GroupRole.Guid ) );
+                    var groupRoleIds = new GroupTypeRoleService( (RockContext)serviceInstance.Context ).Queryable().Where( a => groupRoleGuids.Contains( a.Guid ) ).Select( a => a.Id ).ToList();
+                    groupMemberServiceQry = groupMemberServiceQry.Where( xx => groupRoleIds.Contains( xx.GroupRoleId ) );
+                }
+
+                GroupMemberStatus? groupMemberStatus = null;
+                if ( selectionValues.Length >= 3 )
+                {
+                    groupMemberStatus = selectionValues[2].ConvertToEnumOrNull<GroupMemberStatus>();
+                }
+
+                if ( groupMemberStatus.HasValue )
+                {
+                    groupMemberServiceQry = groupMemberServiceQry.Where( xx => xx.GroupMemberStatus == groupMemberStatus.Value );
                 }
 
                 var qry = new PersonService( (RockContext)serviceInstance.Context ).Queryable()

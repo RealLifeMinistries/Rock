@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -227,13 +227,26 @@ namespace Rock.Model
         #region Methods
 
         /// <summary>
-        /// Gets the query.
+        /// Gets the query using the most appropriate type of dbContext 
         /// </summary>
         /// <param name="sortProperty">The sort property.</param>
         /// <param name="databaseTimeoutSeconds">The database timeout seconds.</param>
         /// <param name="errorMessages">The error messages.</param>
         /// <returns></returns>
-        public IQueryable<IEntity> GetQuery( SortProperty sortProperty, int? databaseTimeoutSeconds,  out List<string> errorMessages )
+        public IQueryable<IEntity> GetQuery( SortProperty sortProperty, int? databaseTimeoutSeconds, out List<string> errorMessages )
+        {
+            return GetQuery( sortProperty, null, databaseTimeoutSeconds, out errorMessages );
+        }
+
+        /// <summary>
+        /// Gets the query using the specified dbContext 
+        /// </summary>
+        /// <param name="sortProperty">The sort property.</param>
+        /// <param name="databaseTimeoutSeconds">The database timeout seconds.</param>
+        /// <param name="dbContext">The database context.</param>
+        /// <param name="errorMessages">The error messages.</param>
+        /// <returns></returns>
+        public IQueryable<IEntity> GetQuery( SortProperty sortProperty, System.Data.Entity.DbContext dbContext, int? databaseTimeoutSeconds, out List<string> errorMessages )
         {
             errorMessages = new List<string>();
 
@@ -246,13 +259,17 @@ namespace Rock.Model
 
                     if ( entityType != null )
                     {
-                        System.Data.Entity.DbContext reportDbContext = Reflection.GetDbContextForEntityType( entityType );
-                        if ( databaseTimeoutSeconds.HasValue )
+                        if ( dbContext == null )
                         {
-                            reportDbContext.Database.CommandTimeout = databaseTimeoutSeconds.Value;
+                            dbContext = Reflection.GetDbContextForEntityType( entityType );
                         }
 
-                        IService serviceInstance = Reflection.GetServiceForEntityType( entityType, reportDbContext );
+                        if ( databaseTimeoutSeconds.HasValue )
+                        {
+                            dbContext.Database.CommandTimeout = databaseTimeoutSeconds.Value;
+                        }
+
+                        IService serviceInstance = Reflection.GetServiceForEntityType( entityType, dbContext );
 
                         if ( serviceInstance != null )
                         {
@@ -262,6 +279,12 @@ namespace Rock.Model
                             MethodInfo getMethod = serviceInstance.GetType().GetMethod( "Get", new Type[] { typeof( ParameterExpression ), typeof( Expression ), typeof( SortProperty ) } );
                             if ( getMethod != null )
                             {
+                                if (sortProperty == null)
+                                {
+                                    // if no sorting is specified, just sort by Id
+                                    sortProperty = new SortProperty { Direction = SortDirection.Ascending, Property = "Id" };
+                                }
+
                                 var getResult = getMethod.Invoke( serviceInstance, new object[] { paramExpression, whereExpression, sortProperty } );
                                 var qry = getResult as IQueryable<IEntity>;
 
@@ -343,6 +366,7 @@ namespace Rock.Model
                         }
                         catch ( SystemException ex )
                         {
+                            ExceptionLogService.LogException( ex, System.Web.HttpContext.Current );
                             errorMessages.Add( string.Format( "{0}: {1}", component.Title, ex.Message ) );
                         }
                     }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -258,6 +258,14 @@ namespace Rock.Web.Cache
         public bool IncludeAdminFooter { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether [allow indexing].
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if [allow indexing]; otherwise, <c>false</c>.
+        /// </value>
+        public bool AllowIndexing { get; set; }
+
+        /// <summary>
         /// Gets the parent page.
         /// </summary>
         /// <value>
@@ -385,17 +393,17 @@ namespace Rock.Web.Cache
             /// <summary>
             /// The id
             /// </summary>
-            public int Id;
+            public int Id { get; set; }
 
             /// <summary>
             /// The GUID
             /// </summary>
-            public Guid Guid;
+            public Guid Guid { get; set; }
 
             /// <summary>
             /// The route
             /// </summary>
-            public string Route;
+            public string Route { get; set; }
         }
 
         /// <summary>
@@ -443,6 +451,7 @@ namespace Rock.Web.Cache
                 {
                     bcName = string.Format( "<i class='{0}'></i> ", IconCssClass );
                 }
+
                 if ( BreadCrumbDisplayName )
                 {
                     bcName += PageTitle;
@@ -492,6 +501,7 @@ namespace Rock.Web.Cache
                 this.KeyWords = page.KeyWords;
                 this.HeaderContent = page.HeaderContent;
                 this.IncludeAdminFooter = page.IncludeAdminFooter;
+                this.AllowIndexing = page.AllowIndexing;
 
                 this.PageContexts = new Dictionary<string, string>();
                 if ( page.PageContexts != null )
@@ -504,7 +514,6 @@ namespace Rock.Web.Cache
                 {
                     page.PageRoutes.ToList().ForEach( r => this.PageRoutes.Add( new PageRouteInfo { Id = r.Id, Guid = r.Guid, Route = r.Route } ) );
                 }
-
             }
         }
 
@@ -593,7 +602,7 @@ namespace Rock.Web.Cache
         /// <param name="parameters">The parameters.</param>
         /// <param name="queryString">The query string.</param>
         /// <returns></returns>
-        public XDocument MenuXml( int levelsDeep, Person person, RockContext rockContext,  PageCache currentPage = null, Dictionary<string, string> parameters = null, NameValueCollection queryString = null )
+        public XDocument MenuXml( int levelsDeep, Person person, RockContext rockContext, PageCache currentPage = null, Dictionary<string, string> parameters = null, NameValueCollection queryString = null )
         {
             XElement menuElement = MenuXmlElement( levelsDeep, person, rockContext, currentPage, parameters, queryString );
             return new XDocument( new XDeclaration( "1.0", "UTF-8", "yes" ), menuElement );
@@ -616,14 +625,16 @@ namespace Rock.Web.Cache
                 string iconUrl = string.Empty;
                 if ( this.IconFileId.HasValue )
                 {
-                    iconUrl = string.Format( "{0}/GetImage.ashx?{1}",
+                    iconUrl = string.Format(
+                        "{0}/GetImage.ashx?{1}",
                         HttpContext.Current.Request.ApplicationPath,
                         this.IconFileId.Value );
                 }
 
                 bool isCurrentPage = currentPage != null && currentPage.Id == this.Id;
 
-                XElement pageElement = new XElement( "page",
+                XElement pageElement = new XElement(
+                    "page",
                     new XAttribute( "id", this.Id ),
                     new XAttribute( "title", string.IsNullOrWhiteSpace( this.PageTitle ) ? this.InternalName : this.PageTitle ),
                     new XAttribute( "current", isCurrentPage.ToString() ),
@@ -632,7 +643,7 @@ namespace Rock.Web.Cache
                     new XAttribute( "display-icon", this.MenuDisplayIcon.ToString().ToLower() ),
                     new XAttribute( "display-child-pages", this.MenuDisplayChildPages.ToString().ToLower() ),
                     new XAttribute( "icon-css-class", this.IconCssClass ?? string.Empty ),
-                    new XElement( "description", this.Description ?? "" ),
+                    new XElement( "description", this.Description ?? string.Empty ),
                     new XElement( "icon-url", iconUrl ) );
 
                 XElement childPagesElement = new XElement( "pages" );
@@ -640,20 +651,26 @@ namespace Rock.Web.Cache
                 pageElement.Add( childPagesElement );
 
                 if ( levelsDeep > 0 && this.MenuDisplayChildPages )
-                    foreach ( PageCache page in GetPages(rockContext) )
+                {
+                    foreach ( PageCache page in GetPages( rockContext ) )
                     {
                         if ( page != null )
                         {
                             XElement childPageElement = page.MenuXmlElement( levelsDeep - 1, person, rockContext, currentPage, parameters, queryString );
                             if ( childPageElement != null )
+                            {
                                 childPagesElement.Add( childPageElement );
+                            }
                         }
                     }
+                }
 
                 return pageElement;
             }
             else
+            {
                 return null;
+            }
         }
 
         #endregion
@@ -688,7 +705,8 @@ namespace Rock.Web.Cache
                 string iconUrl = string.Empty;
                 if ( this.IconFileId.HasValue )
                 {
-                    iconUrl = string.Format( "{0}/GetImage.ashx?{1}",
+                    iconUrl = string.Format(
+                        "{0}/GetImage.ashx?{1}",
                         HttpContext.Current.Request.ApplicationPath,
                         this.IconFileId.Value );
                 }
@@ -711,14 +729,14 @@ namespace Rock.Web.Cache
                 properties.Add( "DisplayIcon", this.MenuDisplayIcon.ToString().ToLower() );
                 properties.Add( "DisplayChildPages", this.MenuDisplayChildPages.ToString().ToLower() );
                 properties.Add( "IconCssClass", this.IconCssClass ?? string.Empty );
-                properties.Add( "Description", this.Description ?? "" );
+                properties.Add( "Description", this.Description ?? string.Empty );
                 properties.Add( "IconUrl", iconUrl );
 
                 if ( levelsDeep > 0 && this.MenuDisplayChildPages )
                 {
                     var childPages = new List<Dictionary<string, object>>();
 
-                    foreach ( PageCache page in GetPages(rockContext) )
+                    foreach ( PageCache page in GetPages( rockContext ) )
                     {
                         if ( page != null && page.DisplayInNav( person ) )
                         {
@@ -730,10 +748,9 @@ namespace Rock.Web.Cache
                         }
                     }
 
-                    if ( childPages.Any() )
-                    {
-                        properties.Add( "Pages", childPages );
-                    }
+                    // Add the Pages property so that Lava users can check it via the "empty" check or size.
+                    properties.Add( "Pages", childPages );
+                    
                 }
 
                 return properties;
@@ -745,7 +762,6 @@ namespace Rock.Web.Cache
         }
 
         #endregion
-
 
         #endregion
 
@@ -809,7 +825,6 @@ namespace Rock.Web.Cache
                 .FirstOrDefault( a => a.Id == id );
             if ( pageModel != null )
             {
-                pageModel.LoadAttributes( rockContext );
                 return new PageCache( pageModel );
             }
 
@@ -892,9 +907,11 @@ namespace Rock.Web.Cache
             {
                 if ( item.Key.StartsWith( "Rock:Page:" ) )
                 {
-                    PageCache page = cache[item.Key] as PageCache;
+                    var page = cache[item.Key] as PageCache;
                     if ( page != null && page.LayoutId == layoutId )
+                    {
                         cache.Remove( item.Key );
+                    }
                 }
             }
         }
@@ -909,14 +926,15 @@ namespace Rock.Web.Cache
             {
                 if ( item.Key.StartsWith( "Rock:Page:" ) )
                 {
-                    PageCache page = cache[item.Key] as PageCache;
+                    var page = cache[item.Key] as PageCache;
                     if ( page != null && page.LayoutId == layoutId )
+                    {
                         page.FlushBlocks();
+                    }
                 }
             }
         }
 
         #endregion
-
     }
 }

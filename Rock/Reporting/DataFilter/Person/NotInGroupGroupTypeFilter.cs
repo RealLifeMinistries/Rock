@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,6 +68,11 @@ function() {
      result = result + ', with role(s): ' + roleCommaList;
   }
 
+  var groupMemberStatus = $('.js-group-member-status option:selected', $content).text();
+  if (groupMemberStatus) {
+     result = result + ', with member status:' + groupMemberStatus;
+  }
+
   return result;
 }
 ";
@@ -91,12 +96,23 @@ function() {
 
                 var groupTypeRoles = new GroupTypeRoleService( new RockContext() ).Queryable().Where( a => groupTypeRoleGuidList.Contains( a.Guid ) ).ToList();
 
+                GroupMemberStatus? groupMemberStatus = null;
+                if ( selectionValues.Length >= 3 )
+                {
+                    groupMemberStatus = selectionValues[2].ConvertToEnumOrNull<GroupMemberStatus>();
+                }
+
                 if ( groupType != null )
                 {
                     result = string.Format( "Not in group of group type: {0}", groupType.Name );
                     if ( groupTypeRoles.Count() > 0 )
                     {
                         result += string.Format( ", with role(s): {0}", groupTypeRoles.Select( a => a.Name ).ToList().AsDelimited( "," ) );
+                    }
+
+                    if ( groupMemberStatus.HasValue )
+                    {
+                        result += string.Format( ", with member status: {0}", groupMemberStatus.ConvertToString() );
                     }
                 }
             }

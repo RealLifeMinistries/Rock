@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,7 @@ namespace Rock.Model
         }
         
         /// <summary>
-        /// Returns a <see cref="Rock.Model.FieldType"/> by it's Guid identifier.
+        /// Returns a <see cref="Rock.Model.FieldType"/> by its Guid identifier.
         /// </summary>
         /// <param name="guid">A <see cref="System.Guid"/> representing the Guid identifier of the <see cref="Rock.Model.FieldType"/> to retrieve.</param>
         /// <returns>The <see cref="Rock.Model.FieldType"/> with a Guid identifier that matches the specified value.</returns>
@@ -89,6 +89,23 @@ namespace Rock.Model
 
                 rockContext.SaveChanges();
             }
+        }
+
+        /// <summary>
+        /// Gets the Guid for the FieldType that has the specified Id
+        /// </summary>
+        /// <param name="id">The identifier.</param>
+        /// <returns></returns>
+        public override Guid? GetGuid( int id )
+        {
+            var cacheItem = Rock.Web.Cache.FieldTypeCache.Read( id );
+            if ( cacheItem != null )
+            {
+                return cacheItem.Guid;
+            }
+
+            return null;
+
         }
     }
 }

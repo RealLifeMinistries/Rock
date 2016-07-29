@@ -5,13 +5,13 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 // <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -51,6 +51,12 @@ namespace Rock.Model
         public bool CanDelete( FinancialTransaction item, out string errorMessage )
         {
             errorMessage = string.Empty;
+ 
+            if ( new Service<FinancialTransactionRefund>( Context ).Queryable().Any( a => a.OriginalTransactionId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", FinancialTransaction.FriendlyTypeName, FinancialTransactionRefund.FriendlyTypeName );
+                return false;
+            }  
             return true;
         }
     }
@@ -92,13 +98,18 @@ namespace Rock.Model
             target.BatchId = source.BatchId;
             target.CheckMicrEncrypted = source.CheckMicrEncrypted;
             target.CheckMicrHash = source.CheckMicrHash;
-            target.CreditCardTypeValueId = source.CreditCardTypeValueId;
-            target.CurrencyTypeValueId = source.CurrencyTypeValueId;
-            target.GatewayEntityTypeId = source.GatewayEntityTypeId;
+            target.CheckMicrParts = source.CheckMicrParts;
+            target.FinancialGatewayId = source.FinancialGatewayId;
+            target.FinancialPaymentDetailId = source.FinancialPaymentDetailId;
+            target.ForeignGuid = source.ForeignGuid;
+            target.ForeignKey = source.ForeignKey;
+            target.MICRStatus = source.MICRStatus;
             target.ProcessedByPersonAliasId = source.ProcessedByPersonAliasId;
             target.ProcessedDateTime = source.ProcessedDateTime;
             target.ScheduledTransactionId = source.ScheduledTransactionId;
             target.SourceTypeValueId = source.SourceTypeValueId;
+            target.Status = source.Status;
+            target.StatusMessage = source.StatusMessage;
             target.Summary = source.Summary;
             target.TransactionCode = source.TransactionCode;
             target.TransactionDateTime = source.TransactionDateTime;

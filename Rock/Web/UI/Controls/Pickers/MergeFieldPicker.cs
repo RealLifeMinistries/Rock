@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ using System.Web.UI.WebControls;
 using Rock.Model;
 using Rock;
 using Rock.Web.Cache;
+using System.Web;
 
 namespace Rock.Web.UI.Controls
 {
@@ -114,7 +115,7 @@ namespace Rock.Web.UI.Controls
                 string workingPath = nodePath;
 
                 // Check to see if the nodepath starts with one of the prefixedMergeFields.  If so
-                // the node path should not split it's items on the first pipe character
+                // the node path should not split its items on the first pipe character
                 foreach ( string fieldId in prefixedMergeFieldIds )
                 {
                     if ( nodePath.StartsWith( fieldId ) )
@@ -169,7 +170,7 @@ namespace Rock.Web.UI.Controls
                     string workingPath = nodePath;
 
                     // Check to see if the nodepath starts with one of the prefixedMergeFields.  If so
-                    // the node path should not split it's items on the first pipe character
+                    // the node path should not split its items on the first pipe character
                     foreach ( string fieldId in prefixedMergeFieldIds )
                     {
                         if ( nodePath.StartsWith( fieldId ) )
@@ -425,7 +426,7 @@ namespace Rock.Web.UI.Controls
         /// <param name="writer">The <see cref="T:System.Web.UI.HtmlTextWriter" /> object that receives the control content.</param>
         public override void RenderControl( HtmlTextWriter writer )
         {
-            ItemRestUrlExtraParams = "/" + MergeFields.AsDelimited( "," );
+            ItemRestUrlExtraParams = "?additionalFields=" + HttpUtility.UrlPathEncode(MergeFields.AsDelimited( "," ));
             base.RenderControl( writer );
         }
     }

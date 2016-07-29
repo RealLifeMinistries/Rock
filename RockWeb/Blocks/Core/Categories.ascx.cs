@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,12 +40,17 @@ namespace RockWeb.Blocks.Core
     [Category( "Core" )]
     [Description( "Block for managing categories for a specific, configured entity type." )]
 
-    [EntityTypeField("Entity Type", "The entity type to manage categories for.")]
+    [EntityTypeField("Entity Type", "The entity type to manage categories for.", true, "", 0)]
+    [TextField("Entity Qualifier Column", "Column to evaluate to determine entities that this category applies to.", false, "", "", 1)]
+    [TextField("Entity Qualifier Value", "The value of the column that this category applies to.", false, "", "", 2)]
     public partial class Categories : RockBlock
     {
         #region Fields
 
         int _entityTypeId = 0;
+        string _entityCol = string.Empty;
+        string _entityVal = string.Empty;
+
         int? _parentCategoryId = null;
         bool _canConfigure = false;
 
@@ -61,59 +66,27 @@ namespace RockWeb.Blocks.Core
         {
             base.OnInit( e );
 
-            _canConfigure = IsUserAuthorized( Authorization.ADMINISTRATE );
-            if ( _canConfigure )
+            // this event gets fired after block settings are updated. it's nice to repaint the screen if these settings would alter it
+            this.BlockUpdated += Block_BlockUpdated;
+            this.AddConfigurationUpdateTrigger( upnlContent );
+
+            int parentCategoryId = int.MinValue;
+            if ( int.TryParse( PageParameter( "CategoryId" ), out parentCategoryId ) )
             {
-                Guid entityTypeGuid = Guid.Empty;
-                if ( Guid.TryParse( GetAttributeValue( "EntityType" ), out entityTypeGuid ) )
-                {
-                    var entityType = Rock.Web.Cache.EntityTypeCache.Read( entityTypeGuid );
-                    if (entityType != null)
-                    {
-                        _entityTypeId = entityType.Id;
-
-                        SecurityField securityField = gCategories.Columns[5] as SecurityField;
-                        securityField.Visible = entityType.IsSecured;
-                        securityField.EntityTypeId = EntityTypeCache.Read(typeof(Category)).Id;
-
-                        catpParentCategory.EntityTypeId = _entityTypeId;
-
-                        int parentCategoryId = int.MinValue;
-                        if (int.TryParse(PageParameter("CategoryId"), out parentCategoryId))
-                        {
-                            _parentCategoryId = parentCategoryId;
-                        }
-
-                        gCategories.DataKeyNames = new string[] { "Id" };
-                        gCategories.Actions.ShowAdd = true;
-
-                        gCategories.Actions.AddClick += gCategories_Add;
-                        gCategories.GridReorder += gCategories_GridReorder;
-                        gCategories.GridRebind += gCategories_GridRebind;
-
-                        mdDetails.SaveClick += mdDetails_SaveClick;
-                        mdDetails.OnCancelScript = string.Format( "$('#{0}').val('');", hfIdValue.ClientID );
-                    }
-                    else
-                    {
-                        pnlList.Visible = false;
-                        nbMessage.Text = "Block has not been configured for a valid Enity Type.";
-                        nbMessage.Visible = true;
-                    }
-                }
-                else
-                {
-                    pnlList.Visible = false;
-                    nbMessage.Text = "Block has not been configured for a valid Enity Type.";
-                    nbMessage.Visible = true;
-                }
+                _parentCategoryId = parentCategoryId;
             }
-            else
-            {
-                pnlList.Visible = false;
-                nbMessage.Text = "You are not authorized to configure this page.";
-                nbMessage.Visible = true;
-            }
+
+            gCategories.DataKeyNames = new string[] { "Id" };
+            gCategories.Actions.ShowAdd = true;
+
+            gCategories.Actions.AddClick += gCategories_Add;
+            gCategories.GridReorder += gCategories_GridReorder;
+            gCategories.GridRebind += gCategories_GridRebind;
+
+            mdDetails.SaveClick += mdDetails_SaveClick;
+            mdDetails.OnCancelScript = string.Format( "$('#{0}').val('');", hfIdValue.ClientID );
+
+            SetDisplay();
         }
 
         /// <summary>
@@ -137,11 +110,15 @@ namespace RockWeb.Blocks.Core
                     Category category = new CategoryService( rockContext ).Get( hfIdValue.Value.AsInteger() );
                     if (category == null)
                     {
-                        category = new Category { EntityTypeId = _entityTypeId };
+                        category = new Category {
+                            EntityTypeId = _entityTypeId,
+                            EntityTypeQualifierColumn = _entityCol,
+                            EntityTypeQualifierValue = _entityVal
+                        };
                     }
                     category.LoadAttributes();
                     phAttributes.Controls.Clear();
-                    Rock.Attribute.Helper.AddEditControls( category, phAttributes, false );
+                    Rock.Attribute.Helper.AddEditControls( category, phAttributes, false, BlockValidationGroup );
 
                     mdDetails.Show();
                 }
@@ -178,7 +155,9 @@ namespace RockWeb.Blocks.Core
                 }
             }
 
-            breadCrumbs.Add( new BreadCrumb( entityType.FriendlyName + " Categories", new PageReference( pageReference.PageId ) ) );
+            string rootPageTitle = string.IsNullOrWhiteSpace( GetAttributeValue( "EntityQualifierColumn" ) ) ? 
+                entityType.FriendlyName + " Categories" : this.RockPage.PageTitle;
+            breadCrumbs.Add( new BreadCrumb( rootPageTitle, new PageReference( pageReference.PageId ) ) );
 
             breadCrumbs.Reverse();
 
@@ -188,6 +167,21 @@ namespace RockWeb.Blocks.Core
         #endregion
 
         #region Events
+
+        /// <summary>
+        /// Handles the BlockUpdated event of the control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void Block_BlockUpdated( object sender, EventArgs e )
+        {
+            SetDisplay();
+
+            if ( _canConfigure )
+            {
+                BindGrid();
+            }
+        }
 
         /// <summary>
         /// Handles the Edit event of the gCategories control.
@@ -222,9 +216,12 @@ namespace RockWeb.Blocks.Core
                 string errorMessage = string.Empty;
                 if ( service.CanDelete( category, out errorMessage ) )
                 {
+                    int categoryId = category.Id;
 
                     service.Delete( category );
                     rockContext.SaveChanges();
+
+                    CategoryCache.Flush( categoryId );
                 }
                 else
                 {
@@ -262,8 +259,13 @@ namespace RockWeb.Blocks.Core
             var categories = GetCategories( rockContext );
             if ( categories != null )
             {
-                new CategoryService( rockContext ).Reorder( categories.ToList(), e.OldIndex, e.NewIndex );
+                var changedIds = new CategoryService( rockContext ).Reorder( categories.ToList(), e.OldIndex, e.NewIndex );
                 rockContext.SaveChanges();
+
+                foreach ( int id in changedIds )
+                {
+                    CategoryCache.Flush( id );
+                }
             }
 
             BindGrid();
@@ -295,6 +297,8 @@ namespace RockWeb.Blocks.Core
             {
                 category = new Category();
                 category.EntityTypeId = _entityTypeId;
+                category.EntityTypeQualifierColumn = _entityCol;
+                category.EntityTypeQualifierValue = _entityVal;
                 var lastCategory = GetUnorderedCategories()
                     .OrderByDescending( c => c.Order ).FirstOrDefault();
                 category.Order = lastCategory != null ? lastCategory.Order + 1 : 0;
@@ -332,6 +336,8 @@ namespace RockWeb.Blocks.Core
                     category.SaveAttributeValues( rockContext );
                 } );
 
+                CategoryCache.Flush( category.Id );
+
                 hfIdValue.Value = string.Empty;
                 mdDetails.Hide();
 
@@ -342,6 +348,56 @@ namespace RockWeb.Blocks.Core
         #endregion
 
         #region Methods
+
+        /// <summary>
+        /// Sets the display.
+        /// </summary>
+        private void SetDisplay()
+        {
+            SecurityField securityField = gCategories.Columns[5] as SecurityField;
+            securityField.EntityTypeId = EntityTypeCache.Read( typeof( Category ) ).Id;
+
+            _canConfigure = IsUserAuthorized( Authorization.ADMINISTRATE );
+            if ( _canConfigure )
+            {
+                Guid entityTypeGuid = Guid.Empty;
+                if ( Guid.TryParse( GetAttributeValue( "EntityType" ), out entityTypeGuid ) )
+                {
+                    var entityType = Rock.Web.Cache.EntityTypeCache.Read( entityTypeGuid );
+                    if ( entityType != null )
+                    {
+                        securityField.Visible = entityType.IsSecured;
+
+                        _entityTypeId = entityType.Id;
+                        _entityCol = GetAttributeValue( "EntityQualifierColumn" );
+                        _entityVal = GetAttributeValue( "EntityQualifierValue" );
+
+                        catpParentCategory.EntityTypeId = _entityTypeId;
+
+                        pnlList.Visible = true;
+                        nbMessage.Visible = false;
+                    }
+                    else
+                    {
+                        pnlList.Visible = false;
+                        nbMessage.Text = "Block has not been configured for a valid Enity Type.";
+                        nbMessage.Visible = true;
+                    }
+                }
+                else
+                {
+                    pnlList.Visible = false;
+                    nbMessage.Text = "Block has not been configured for a valid Enity Type.";
+                    nbMessage.Visible = true;
+                }
+            }
+            else
+            {
+                pnlList.Visible = false;
+                nbMessage.Text = "You are not authorized to configure this page.";
+                nbMessage.Visible = true;
+            }
+        }
 
         /// <summary>
         /// Binds the grid.
@@ -358,21 +414,29 @@ namespace RockWeb.Blocks.Core
                     ChildCount = c.ChildCategories.Count()
                 } ).ToList();
 
+            gCategories.EntityTypeId = EntityTypeCache.Read<Rock.Model.Category>().Id;
             gCategories.DataBind();
         }
 
-        private IQueryable<Category> GetCategories( RockContext rockContext = null )
+        private IEnumerable<Category> GetCategories( RockContext rockContext = null )
         {
             return GetUnorderedCategories( rockContext )
                 .OrderBy( a => a.Order )
                 .ThenBy( a => a.Name );
         }
 
-        private IQueryable<Category> GetUnorderedCategories( RockContext rockContext = null )
+        private IEnumerable<Category> GetUnorderedCategories( RockContext rockContext = null )
         {
             rockContext = rockContext ?? new RockContext();
 
-            var queryable = new CategoryService( rockContext ).Queryable().Where( c => c.EntityTypeId == _entityTypeId );
+            var queryable = new CategoryService( rockContext )
+                .Queryable()
+                .Where( c => c.EntityTypeId == _entityTypeId )
+                .ToList()
+                .Where( c =>
+                    ( c.EntityTypeQualifierColumn ?? "" ) == ( _entityCol ?? "" ) &&
+                    ( c.EntityTypeQualifierValue ?? "" ) == ( _entityVal ?? "" ) );
+
             if (_parentCategoryId.HasValue)
             {
                 queryable = queryable.Where( c => c.ParentCategoryId == _parentCategoryId );
@@ -404,6 +468,8 @@ namespace RockWeb.Blocks.Core
                 {
                     Id = 0,
                     EntityTypeId = _entityTypeId,
+                    EntityTypeQualifierColumn = _entityCol,
+                    EntityTypeQualifierValue = _entityVal,
                     ParentCategoryId = _parentCategoryId,
                 };
             }
@@ -417,7 +483,7 @@ namespace RockWeb.Blocks.Core
 
             category.LoadAttributes();
             phAttributes.Controls.Clear();
-            Rock.Attribute.Helper.AddEditControls( category, phAttributes, true );
+            Rock.Attribute.Helper.AddEditControls( category, phAttributes, true, BlockValidationGroup );
 
             hfIdValue.Value = categoryId.ToString();
             mdDetails.Show();

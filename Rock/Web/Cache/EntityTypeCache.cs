@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -160,6 +160,7 @@ namespace Rock.Web.Cache
             {
                 return Type.GetType( this.AssemblyName );
             }
+
             return null;
         }
 
@@ -219,11 +220,21 @@ namespace Rock.Web.Cache
         /// <summary>
         /// Gets the id.
         /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static int? GetId<T>()
+        {
+            return GetId( typeof( T ) );
+        }
+
+        /// <summary>
+        /// Gets the id.
+        /// </summary>
         /// <param name="name">The name.</param>
         /// <returns></returns>
         public static int? GetId( string name )
         {
-            if ( String.IsNullOrEmpty( name ) )
+            if ( string.IsNullOrEmpty( name ) )
             {
                 return null;
             }
@@ -240,7 +251,7 @@ namespace Rock.Web.Cache
         /// <returns></returns>
         public static EntityTypeCache Read( Type type, bool createIfNotFound = true, RockContext rockContext = null )
         {
-            if ( type.Namespace == "System.Data.Entity.DynamicProxies" )
+            if ( type.IsDynamicProxyType() )
             {
                 type = type.BaseType;
             }
@@ -251,12 +262,14 @@ namespace Rock.Web.Cache
                 return Read( entityTypeId );
             }
 
+            EntityTypeCache entityType = null;
+
             if ( rockContext != null )
             {
                 var entityTypeModel = new EntityTypeService( rockContext ).Get( type, createIfNotFound, null );
                 if ( entityTypeModel != null )
                 {
-                    return Read( entityTypeModel );
+                    entityType = Read( entityTypeModel );
                 }
             }
             else
@@ -266,12 +279,29 @@ namespace Rock.Web.Cache
                     var entityTypeModel = new EntityTypeService( myRockContext ).Get( type, createIfNotFound, null );
                     if ( entityTypeModel != null )
                     {
-                        return Read( entityTypeModel );
+                        entityType = Read( entityTypeModel );
                     }
                 }
             }
 
-            return null;
+            if ( entityType != null )
+            {
+                _entityTypes.AddOrUpdate( entityType.Name, entityType.Id, ( k, v ) => entityType.Id );
+            }
+
+            return entityType;
+        }
+
+        /// <summary>
+        /// Reads the specified type
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="createIfNotFound">if set to <c>true</c> [create if not found].</param>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public static EntityTypeCache Read<T>( bool createIfNotFound = true, RockContext rockContext = null )
+        {
+            return EntityTypeCache.Read( typeof( T ), createIfNotFound, rockContext );
         }
 
         /// <summary>
@@ -300,12 +330,14 @@ namespace Rock.Web.Cache
                 return Read( entityTypeId );
             }
 
+            EntityTypeCache entityType = null;
+
             if ( rockContext != null )
             {
                 var entityTypeModel = new EntityTypeService( rockContext ).Get( name, createNew );
                 if ( entityTypeModel != null )
                 {
-                    return Read( entityTypeModel );
+                    entityType = Read( entityTypeModel );
                 }
             }
             else
@@ -315,12 +347,17 @@ namespace Rock.Web.Cache
                     var entityTypeModel = new EntityTypeService( myRockContext ).Get( name, createNew );
                     if ( entityTypeModel != null )
                     {
-                        return Read( entityTypeModel );
+                        entityType =  Read( entityTypeModel );
                     }
                 }
             }
 
-            return null;
+            if ( entityType != null )
+            {
+                _entityTypes.AddOrUpdate( entityType.Name, entityType.Id, ( k, v ) => entityType.Id );
+            }
+
+            return entityType;
         }
 
         /// <summary>
@@ -357,7 +394,7 @@ namespace Rock.Web.Cache
             {
                 return new EntityTypeCache( entityTypeModel );
             }
-            
+
             return null;
         }
 
@@ -417,7 +454,7 @@ namespace Rock.Web.Cache
             }
             return null;
         }
-        
+
         /// <summary>
         /// Removes entityType from cache
         /// </summary>
@@ -425,7 +462,15 @@ namespace Rock.Web.Cache
         public static void Flush( int id )
         {
             FlushCache( EntityTypeCache.CacheKey( id ) );
-            _entityTypes = new ConcurrentDictionary<string, int>();
+            if ( _entityTypes == null )
+            {
+                // shouldn't happen, but just in case
+                _entityTypes = new ConcurrentDictionary<string, int>();
+            }
+
+            // rebuild the _entityTypes dictionary 
+            var _keepEntityTypes = _entityTypes.Where( a => a.Value != id );
+            _entityTypes = new ConcurrentDictionary<string, int>( _keepEntityTypes );
         }
 
         #endregion

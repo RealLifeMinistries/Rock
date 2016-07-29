@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,7 @@
 // </copyright>
 //
 using System;
-using System.Collections.Generic;
 using System.Linq;
-
-using Rock.Data;
 
 namespace Rock.Model
 {
@@ -27,8 +24,9 @@ namespace Rock.Model
     /// </summary>
     public partial class FinancialTransactionService 
     {
+
         /// <summary>
-        /// Gets a transaction by it's transaction code.
+        /// Gets a transaction by its transaction code.
         /// </summary>
         /// <param name="transactionCode">A <see cref="System.String"/> representing the transaction code for the transaction</param>
         /// <returns>The <see cref="Rock.Model.FinancialTransaction"/> that matches the transaction code, this value will be null if a match is not found.</returns>
@@ -41,6 +39,26 @@ namespace Rock.Model
                     .FirstOrDefault();
             }
             return null;
+        }
+
+        /// <summary>
+        /// Deletes the specified item.
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <returns></returns>
+        public override bool Delete( FinancialTransaction item )
+        {
+            if ( item.FinancialPaymentDetailId.HasValue )
+            {
+                var paymentDetailsService = new FinancialPaymentDetailService( (Rock.Data.RockContext)this.Context );
+                var paymentDetail = paymentDetailsService.Get( item.FinancialPaymentDetailId.Value );
+                if ( paymentDetail != null )
+                {
+                    paymentDetailsService.Delete( paymentDetail );
+                }
+            }
+
+            return base.Delete( item );
         }
     }
 }

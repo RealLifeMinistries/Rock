@@ -133,6 +133,7 @@
 
                     <Rock:PanelWidget ID="pwNote" runat="server" Title="Add note" TitleIconCssClass="fa fa-file-text-o" Expanded="false">
                         <div class="panel-noteentry">
+                            <Rock:RockDropDownList ID="ddlNoteType" runat="server" Label="Note Type" />
                             <Rock:RockTextBox ID="tbNote" runat="server" Label="Note" TextMode="MultiLine" Rows="3" />
                             <div class="settings clearfix">
                                 <div class="options pull-left">
@@ -165,6 +166,18 @@
                         </asp:Panel>
                     </Rock:PanelWidget>
 
+                    <Rock:PanelWidget ID="pwTag" runat="server" Title="Tag" TitleIconCssClass="fa fa-tags" Expanded="false">
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <Rock:RockDropDownList ID="ddlTagAction" runat="server" Label="Action" AutoPostBack="true" OnSelectedIndexChanged="ddlGroupAction_SelectedIndexChanged" >
+                                    <asp:ListItem Value="Add" Text="Add To Tag" />
+                                    <asp:ListItem Value="Remove" Text="Remove From Tag" />
+                                </Rock:RockDropDownList>
+                                <Rock:RockDropDownList ID="ddlTagList" runat="server" Label="Tag" />
+                            </div>
+                        </div>
+                    </Rock:PanelWidget>
+
                     <asp:CustomValidator ID="cvSelection" runat="server" OnServerValidate="cvSelection_ServerValidate" Display="None" ErrorMessage="You have not selected anything to update." />
 
                     <div class="actions">
@@ -189,6 +202,12 @@
 
             </div>
         </div>
+
+        <script type="text/javascript">
+            function ResetScrollPosition() {
+                setTimeout("window.scrollTo(0,0)", 0);
+            }
+        </script>
 
     </ContentTemplate>
 </asp:UpdatePanel>

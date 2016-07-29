@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,6 +22,7 @@ using System.Security.Principal;
 using System.ServiceModel.Web;
 using System.Web;
 using System.Web.SessionState;
+
 using Rock;
 using Rock.Data;
 using Rock.Model;
@@ -60,7 +61,7 @@ namespace RockWeb
                     authToken = context.Request.Params["apikey"];
                 }
 
-                if (!string.IsNullOrWhiteSpace(authToken))
+                if ( !string.IsNullOrWhiteSpace( authToken ) )
                 {
                     var userLoginService = new UserLoginService( new Rock.Data.RockContext() );
                     var userLogin = userLoginService.Queryable().Where( u => u.ApiKey == authToken ).FirstOrDefault();
@@ -75,11 +76,6 @@ namespace RockWeb
 
             var currentUser = UserLoginService.GetCurrentUser();
             Person currentPerson = currentUser != null ? currentUser.Person : null;
-
-            if ( !context.User.Identity.IsAuthenticated )
-            {
-                throw new Rock.Web.FileUploadException( "Must be logged in", System.Net.HttpStatusCode.Forbidden );
-            }
 
             try
             {
@@ -97,18 +93,26 @@ namespace RockWeb
 
                 if ( isBinaryFile )
                 {
-                    ProcessBinaryFile( context, uploadedFile );
+                    ProcessBinaryFile( context, uploadedFile, currentPerson );
                 }
                 else
                 {
-                    ProcessContentFile( context, uploadedFile );
+                    if ( !context.User.Identity.IsAuthenticated )
+                    {
+                        throw new Rock.Web.FileUploadException( "Must be logged in", System.Net.HttpStatusCode.Forbidden );
+                    }
+                    else
+                    {
+                        ProcessContentFile( context, uploadedFile );
+                    }
                 }
             }
             catch ( Rock.Web.FileUploadException fex )
             {
                 ExceptionLogService.LogException( fex, context );
+                context.Response.TrySkipIisCustomErrors = true;
                 context.Response.StatusCode = (int)fex.StatusCode;
-                context.Response.Write( "error: " + fex.Detail );
+                context.Response.Write( fex.Detail );
             }
             catch ( Exception ex )
             {
@@ -169,6 +173,7 @@ namespace RockWeb
                 {
                     fileContent.Seek( 0, SeekOrigin.Begin );
                 }
+
                 fileContent.CopyTo( writeStream );
             }
 
@@ -186,7 +191,7 @@ namespace RockWeb
         /// </summary>
         /// <param name="context">The context.</param>
         /// <param name="uploadedFile">The uploaded file.</param>
-        private void ProcessBinaryFile( HttpContext context, HttpPostedFile uploadedFile )
+        private void ProcessBinaryFile( HttpContext context, HttpPostedFile uploadedFile, Person currentPerson )
         {
             // get BinaryFileType info
             Guid fileTypeGuid = context.Request.QueryString["fileTypeGuid"].AsGuid();
@@ -200,9 +205,6 @@ namespace RockWeb
             }
             else
             {
-                var currentUser = UserLoginService.GetCurrentUser();
-                Person currentPerson = currentUser != null ? currentUser.Person : null;
-
                 if ( !binaryFileType.IsAuthorized( Authorization.EDIT, currentPerson ) )
                 {
                     throw new Rock.Web.FileUploadException( "Not authorized to upload this type of file", System.Net.HttpStatusCode.Forbidden );

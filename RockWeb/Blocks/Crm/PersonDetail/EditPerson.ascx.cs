@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,21 +15,22 @@
 // </copyright>
 //
 using System;
-using System.ComponentModel;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Web.UI;
 using System.Web.UI.WebControls;
+using Newtonsoft.Json;
 
 using Rock;
 using Rock.Constants;
+using Rock.Data;
 using Rock.Model;
 using Rock.Web.Cache;
 using Rock.Web.UI.Controls;
-using Rock.Data;
 
 /*******************************************************************************************************************************
- * NOTE: The Security/EditMyAccount.ascx block has very similiar functionality.  If updating this block, make sure to check
+ * NOTE: The Security/AccountEdit.ascx block has very similiar functionality.  If updating this block, make sure to check
  * that block also.  It may need the same updates.
  *******************************************************************************************************************************/
 
@@ -63,13 +64,14 @@ namespace RockWeb.Blocks.Crm.PersonDetail
             if ( Person != null )
             {
                 var personService = new PersonService( new RockContext() );
-                foreach ( var family in personService.GetFamilies( Person.Id ).Select( a => new { a.Name, a.Id } ) )
+                foreach ( var family in personService.GetFamilies( Person.Id ).Select( a => new { a.Name, a.Id, a.Members } ) )
                 {
-                    ddlGivingGroup.Items.Add( new ListItem( family.Name, family.Id.ToString() ) );
+                    string familyNameWithFirstNames = GetFamilyNameWithFirstNames( family.Name, family.Members );
+                    ddlGivingGroup.Items.Add( new ListItem( familyNameWithFirstNames, family.Id.ToString() ) );
                 }
             }
 
-            ScriptManager.RegisterStartupScript( ddlGradePicker, ddlGradePicker.GetType(), "grade-selection-" + BlockId.ToString(), ddlGradePicker.GetJavascriptForYearPicker(ypGraduation), true );
+            ScriptManager.RegisterStartupScript( ddlGradePicker, ddlGradePicker.GetType(), "grade-selection-" + BlockId.ToString(), ddlGradePicker.GetJavascriptForYearPicker( ypGraduation ), true );
 
             string smsScript = @"
     $('.js-sms-number').click(function () {
@@ -82,6 +84,33 @@ namespace RockWeb.Blocks.Crm.PersonDetail
 
             ScriptManager.RegisterStartupScript( rContactInfo, rContactInfo.GetType(), "sms-number-" + BlockId.ToString(), smsScript, true );
 
+            grdPreviousNames.Actions.ShowAdd = true;
+            grdPreviousNames.Actions.AddClick += grdPreviousNames_AddClick;
+        }
+
+        /// <summary>
+        /// Gets the family name with first names.
+        /// </summary>
+        /// <param name="familyName">Name of the family.</param>
+        /// <param name="familyMembers">The family members.</param>
+        /// <returns></returns>
+        private string GetFamilyNameWithFirstNames( string familyName, ICollection<GroupMember> familyMembers )
+        {
+            var adultFirstNames = familyMembers.Where( a => a.GroupRole.Guid == Rock.SystemGuid.GroupRole.GROUPROLE_FAMILY_MEMBER_ADULT.AsGuid() ).OrderBy( a => a.Person.Gender ).ThenBy( a => a.Person.NickName ).Select( a => a.Person.NickName ?? a.Person.FirstName ).ToList();
+            var otherFirstNames = familyMembers.Where( a => a.GroupRole.Guid != Rock.SystemGuid.GroupRole.GROUPROLE_FAMILY_MEMBER_ADULT.AsGuid() ).OrderBy( a => a.Person.Gender ).ThenBy( a => a.Person.NickName ).Select( a => a.Person.NickName ?? a.Person.FirstName ).ToList();
+            var firstNames = new List<string>();
+            firstNames.AddRange( adultFirstNames );
+            firstNames.AddRange( otherFirstNames );
+            string familyNameWithFirstNames;
+            if ( firstNames.Any() )
+            {
+                familyNameWithFirstNames = string.Format( "{0} ({1})", familyName, firstNames.AsDelimited( ", ", " and " ) );
+            }
+            else
+            {
+                familyNameWithFirstNames = string.Format( "{0} (no family members)", familyName );
+            }
+            return familyNameWithFirstNames;
         }
 
         /// <summary>
@@ -98,6 +127,57 @@ namespace RockWeb.Blocks.Crm.PersonDetail
             }
         }
 
+        #region View State related stuff
+
+        /// <summary>
+        /// Gets or sets the state of the person previous names.
+        /// </summary>
+        /// <value>
+        /// The state of the person previous names.
+        /// </value>
+        private List<PersonPreviousName> PersonPreviousNamesState { get; set; }
+
+        /// <summary>
+        /// Restores the view-state information from a previous user control request that was saved by the <see cref="M:System.Web.UI.UserControl.SaveViewState" /> method.
+        /// </summary>
+        /// <param name="savedState">An <see cref="T:System.Object" /> that represents the user control state to be restored.</param>
+        protected override void LoadViewState( object savedState )
+        {
+            base.LoadViewState( savedState );
+
+            string json = ViewState["PersonPreviousNamesState"] as string;
+
+            if ( string.IsNullOrWhiteSpace( json ) )
+            {
+                PersonPreviousNamesState = new List<PersonPreviousName>();
+            }
+            else
+            {
+                PersonPreviousNamesState = PersonPreviousName.FromJsonAsList( json ) ?? new List<PersonPreviousName>();
+            }
+        }
+
+        /// <summary>
+        /// Saves any user control view-state changes that have occurred since the last page postback.
+        /// </summary>
+        /// <returns>
+        /// Returns the user control's current view state. If there is no view state associated with the control, it returns null.
+        /// </returns>
+        protected override object SaveViewState()
+        {
+            var jsonSetting = new JsonSerializerSettings
+            {
+                ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+                ContractResolver = new Rock.Utility.IgnoreUrlEncodedKeyContractResolver()
+            };
+
+            ViewState["PersonPreviousNamesState"] = JsonConvert.SerializeObject( PersonPreviousNamesState, Formatting.None, jsonSetting );
+
+            return base.SaveViewState();
+        }
+
+        #endregion
+
         /// <summary>
         /// Handles the SelectedIndexChanged event of the ddlRecordStatus control.
         /// </summary>
@@ -105,7 +185,10 @@ namespace RockWeb.Blocks.Crm.PersonDetail
         /// <param name="e">The <see cref="EventArgs" /> instance containing the event data.</param>
         protected void ddlRecordStatus_SelectedIndexChanged( object sender, EventArgs e )
         {
-            ddlReason.Visible = ( ddlRecordStatus.SelectedValueAsInt() == DefinedValueCache.Read( new Guid( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_INACTIVE ) ).Id );
+            bool showInactiveReason = ( ddlRecordStatus.SelectedValueAsInt() == DefinedValueCache.Read( new Guid( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_INACTIVE ) ).Id );
+
+            ddlReason.Visible = showInactiveReason;
+            tbInactiveReasonNote.Visible = showInactiveReason;
         }
 
         /// <summary>
@@ -210,6 +293,7 @@ namespace RockWeb.Blocks.Crm.PersonDetail
                     {
                         graduationYear = ypGraduation.SelectedYear.Value;
                     }
+
                     History.EvaluateChange( changes, "Graduation Year", person.GraduationYear, graduationYear );
                     person.GraduationYear = graduationYear;
 
@@ -278,9 +362,11 @@ namespace RockWeb.Blocks.Crm.PersonDetail
                                     phoneNumber.IsUnlisted = cbUnlisted.Checked;
                                     phoneNumberTypeIds.Add( phoneNumberTypeId );
 
-                                    History.EvaluateChange( changes,
+                                    History.EvaluateChange(
+                                        changes,
                                         string.Format( "{0} Phone", DefinedValueCache.GetName( phoneNumberTypeId ) ),
-                                        oldPhoneNumber, phoneNumber.NumberFormattedWithCountryCode );
+                                        oldPhoneNumber,
+                                        phoneNumber.NumberFormattedWithCountryCode );
                                 }
                             }
                         }
@@ -292,9 +378,11 @@ namespace RockWeb.Blocks.Crm.PersonDetail
                         .Where( n => n.NumberTypeValueId.HasValue && !phoneNumberTypeIds.Contains( n.NumberTypeValueId.Value ) )
                         .ToList() )
                     {
-                        History.EvaluateChange( changes,
+                        History.EvaluateChange(
+                            changes,
                             string.Format( "{0} Phone", DefinedValueCache.GetName( phoneNumber.NumberTypeValueId ) ),
-                            phoneNumber.ToString(), string.Empty );
+                            phoneNumber.ToString(),
+                            string.Empty );
 
                         person.PhoneNumbers.Remove( phoneNumber );
                         phoneNumberService.Delete( phoneNumber );
@@ -303,7 +391,7 @@ namespace RockWeb.Blocks.Crm.PersonDetail
                     History.EvaluateChange( changes, "Email", person.Email, tbEmail.Text );
                     person.Email = tbEmail.Text.Trim();
 
-                    History.EvaluateChange( changes, "Email Active", ( person.IsEmailActive ?? true ), cbIsEmailActive.Checked );
+                    History.EvaluateChange( changes, "Email Active", person.IsEmailActive, cbIsEmailActive.Checked );
                     person.IsEmailActive = cbIsEmailActive.Checked;
 
                     var newEmailPreference = rblEmailPreference.SelectedValue.ConvertToEnum<EmailPreference>();
@@ -313,7 +401,12 @@ namespace RockWeb.Blocks.Crm.PersonDetail
                     int? newGivingGroupId = ddlGivingGroup.SelectedValueAsId();
                     if ( person.GivingGroupId != newGivingGroupId )
                     {
-                        string oldGivingGroupName = person.GivingGroup != null ? person.GivingGroup.Name : string.Empty;
+                        string oldGivingGroupName = string.Empty;
+                        if ( Person.GivingGroup != null )
+                        {
+                            oldGivingGroupName = GetFamilyNameWithFirstNames( Person.GivingGroup.Name, Person.GivingGroup.Members );
+                        }
+                        
                         string newGivingGroupName = newGivingGroupId.HasValue ? ddlGivingGroup.Items.FindByValue( newGivingGroupId.Value.ToString() ).Text : string.Empty;
                         History.EvaluateChange( changes, "Giving Group", oldGivingGroupName, newGivingGroupName );
                     }
@@ -329,8 +422,37 @@ namespace RockWeb.Blocks.Crm.PersonDetail
                     {
                         newRecordStatusReasonId = ddlReason.SelectedValueAsInt();
                     }
+
                     History.EvaluateChange( changes, "Inactive Reason", DefinedValueCache.GetName( person.RecordStatusReasonValueId ), DefinedValueCache.GetName( newRecordStatusReasonId ) );
                     person.RecordStatusReasonValueId = newRecordStatusReasonId;
+                    History.EvaluateChange( changes, "Inactive Reason Note", person.InactiveReasonNote, tbInactiveReasonNote.Text );
+                    person.InactiveReasonNote = tbInactiveReasonNote.Text.Trim();
+
+                    // Save any Removed/Added Previous Names
+                    var personPreviousNameService = new PersonPreviousNameService( rockContext );
+                    var databasePreviousNames = personPreviousNameService.Queryable().Where( a => a.PersonAlias.PersonId == person.Id ).ToList();
+                    foreach ( var deletedPreviousName in databasePreviousNames.Where( a => !PersonPreviousNamesState.Any( p => p.Guid == a.Guid ) ) )
+                    {
+                        personPreviousNameService.Delete( deletedPreviousName );
+
+                        History.EvaluateChange(
+                            changes,
+                            "Previous Name",
+                            deletedPreviousName.ToString(),
+                            string.Empty );
+                    }
+
+                    foreach ( var addedPreviousName in PersonPreviousNamesState.Where( a => !databasePreviousNames.Any( d => d.Guid == a.Guid ) ) )
+                    {
+                        addedPreviousName.PersonAliasId = person.PrimaryAliasId.Value;
+                        personPreviousNameService.Add( addedPreviousName );
+
+                        History.EvaluateChange(
+                            changes,
+                            "Previous Name",
+                            string.Empty,
+                            addedPreviousName.ToString() );
+                    }
 
                     if ( person.IsValid )
                     {
@@ -338,24 +460,50 @@ namespace RockWeb.Blocks.Crm.PersonDetail
                         {
                             if ( changes.Any() )
                             {
-                                HistoryService.SaveChanges( rockContext, typeof( Person ), Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(),
-                                    Person.Id, changes );
+                                HistoryService.SaveChanges(
+                                    rockContext,
+                                    typeof( Person ),
+                                    Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(),
+                                    Person.Id,
+                                    changes );
                             }
+
                             if ( orphanedPhotoId.HasValue )
                             {
                                 BinaryFileService binaryFileService = new BinaryFileService( rockContext );
                                 var binaryFile = binaryFileService.Get( orphanedPhotoId.Value );
                                 if ( binaryFile != null )
                                 {
-                                    binaryFileService.Delete( binaryFile );
-                                    rockContext.SaveChanges();
+                                    string errorMessage;
+                                    if ( binaryFileService.CanDelete( binaryFile, out errorMessage ) )
+                                    {
+                                        binaryFileService.Delete( binaryFile );
+                                        rockContext.SaveChanges();
+                                    }
                                 }
                             }
 
+                            // if they used the ImageEditor, and cropped it, the uncropped file is still in BinaryFile. So clean it up
+                            if ( imgPhoto.CropBinaryFileId.HasValue )
+                            {
+                                if ( imgPhoto.CropBinaryFileId != person.PhotoId )
+                                {
+                                    BinaryFileService binaryFileService = new BinaryFileService( rockContext );
+                                    var binaryFile = binaryFileService.Get( imgPhoto.CropBinaryFileId.Value );
+                                    if ( binaryFile != null && binaryFile.IsTemporary )
+                                    {
+                                        string errorMessage;
+                                        if ( binaryFileService.CanDelete( binaryFile, out errorMessage ) )
+                                        {
+                                            binaryFileService.Delete( binaryFile );
+                                            rockContext.SaveChanges();
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         Response.Redirect( string.Format( "~/Person/{0}", Person.Id ), false );
-
                     }
                 } );
             }
@@ -376,15 +524,14 @@ namespace RockWeb.Blocks.Crm.PersonDetail
         /// </summary>
         private void ShowDetails()
         {
-
-            lTitle.Text = String.Format( "Edit: {0}", Person.FullName ).FormatAsHtmlTitle();
+            lTitle.Text = string.Format( "Edit: {0}", Person.FullName ).FormatAsHtmlTitle();
 
             imgPhoto.BinaryFileId = Person.PhotoId;
-            imgPhoto.NoPictureUrl = Person.GetPhotoUrl( null, Person.Age, Person.Gender );
+            imgPhoto.NoPictureUrl = Person.GetPersonPhotoUrl( Person, 400, 400 );
 
             ddlTitle.SelectedValue = Person.TitleValueId.HasValue ? Person.TitleValueId.Value.ToString() : string.Empty;
             tbFirstName.Text = Person.FirstName;
-            tbNickName.Text = string.IsNullOrWhiteSpace( Person.NickName ) ? "" : ( Person.NickName.Equals( Person.FirstName, StringComparison.OrdinalIgnoreCase ) ? "" : Person.NickName );
+            tbNickName.Text = string.IsNullOrWhiteSpace( Person.NickName ) ? string.Empty : ( Person.NickName.Equals( Person.FirstName, StringComparison.OrdinalIgnoreCase ) ? string.Empty : Person.NickName );
             tbMiddleName.Text = Person.MiddleName;
             tbLastName.Text = Person.LastName;
             ddlSuffix.SelectedValue = Person.SuffixValueId.HasValue ? Person.SuffixValueId.Value.ToString() : string.Empty;
@@ -402,8 +549,8 @@ namespace RockWeb.Blocks.Crm.PersonDetail
             if ( !Person.HasGraduated ?? false )
             {
                 int gradeOffset = Person.GradeOffset.Value;
-                var maxGradeOffset = ddlGradePicker.MaxGradeOffset; ;
-                
+                var maxGradeOffset = ddlGradePicker.MaxGradeOffset;
+
                 // keep trying until we find a Grade that has a gradeOffset that that includes the Person's gradeOffset (for example, there might be combined grades)
                 while ( !ddlGradePicker.Items.OfType<ListItem>().Any( a => a.Value.AsInteger() == gradeOffset ) && gradeOffset <= maxGradeOffset )
                 {
@@ -422,13 +569,19 @@ namespace RockWeb.Blocks.Crm.PersonDetail
             ddlMaritalStatus.SelectedValue = Person.MaritalStatusValueId.HasValue ? Person.MaritalStatusValueId.Value.ToString() : string.Empty;
             ddlConnectionStatus.SelectedValue = Person.ConnectionStatusValueId.HasValue ? Person.ConnectionStatusValueId.Value.ToString() : string.Empty;
             tbEmail.Text = Person.Email;
-            cbIsEmailActive.Checked = Person.IsEmailActive ?? true;
+            cbIsEmailActive.Checked = Person.IsEmailActive;
             rblEmailPreference.SelectedValue = Person.EmailPreference.ConvertToString( false );
 
             ddlRecordStatus.SelectedValue = Person.RecordStatusValueId.HasValue ? Person.RecordStatusValueId.Value.ToString() : string.Empty;
             ddlReason.SelectedValue = Person.RecordStatusReasonValueId.HasValue ? Person.RecordStatusReasonValueId.Value.ToString() : string.Empty;
-            ddlReason.Visible = Person.RecordStatusReasonValueId.HasValue &&
-                Person.RecordStatusValueId.Value == DefinedValueCache.Read( new Guid( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_INACTIVE ) ).Id;
+
+            tbInactiveReasonNote.Text = Person.InactiveReasonNote;
+
+            bool showInactiveReason = ( Person.RecordStatusValueId.HasValue
+                                        && Person.RecordStatusValueId.Value == DefinedValueCache.Read( new Guid( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_INACTIVE ) ).Id );
+
+            ddlReason.Visible = showInactiveReason;
+            tbInactiveReasonNote.Visible = showInactiveReason;
 
             var mobilePhoneType = DefinedValueCache.Read( new Guid( Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE ) );
 
@@ -463,6 +616,54 @@ namespace RockWeb.Blocks.Crm.PersonDetail
 
             ddlGivingGroup.SetValue( Person.GivingGroupId );
 
+            this.PersonPreviousNamesState = Person.GetPreviousNames().ToList();
+
+            BindPersonPreviousNamesGrid();
+        }
+
+        /// <summary>
+        /// Binds the person previous names grid.
+        /// </summary>
+        private void BindPersonPreviousNamesGrid()
+        {
+            grdPreviousNames.DataKeyNames = new string[] { "Guid" };
+            grdPreviousNames.DataSource = this.PersonPreviousNamesState;
+            grdPreviousNames.DataBind();
+        }
+
+        /// <summary>
+        /// Handles the AddClick event of the grdPreviousNames control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void grdPreviousNames_AddClick( object sender, EventArgs e )
+        {
+            tbPreviousLastName.Text = string.Empty;
+            mdPreviousName.Show();
+        }
+
+        /// <summary>
+        /// Handles the Delete event of the grdPreviousNames control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RowEventArgs"/> instance containing the event data.</param>
+        protected void grdPreviousNames_Delete( object sender, RowEventArgs e )
+        {
+            this.PersonPreviousNamesState.RemoveEntity( (Guid)e.RowKeyValue );
+            BindPersonPreviousNamesGrid();
+        }
+
+        /// <summary>
+        /// Handles the SaveClick event of the mdPreviousName control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void mdPreviousName_SaveClick( object sender, EventArgs e )
+        {
+            this.PersonPreviousNamesState.Add( new PersonPreviousName { LastName = tbPreviousLastName.Text, Guid = Guid.NewGuid() } );
+            BindPersonPreviousNamesGrid();
+
+            mdPreviousName.Hide();
         }
     }
 }

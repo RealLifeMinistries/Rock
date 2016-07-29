@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,9 +16,12 @@
 //
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Data.Entity;
 using System.Linq;
 using System.Runtime.Caching;
 using System.Runtime.Serialization;
+
 using Rock.Data;
 using Rock.Model;
 
@@ -30,6 +33,8 @@ namespace Rock.CheckIn
     [DataContract]
     public class KioskDevice
     {
+        private static ConcurrentDictionary<int, object> _locks = new ConcurrentDictionary<int,object>();
+
         /// <summary>
         /// Prevents a default instance of the <see cref="KioskDevice" /> class from being created.
         /// </summary>
@@ -76,12 +81,24 @@ namespace Rock.CheckIn
         {
             if ( configuredGroupTypes != null )
             {
-                return KioskGroupTypes.Where( g => configuredGroupTypes.Contains( g.GroupType.Id ) ).ToList();
+                return KioskGroupTypes
+                    .Where( g => configuredGroupTypes.Contains( g.GroupType.Id ) )
+                    .ToList();
             }
             else
             {
                 return KioskGroupTypes;
             }
+        }
+
+        /// <summary>
+        /// Subset of the KioskGroupTypes that are configured and currently active or check in.
+        /// </summary>
+        /// <param name="configuredGroupTypes">The configured group types.</param>
+        /// <returns></returns>
+        public List<KioskGroupType> ActiveGroupTypes( List<int> configuredGroupTypes )
+        {
+            return FilteredGroupTypes( configuredGroupTypes ).Where( t => t.IsCheckInActive ).ToList();
         }
 
         /// <summary>
@@ -92,7 +109,7 @@ namespace Rock.CheckIn
         /// </value>
         public bool HasLocations(List<int> configuredGroupTypes)
         {
-            return FilteredGroupTypes( configuredGroupTypes ).SelectMany( t => t.KioskGroups ).Any( g => g.KioskLocations.Any() );
+            return ActiveGroupTypes( configuredGroupTypes ).SelectMany( t => t.KioskGroups ).Any( g => g.KioskLocations.Any( l => l.IsCheckInActive ) );
         }
 
         /// <summary>
@@ -103,7 +120,49 @@ namespace Rock.CheckIn
         /// </value>
         public bool HasActiveLocations(List<int> configuredGroupTypes)
         {
-            return FilteredGroupTypes( configuredGroupTypes ).SelectMany( t => t.KioskGroups ).Any( g => g.KioskLocations.Any( l => l.Location.IsActive ) );
+            return ActiveGroupTypes( configuredGroupTypes ).SelectMany( t => t.KioskGroups ).Any( g => g.KioskLocations.Any( l => l.IsCheckInActive && l.IsActiveAndNotFull ) );
+        }
+
+        /// <summary>
+        /// returns the locations for this Kiosk for the configured group types
+        /// </summary>
+        /// <param name="configuredGroupTypes">The configured group types.</param>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public IEnumerable<Location> Locations( List<int> configuredGroupTypes, RockContext rockContext )
+        {
+            var result = new List<Rock.Model.Location>();
+
+            Rock.Model.Device currentDevice = new DeviceService( rockContext ).Get(this.Device.Id);
+
+            // first, get all the possible locations for this device including child locations
+            var allLocations = new List<int>();
+            foreach ( Rock.Model.Location location in currentDevice.Locations )
+            {
+                // add the location to the locations for this device
+                allLocations.Add( location.Id );
+
+                // Get all the child locations also
+                new LocationService( rockContext )
+                    .GetAllDescendents( location.Id )
+                    .Select( l => l.Id )
+                    .ToList()
+                    .ForEach( l => allLocations.Add( l ) );
+            }
+
+            // now, narrow it down to only locations that are active group locations for the configured group types
+            foreach ( var groupLocation in new GroupLocationService( rockContext ).GetActiveByLocations( allLocations ) )
+            {
+                if ( configuredGroupTypes.Contains( groupLocation.Group.GroupTypeId ) )
+                {
+                    if ( !result.Any( a => a.Id == groupLocation.LocationId ) )
+                    {
+                        result.Add( groupLocation.Location );
+                    }
+                }
+            }
+
+            return result;
         }
 
         #region Static Methods
@@ -126,57 +185,52 @@ namespace Rock.CheckIn
         /// <returns></returns>
         public static KioskDevice Read( int id, List<int> configuredGroupTypes )
         {
-            string cacheKey = KioskDevice.CacheKey( id );
+            object obj = new object();
+            obj =_locks.GetOrAdd( id, obj );
 
-            ObjectCache cache = Rock.Web.Cache.RockMemoryCache.Default;
-            KioskDevice device = cache[cacheKey] as KioskDevice;
-
-            // If the kioskdevice is currently inactive, but has a next active time prior to now, force a refresh
-            if ( device != null && device.FilteredGroupTypes(configuredGroupTypes).Count > 0 && !device.HasLocations( configuredGroupTypes ) )
+            lock ( obj )
             {
-                if ( device.KioskGroupTypes.Select( g => g.NextActiveTime ).Min().CompareTo( RockDateTime.Now ) < 0 )
+                string cacheKey = KioskDevice.CacheKey( id );
+
+                ObjectCache cache = Rock.Web.Cache.RockMemoryCache.Default;
+                KioskDevice device = cache[cacheKey] as KioskDevice;
+
+                if ( device != null )
                 {
-                    device = null;
+                    return device;
                 }
-            }
-
-            if ( device != null )
-            {
-                return device;
-            }
-            else
-            {
-                using ( var rockContext = new RockContext() )
+                else
                 {
-                    var campusLocations = new Dictionary<int, int>();
-                    Rock.Web.Cache.CampusCache.All()
-                        .Where( c => c.LocationId.HasValue )
-                        .Select( c => new
-                        {
-                            CampusId = c.Id,
-                            LocationId = c.LocationId.Value
-                        } )
-                        .ToList()
-                        .ForEach( c => campusLocations.Add( c.CampusId, c.LocationId ) );
-
-                    var deviceModel = new DeviceService( rockContext )
-                        .Queryable( "Locations" )
-                        .Where( d => d.Id == id )
-                        .FirstOrDefault();
-
-                    if ( deviceModel != null )
+                    using ( var rockContext = new RockContext() )
                     {
-                        device = new KioskDevice( deviceModel );
-                        foreach ( Location location in deviceModel.Locations )
+                        var campusLocations = new Dictionary<int, int>();
+                        Rock.Web.Cache.CampusCache.All()
+                            .Where( c => c.LocationId.HasValue )
+                            .Select( c => new
+                            {
+                                CampusId = c.Id,
+                                LocationId = c.LocationId.Value
+                            } )
+                            .ToList()
+                            .ForEach( c => campusLocations.Add( c.CampusId, c.LocationId ) );
+
+                        var deviceModel = new DeviceService( rockContext )
+                            .Queryable().AsNoTracking()
+                            .Where( d => d.Id == id )
+                            .FirstOrDefault();
+
+                        if ( deviceModel != null )
                         {
-                            LoadKioskLocations( device, location, campusLocations, rockContext );
+                            device = new KioskDevice( deviceModel );
+                            foreach ( Location location in deviceModel.Locations )
+                            {
+                                LoadKioskLocations( device, location, campusLocations, rockContext );
+                            }
+
+                            cache.Set( cacheKey, device, new CacheItemPolicy { AbsoluteExpiration = DateTimeOffset.Now.Date.AddDays( 1 ) } );
+
+                            return device;
                         }
-
-                        var cachePolicy = new CacheItemPolicy();
-                        cachePolicy.AbsoluteExpiration = DateTimeOffset.Now.AddSeconds( 60 );
-                        cache.Set( cacheKey, device, cachePolicy );
-
-                        return device;
                     }
                 }
             }
@@ -194,6 +248,25 @@ namespace Rock.CheckIn
             cache.Remove( KioskDevice.CacheKey( id ) );
         }
 
+
+        /// <summary>
+        /// Flushes all.
+        /// </summary>
+        public static void FlushAll()
+        {
+            ObjectCache cache = Rock.Web.Cache.RockMemoryCache.Default;
+            var keysToRemove = cache
+                .Where( c =>
+                    c.Key.StartsWith( "Rock:CheckIn:KioskDevice:" ) )
+                .Select( c => c.Key )
+                .ToList();
+
+            foreach ( var key in keysToRemove )
+            {
+                cache.Remove( key );
+            }
+        }
+
         /// <summary>
         /// Loads the kiosk locations.
         /// </summary>
@@ -203,15 +276,27 @@ namespace Rock.CheckIn
         /// <param name="rockContext">The rock context.</param>
         private static void LoadKioskLocations( KioskDevice kioskDevice, Location location, Dictionary<int, int> campusLocations, RockContext rockContext )
         {
-            int campusId = 0;
-            var parentLocation = location;
-            while ( campusId == 0 && parentLocation != null )
+            // First check to see if this is a campus location
+            int campusId = campusLocations
+                .Where( c => c.Value == location.Id )
+                .Select( c => c.Key )
+                .FirstOrDefault();
+
+            // If location is not a campus, check the location's parent locations to see if any of them are a campus
+            if ( campusId == 0 )
             {
-                campusId = campusLocations
-                    .Where( c => c.Value == parentLocation.Id )
-                    .Select( c => c.Key )
-                    .FirstOrDefault();
-                parentLocation = parentLocation.ParentLocation;
+                foreach ( var parentLocationId in new LocationService( rockContext )
+                    .GetAllAncestorIds( location.Id ) )
+                {
+                    campusId = campusLocations
+                        .Where( c => c.Value == parentLocationId )
+                        .Select( c => c.Key )
+                        .FirstOrDefault();
+                    if ( campusId != 0 )
+                    {
+                        break;
+                    }
+                }
             }
 
             LoadKioskLocations( kioskDevice, location, ( campusId > 0 ? campusId : (int?)null ), rockContext );
@@ -226,69 +311,57 @@ namespace Rock.CheckIn
         /// <param name="rockContext">The rock context.</param>
         private static void LoadKioskLocations( KioskDevice kioskDevice, Location location, int? campusId, RockContext rockContext )
         {
-            var groupLocationService = new GroupLocationService( rockContext );
-            foreach ( var groupLocation in groupLocationService.GetActiveByLocation( location.Id ) )
-            {
-                DateTime nextGroupActiveTime = DateTime.MaxValue;
+            // Get the child locations and the selected location
+            var allLocations = new LocationService( rockContext ).GetAllDescendentIds( location.Id ).ToList();
+            allLocations.Add( location.Id );
 
-                var kioskLocation = new KioskLocation( location );
+            var activeSchedules = new Dictionary<int, KioskSchedule>();
+
+            foreach ( var groupLocation in new GroupLocationService( rockContext ).GetActiveByLocations( allLocations ).AsNoTracking() )
+            {
+                var kioskLocation = new KioskLocation( groupLocation.Location );
                 kioskLocation.CampusId = campusId;
 
-                // Populate each kioskLocation with it's schedules (kioskSchedules)
+                // Populate each kioskLocation with its schedules (kioskSchedules)
                 foreach ( var schedule in groupLocation.Schedules.Where( s => s.CheckInStartOffsetMinutes.HasValue ) )
                 {
-                    var nextScheduleActiveTime = schedule.GetNextCheckInStartTime( RockDateTime.Now );
-                    if ( nextScheduleActiveTime.HasValue &&
-                        ( schedule.IsCheckInActive || nextScheduleActiveTime.Value.CompareTo( RockDateTime.Now ) >= 0 ) &&
-                        nextScheduleActiveTime.Value.CompareTo( nextGroupActiveTime ) < 0 )
+                    if ( activeSchedules.Keys.Contains( schedule.Id ) )
                     {
-                        nextGroupActiveTime = nextScheduleActiveTime.Value;
+                        kioskLocation.KioskSchedules.Add( activeSchedules[schedule.Id] );
                     }
-
-                    if ( schedule.IsCheckInActive && kioskLocation != null )
+                    else
                     {
-                        kioskLocation.KioskSchedules.Add( new KioskSchedule( schedule ) );
+                        var kioskSchedule = new KioskSchedule( schedule );
+                        kioskSchedule.CheckInTimes = schedule.GetCheckInTimes( RockDateTime.Now );
+                        if ( kioskSchedule.IsCheckInActive || kioskSchedule.NextActiveDateTime.HasValue )
+                        {
+                            kioskLocation.KioskSchedules.Add( kioskSchedule );
+                            activeSchedules.Add( schedule.Id, kioskSchedule );
+                        }
                     }
                 }
 
                 // If the group location has any active OR future schedules, add the group's group type to the kiosk's 
                 // list of group types
-                if ( kioskLocation.KioskSchedules.Count > 0 || nextGroupActiveTime < DateTime.MaxValue )
+                if ( kioskLocation.KioskSchedules.Count > 0 )
                 {
                     KioskGroupType kioskGroupType = kioskDevice.KioskGroupTypes.Where( g => g.GroupType.Id == groupLocation.Group.GroupTypeId ).FirstOrDefault();
                     if ( kioskGroupType == null )
                     {
-                        kioskGroupType = new KioskGroupType( groupLocation.Group.GroupType );
-                        kioskGroupType.GroupType.LoadAttributes( rockContext );
-                        kioskGroupType.NextActiveTime = DateTime.MaxValue;
+                        kioskGroupType = new KioskGroupType( groupLocation.Group.GroupTypeId );
                         kioskDevice.KioskGroupTypes.Add( kioskGroupType );
                     }
 
-                    if ( nextGroupActiveTime.CompareTo( kioskGroupType.NextActiveTime ) < 0 )
+                    KioskGroup kioskGroup = kioskGroupType.KioskGroups.Where( g => g.Group.Id == groupLocation.GroupId ).FirstOrDefault();
+                    if ( kioskGroup == null )
                     {
-                        kioskGroupType.NextActiveTime = nextGroupActiveTime;
+                        kioskGroup = new KioskGroup( groupLocation.Group );
+                        kioskGroup.Group.LoadAttributes( rockContext );
+                        kioskGroupType.KioskGroups.Add( kioskGroup );
                     }
 
-                    // If there are active schedules, add the group to the group type groups
-                    if ( kioskLocation.KioskSchedules.Count > 0 )
-                    {
-                        KioskGroup kioskGroup = kioskGroupType.KioskGroups.Where( g => g.Group.Id == groupLocation.GroupId ).FirstOrDefault();
-                        if ( kioskGroup == null )
-                        {
-                            kioskGroup = new KioskGroup( groupLocation.Group );
-                            kioskGroup.Group.LoadAttributes( rockContext );
-                            kioskGroupType.KioskGroups.Add( kioskGroup );
-                        }
-
-                        kioskLocation.Location.LoadAttributes( rockContext );
-                        kioskGroup.KioskLocations.Add( kioskLocation );
-                    }
+                    kioskGroup.KioskLocations.Add( kioskLocation );
                 }
-            }
-
-            foreach ( var childLocation in location.ChildLocations )
-            {
-                LoadKioskLocations( kioskDevice, childLocation, campusId, rockContext );
             }
         }
 

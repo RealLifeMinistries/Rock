@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -77,6 +77,25 @@ namespace Rock.Data
         /// The modified by person alias.
         /// </value>
         PersonAlias ModifiedByPersonAlias { get; set; }
+
+        /// <summary>
+        /// Gets or sets the custom sort value.
+        /// </summary>
+        /// <value>
+        /// The custom sort value.
+        /// </value>
+        object CustomSortValue { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the ModifiedByPersonAliasId value has already been 
+        /// updated to reflect who/when model was updated. If this value is false (default) the framework will update 
+        /// the value with the current user when the model is saved. Set this value to true if this automatic
+        /// update should not be done.
+        /// </summary>
+        /// <value>
+        /// <c>false</c> if rock should set the ModifiedByPersonAliasId to current user when saving model; otherwise, <c>true</c>.
+        /// </value>
+        bool ModifiedAuditValuesAlreadyUpdated { get; set; }
 
         /// <summary>
         /// Method that will be called on an entity immediately before the item is saved

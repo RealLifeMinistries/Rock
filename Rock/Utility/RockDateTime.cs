@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -115,6 +115,28 @@ namespace Rock
             {
                 return DayOfWeek.Monday;
             }
+        }
+
+        /// <summary>
+        /// Creates a new datetime based on year, month, day, and handles 2/29 for non leap years (returns 2/28 in this case)
+        /// </summary>
+        /// <param name="year">The year.</param>
+        /// <param name="month">The month.</param>
+        /// <param name="day">The day.</param>
+        /// <returns></returns>
+        public static DateTime? New( int year, int month, int day )
+        {
+            try
+            {
+                if ( !DateTime.IsLeapYear( year ) && month == 2 && day == 29 )
+                {
+                    return new DateTime( year, 2, 28 );
+                }
+                return new DateTime( year, month, day );
+            }
+            catch { }
+
+            return (DateTime?)null;
         }
     }
 }

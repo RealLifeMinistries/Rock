@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -86,6 +86,7 @@ namespace Rock.Web.UI.Controls.Communication
             ddlFrom.Label = "From";
             ddlFrom.Help = "The number to originate message from (configured under Admin Tools > General Settings > Defined Types > SMS From Values).";
             ddlFrom.BindToDefinedType( DefinedTypeCache.Read( new Guid( Rock.SystemGuid.DefinedType.COMMUNICATION_SMS_FROM ) ), false, true );
+            ddlFrom.Required = true;
             Controls.Add( ddlFrom );
 
             rcwMessage = new RockControlWrapper();
@@ -107,6 +108,7 @@ namespace Rock.Web.UI.Controls.Communication
             tbMessage.ID = string.Format( "tbTextMessage_{0}", this.ID );
             tbMessage.TextMode = TextBoxMode.MultiLine;
             tbMessage.Rows = 3;
+            tbMessage.Required = true;
             rcwMessage.Controls.Add( tbMessage );
         }
 

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -244,18 +244,21 @@ namespace RockWeb.Blocks.WorkFlow
             // Set the note type if this is first request
             if ( !Page.IsPostBack )
             {
-                var noteType = new NoteTypeService( _rockContext ).Get( Rock.SystemGuid.NoteType.WORKFLOW_NOTE.AsGuid() );
-                ncWorkflowNotes.NoteTypeId = noteType.Id;
+                var entityType = EntityTypeCache.Read( typeof( Rock.Model.Workflow ) );
+                var noteTypes = NoteTypeCache.GetByEntity( entityType.Id, string.Empty, string.Empty );
+                ncWorkflowNotes.NoteTypes = noteTypes;
             }
 
             if ( _workflowType == null )
             {
+                ShowNotes( false );
                 ShowMessage( NotificationBoxType.Danger, "Configuration Error", "Workflow type was not configured or specified correctly." );
                 return false;
             }
 
             if ( !_workflowType.IsAuthorized( Authorization.VIEW, CurrentPerson ) )
             {
+                ShowNotes( false );
                 ShowMessage( NotificationBoxType.Warning, "Sorry", "You are not authorized to view this type of workflow." );
                 return false;
             }
@@ -336,34 +339,23 @@ namespace RockWeb.Blocks.WorkFlow
                     }
 
                     List<string> errorMessages;
-                    if ( _workflow.Process( _rockContext, entity, out errorMessages ) )
+                    if ( !_workflowService.Process( _workflow, entity, out errorMessages ) )
                     {
-                        // If the workflow type is persisted, save the workflow
-                        if ( _workflow.IsPersisted || _workflowType.IsPersisted )
-                        {
-                            if ( _workflow.Id == 0 )
-                            {
-                                _workflowService.Add( _workflow );
-                            }
-
-                            _rockContext.WrapTransaction( () =>
-                            {
-                                _rockContext.SaveChanges();
-                                _workflow.SaveAttributeValues( _rockContext );
-                                foreach ( var activity in _workflow.Activities )
-                                {
-                                    activity.SaveAttributeValues( _rockContext );
-                                }
-                            } );
-
-                            WorkflowId = _workflow.Id;
-                        }
+                        ShowNotes( false );
+                        ShowMessage( NotificationBoxType.Danger, "Workflow Processing Error(s):",
+                            "<ul><li>" + errorMessages.AsDelimited( "</li><li>" ) + "</li></ul>" );
+                        return false;
+                    }
+                    if ( _workflow.Id != 0 )
+                    {
+                        WorkflowId = _workflow.Id;
                     }
                 }
             }
 
             if ( _workflow == null )
             {
+                ShowNotes( false );
                 ShowMessage( NotificationBoxType.Danger, "Workflow Activation Error", "Workflow could not be activated." );
                 return false;
             }
@@ -382,12 +374,12 @@ namespace RockWeb.Blocks.WorkFlow
 
                             _actionType = _action.ActionType;
                             ActionTypeId = _actionType.Id;
-                            return true;
+                            return true; 
                         }
                     }
                 }
 
-                var canEdit = IsUserAuthorized( Authorization.EDIT );
+                var canEdit = UserCanEdit || _workflow.IsAuthorized( Authorization.EDIT, CurrentPerson );
 
                 // Find first active action form
                 int personId = CurrentPerson != null ? CurrentPerson.Id : 0;
@@ -395,6 +387,7 @@ namespace RockWeb.Blocks.WorkFlow
                     .Where( a =>
                         a.IsActive &&
                         (
+                            ( canEdit ) ||
                             ( !a.AssignedGroupId.HasValue && !a.AssignedPersonAliasId.HasValue ) ||
                             ( a.AssignedPersonAlias != null && a.AssignedPersonAlias.PersonId == personId ) ||
                             ( a.AssignedGroup != null && a.AssignedGroup.Members.Any( m => m.PersonId == personId ) )
@@ -489,17 +482,22 @@ namespace RockWeb.Blocks.WorkFlow
 
             if ( setValues )
             {
-                var mergeFields = Rock.Web.Cache.GlobalAttributesCache.GetMergeFields( null );
+                var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( this.RockPage, this.CurrentPerson );
                 mergeFields.Add( "Action", _action );
                 mergeFields.Add( "Activity", _activity );
                 mergeFields.Add( "Workflow", _workflow );
-                if ( CurrentPerson != null )
-                {
-                    mergeFields.Add( "CurrentPerson", CurrentPerson );
-                }
 
                 lheadingText.Text = form.Header.ResolveMergeFields( mergeFields );
                 lFootingText.Text = form.Footer.ResolveMergeFields( mergeFields );
+            }
+
+            if ( _workflow != null && _workflow.CreatedDateTime.HasValue )
+            {
+                hlblDateAdded.Text = String.Format( "Added: {0}", _workflow.CreatedDateTime.Value.ToShortDateString() );
+            }
+            else
+            {
+                hlblDateAdded.Visible = false;
             }
 
             phAttributes.Controls.Clear();
@@ -523,7 +521,18 @@ namespace RockWeb.Blocks.WorkFlow
                     if ( formAttribute.IsReadOnly )
                     {
                         var field = attribute.FieldType.Field;
-                        string formattedValue = field.FormatValueAsHtml( phAttributes, value, attribute.QualifierValues );
+
+                        string formattedValue = null;
+
+                        // get formatted value 
+                        if ( attribute.FieldType.Class == typeof( Rock.Field.Types.ImageFieldType ).FullName )
+                        {
+                            formattedValue = attribute.FieldType.Field.FormatValueAsHtml( phAttributes, value, attribute.QualifierValues, true );
+                        }
+                        else
+                        {
+                            formattedValue = field.FormatValueAsHtml( phAttributes, value, attribute.QualifierValues );
+                        }
 
                         if ( formAttribute.HideLabel )
                         {
@@ -673,18 +682,13 @@ namespace RockWeb.Blocks.WorkFlow
                 _activity != null &&
                 _action != null )
             {
-
-                var mergeFields = Rock.Web.Cache.GlobalAttributesCache.GetMergeFields( null );
+                var mergeFields = Rock.Lava.LavaHelper.GetCommonMergeFields( this.RockPage, this.CurrentPerson );
                 mergeFields.Add( "Action", _action );
                 mergeFields.Add( "Activity", _activity );
                 mergeFields.Add( "Workflow", _workflow );
-                if ( CurrentPerson != null )
-                {
-                    mergeFields.Add( "CurrentPerson", CurrentPerson );
-                } 
                 
                 Guid activityTypeGuid = Guid.Empty;
-                string responseText = "Your information has been submitted succesfully.";
+                string responseText = "Your information has been submitted successfully.";
 
                 foreach ( var action in _actionType.WorkflowForm.Actions.Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries ) )
                 {
@@ -745,29 +749,10 @@ namespace RockWeb.Blocks.WorkFlow
                 }
 
                 List<string> errorMessages;
-                if ( _workflow.Process( _rockContext, out errorMessages ) )
+                if ( _workflowService.Process( _workflow, out errorMessages ) )
                 {
-                    if ( _workflow.IsPersisted || _workflowType.IsPersisted )
-                    {
-                        if ( _workflow.Id == 0 )
-                        {
-                            _workflowService.Add( _workflow );
-                        }
-
-                        _rockContext.WrapTransaction( () =>
-                        {
-                            _rockContext.SaveChanges();
-                            _workflow.SaveAttributeValues( _rockContext );
-                            foreach ( var activity in _workflow.Activities )
-                            {
-                                activity.SaveAttributeValues( _rockContext );
-                            }
-                        } );
-
-                        WorkflowId = _workflow.Id;
-                    }
-
                     int? previousActionId = null;
+                    
                     if ( _action != null )
                     {
                         previousActionId = _action.Id;
@@ -790,7 +775,11 @@ namespace RockWeb.Blocks.WorkFlow
                 else
                 {
                     ShowMessage( NotificationBoxType.Danger, "Workflow Processing Error(s):", 
-                        "<ul><li>" + errorMessages.AsDelimited( "</li><li>" ) + "</li></ul>" );
+                        "<ul><li>" + errorMessages.AsDelimited( "</li><li>", null, true ) + "</li></ul>" );
+                }
+                if ( _workflow.Id != 0 )
+                {
+                    WorkflowId = _workflow.Id;
                 }
             }
         }

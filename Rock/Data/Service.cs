@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -189,6 +189,24 @@ namespace Rock.Data
         public IQueryable<int> GetIds( ParameterExpression parameterExpression, Expression whereExpression )
         {
             return Get( parameterExpression, whereExpression, null ).Select( t => t.Id );
+        }
+
+        /// <summary>
+        /// Gets the Guid for the entity that has the specified Id
+        /// </summary>
+        /// <param name="id">The identifier.</param>
+        /// <returns></returns>
+        public virtual Guid? GetGuid( int id )
+        {
+            var result = this.Queryable().Where( a => a.Id == id ).Select( a => a.Guid ).FirstOrDefault();
+            if (result.IsEmpty())
+            {
+                return null;
+            }
+            else
+            {
+                return result;
+            }
         }
 
         /// <summary>
@@ -420,6 +438,63 @@ namespace Rock.Data
 
         #endregion
 
+        #region Following
+
+        /// <summary>
+        /// Gets a quety of the followers of a particular item
+        /// </summary>
+        /// <param name="id">The identifier.</param>
+        /// <returns></returns>
+        public IQueryable<Rock.Model.Person> GetFollowers( int id )
+        {
+            var rockContext = this.Context as RockContext;
+
+            var entityType = Rock.Web.Cache.EntityTypeCache.Read( typeof( T ), false, rockContext );
+            if ( entityType != null )
+            {
+                var followerPersonIds = new Rock.Model.FollowingService( rockContext )
+                    .Queryable()
+                    .Where( f =>
+                        f.EntityTypeId == entityType.Id &&
+                        f.EntityId == id )
+                    .Select( f => f.PersonAlias.PersonId );
+
+                return new Rock.Model.PersonService( rockContext )
+                    .Queryable()
+                    .Where( p => followerPersonIds.Contains( p.Id ) );
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets a query of the items that are followed by a specific person id 
+        /// </summary>
+        /// <param name="personId">The person identifier.</param>
+        /// <returns></returns>
+        public IQueryable<T> GetFollowed( int personId )
+        {
+            var rockContext = this.Context as RockContext;
+
+            var entityType = Rock.Web.Cache.EntityTypeCache.Read( typeof( T ), false, rockContext );
+            if ( entityType != null )
+            {
+                var ids = new Rock.Model.FollowingService( rockContext )
+                    .Queryable()
+                    .Where( f =>
+                        f.EntityTypeId == entityType.Id &&
+                        f.PersonAlias != null &&
+                        f.PersonAlias.PersonId == personId )
+                    .Select( f => f.PersonAlias.PersonId );
+
+                return Queryable().Where( t => ids.Contains( t.Id ) );
+            }
+
+            return null;
+        }
+
+        #endregion
+
         #region Other
 
         /// <summary>
@@ -468,6 +543,12 @@ namespace Rock.Data
         public virtual void SetValues( T sourceItem, T targetItem )
         {
             _context.Entry( targetItem ).CurrentValues.SetValues( sourceItem );
+
+            if ( ( targetItem is IModel ) && ( sourceItem is IModel ) )
+            {
+                // manually set the value of ModifiedAuditValuesAlreadyUpdated since it isn't a Database field
+                ( targetItem as IModel ).ModifiedAuditValuesAlreadyUpdated = ( sourceItem as IModel ).ModifiedAuditValuesAlreadyUpdated;
+            }
         }
 
         #endregion

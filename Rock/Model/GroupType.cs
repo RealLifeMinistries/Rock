@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -154,6 +154,7 @@ namespace Rock.Model
         /// A <see cref="System.String"/> representing the CSS class name of a font based icon.
         /// </value>
         [DataMember]
+        [MaxLength( 100 )]
         public string IconCssClass { get; set; }
 
         /// <summary>
@@ -166,6 +167,15 @@ namespace Rock.Model
         public bool TakesAttendance { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether [attendance counts as weekend service].
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if [attendance counts as weekend service]; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool AttendanceCountsAsWeekendService { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating if an attendance reminder should be sent to group leaders.
         /// </summary>
         /// <value>
@@ -175,10 +185,19 @@ namespace Rock.Model
         public bool SendAttendanceReminder { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to show the Person's connection status as a column in the Group Member Grid
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if [show connection status]; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool ShowConnectionStatus { get; set; }
+
+        /// <summary>
         /// Gets or sets the <see cref="Rock.Model.AttendanceRule"/> that indicates how attendance is managed a <see cref="Rock.Model.Group"/> of this GroupType
         /// </summary>
         /// <value>
-        /// The <see cref="Rock.Model.AttendanceRule"/> that indicates how attendance is manged for a <see cref="Rock.Model.Group"/> of this GroupType.
+        /// The <see cref="Rock.Model.AttendanceRule"/> that indicates how attendance is managed for a <see cref="Rock.Model.Group"/> of this GroupType.
         /// </value>
         /// <example>
         /// The available options are:
@@ -188,6 +207,15 @@ namespace Rock.Model
         /// </example>
         [DataMember]
         public AttendanceRule AttendanceRule { get; set; }
+
+        /// <summary>
+        /// Gets or sets the group capacity rule.
+        /// </summary>
+        /// <value>
+        /// The group capacity rule.
+        /// </value>
+        [DataMember]
+        public GroupCapacityRule GroupCapacityRule { get; set; }
 
         /// <summary>
         /// Gets or sets the <see cref="Rock.Model.PrintTo"/> indicating the type of  location of where attendee labels for <see cref="Rock.Model.Group">Groups</see> of this GroupType should print.
@@ -267,6 +295,18 @@ namespace Rock.Model
         [DefinedValue( SystemGuid.DefinedType.GROUPTYPE_PURPOSE )]
         public int? GroupTypePurposeValueId { get; set; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether to ignore person inactivated.
+        /// By default group members are inactivated in their group whenever the person
+        /// is inactivated. If this value is set to true, members in groups of this type
+        /// will not be marked inactive when the person is inactivated
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if [ignore person inactivated]; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool IgnorePersonInactivated { get; set; }
+
         #endregion
 
         #region Virtual Properties
@@ -325,6 +365,19 @@ namespace Rock.Model
         }
         private ICollection<GroupTypeRole> _roles;
 
+        /// <summary>
+        /// Gets or sets the group member workflow triggers.
+        /// </summary>
+        /// <value>
+        /// The group member workflow triggers.
+        /// </value>
+        public virtual ICollection<GroupMemberWorkflowTrigger> GroupMemberWorkflowTriggers
+        {
+            get { return _triggers ?? ( _triggers = new Collection<GroupMemberWorkflowTrigger>() ); }
+            set { _triggers = value; }
+        }
+        private ICollection<GroupMemberWorkflowTrigger> _triggers;
+        
         /// <summary>
         /// Gets or sets the group schedule exclusions.
         /// </summary>
@@ -483,6 +536,27 @@ namespace Rock.Model
         /// User must already belong to the group before they will be allowed to check-in
         /// </summary>
         AlreadyBelongs = 2
+    }
+
+    /// <summary>
+    /// Group Capacity Rule
+    /// </summary>
+    public enum GroupCapacityRule
+    {
+        /// <summary>
+        /// The group does not have capacity limitations
+        /// </summary>
+        None = 0,
+
+        /// <summary>
+        /// The group can not go over capacity
+        /// </summary>
+        Hard = 1,
+
+        /// <summary>
+        /// A warning will be shown if a group is going to go over capacity
+        /// </summary>
+        Soft = 2
     }
 
     /// <summary>

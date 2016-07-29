@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -232,7 +232,7 @@ namespace RockWeb.Blocks.Utility
             bool dataExpanded = hfSelectedFolder.Value.StartsWith( relativeFolderPath );
             bool selected = hfSelectedFolder.Value == relativeFolderPath;
 
-            sb.AppendFormat( "<li data-expanded='{2}' data-id='{0}'><span class='{3}'><i class=\"fa fa-folder\"></i> {1}</span> \n", HttpUtility.HtmlEncode( relativeFolderPath ), directoryInfo.Name, dataExpanded.ToTrueFalse().ToLower(), selected ? "selected" : string.Empty );
+            sb.AppendFormat( "<li data-expanded='{2}' data-id='{0}'><span class='{3}'> {1}</span> \n", HttpUtility.HtmlEncode( relativeFolderPath ), directoryInfo.Name, dataExpanded.ToTrueFalse().ToLower(), selected ? "selected" : string.Empty );
 
             try
             {
@@ -367,7 +367,9 @@ namespace RockWeb.Blocks.Utility
         {
             string rootFolder = GetRootFolderPath();
             string imageUrl = rootFolder.TrimEnd( '\\', '/' ) + '/' + relativeFilePath.TrimStart( '\\', '/' ).Replace( '\\', '/' );
-            string result = string.Format( "{0},{1}", imageUrl.TrimStart( '~', '/', '\\' ), Path.GetFileName( relativeFilePath ) );
+
+            // pipe delimit in the format 'imageSrcUrl|imageAltText' (use Pipe instead of comma since comma is a valid char for filenames)
+            string result = string.Format( "{0}|{1}", imageUrl.TrimStart( '~', '/', '\\' ), Path.GetFileName( relativeFilePath ) );
             return result;
         }
 

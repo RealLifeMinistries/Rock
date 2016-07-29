@@ -16,6 +16,8 @@
                     $.ajaxSetup({ cache: true });
                     var src = apiSrc + '&callback=Rock.controls.util.googleMapsIsLoaded';
                     $('head').prepend("<script id='googleMapsApi' src='" + src + "' />");
+                } else if (typeof google == 'object' && typeof google.maps == 'object') {
+                    this.googleMapsIsLoaded();
                 }
             }
         };

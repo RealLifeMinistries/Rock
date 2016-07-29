@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,7 +31,7 @@ namespace Rock.Model
     public partial class EntityTypeService
     {
         /// <summary>
-        /// Gets an <see cref="Rock.Model.EntityType"/> by it's name / type name.
+        /// Gets an <see cref="Rock.Model.EntityType"/> by its name / type name.
         /// </summary>
         /// <param name="entityName">A <see cref="System.String"/> representing the name of the EntityType to search for.</param>
         /// <returns>The first <see cref="Rock.Model.EntityType"/> with a name that matches the provided value.</returns>
@@ -79,7 +79,7 @@ namespace Rock.Model
         }
 
         /// <summary>
-        /// Gets an <see cref="Rock.Model.EntityType" /> by it's name. If a match is not found, a new <see cref="Rock.Model.EntityType" /> can optionally be created.
+        /// Gets an <see cref="Rock.Model.EntityType" /> by its name. If a match is not found, a new <see cref="Rock.Model.EntityType" /> can optionally be created.
         /// </summary>
         /// <param name="name">A <see cref="System.String" /> representing the name of the object/entity type to search for.</param>
         /// <param name="createIfNotFound">A <see cref="System.Boolean" /> value that indicates if a new <see cref="Rock.Model.EntityType" /> should be created if a match is not found. This value
@@ -128,7 +128,13 @@ namespace Rock.Model
         {
             return this.GetEntities()
                 .Where( a => a.IsAuthorized( Rock.Security.Authorization.VIEW, currentPerson ) )
-                .Where( a => !Rock.Web.Cache.EntityTypeCache.Read( a ).GetEntityType().GetCustomAttributes( typeof( HideFromReportingAttribute ), true ).Any() );
+                .Select( s => new
+                {
+                    EntityTypeCache = Rock.Web.Cache.EntityTypeCache.Read( s ),
+                    Entity = s,
+                } )
+                .Where( a => a.EntityTypeCache != null && a.EntityTypeCache.GetEntityType() != null && !a.EntityTypeCache.GetEntityType().GetCustomAttributes( typeof( HideFromReportingAttribute ), true ).Any() )
+                .Select( s => s.Entity );
         }
 
         /// <summary>
@@ -213,6 +219,7 @@ namespace Rock.Model
                         oldEntityType.IsSecured = false;
                         oldEntityType.IsEntity = false;
                         oldEntityType.AssemblyName = null;
+                        EntityTypeCache.Flush( oldEntityType.Id );
                     }
                 }
 
@@ -236,6 +243,7 @@ namespace Rock.Model
                         existingEntityType.IsSecured = entityType.IsSecured;
                         existingEntityType.FriendlyName = existingEntityType.FriendlyName ?? entityType.FriendlyName;
                         existingEntityType.AssemblyName = entityType.AssemblyName;
+                        EntityTypeCache.Flush( existingEntityType.Id );
                     }
                     entityTypes.Remove( key );
                 }
@@ -259,6 +267,23 @@ namespace Rock.Model
                     EntityTypeCache.Read( entityTypeModel );
                 }
             }
+        }
+
+        /// <summary>
+        /// Gets the Guid for the EntityType that has the specified Id
+        /// </summary>
+        /// <param name="id">The identifier.</param>
+        /// <returns></returns>
+        public override Guid? GetGuid( int id )
+        {
+            var cacheItem = Rock.Web.Cache.EntityTypeCache.Read( id );
+            if ( cacheItem != null )
+            {
+                return cacheItem.Guid;
+            }
+
+            return null;
+
         }
     }
 }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -67,6 +67,7 @@ namespace RockWeb.Blocks.Security
 
                 // Hide the person name column
                 gUserLogins.Columns[1].Visible = false;
+                ppPerson.Visible = false;
             }
 
             _canEdit = IsUserAuthorized( Authorization.EDIT );
@@ -75,7 +76,7 @@ namespace RockWeb.Blocks.Security
             gfSettings.DisplayFilterValue += gfSettings_DisplayFilterValue;
 
             gUserLogins.DataKeyNames = new string[] { "Id" };
-            gUserLogins.Actions.ShowAdd = _personId.HasValue && _canEdit;
+            gUserLogins.Actions.ShowAdd = _canEdit;
             gUserLogins.Actions.AddClick += gUserLogins_Add;
             gUserLogins.IsDeleteEnabled = _canEdit;
             gUserLogins.GridRebind += gUserLogins_GridRebind;
@@ -251,12 +252,35 @@ namespace RockWeb.Blocks.Security
                 var rockContext = new RockContext();
                 UserLogin userLogin = null;
                 var service = new UserLoginService( rockContext );
+                string newUserName = tbUserName.Text.Trim();
 
                 int userLoginId = int.Parse( hfIdValue.Value );
 
                 if ( userLoginId != 0 )
                 {
                     userLogin = service.Get( userLoginId );
+                }
+
+                // Check to see if there is a change to the username, and if so check that the new username does not exist.
+                if ( userLogin == null || ( userLogin.UserName != newUserName ) )
+                {
+                    if ( service.GetByUserName( newUserName ) != null )
+                    {
+                        // keep looking until we find the next available one 
+                        int numericSuffix = 1;
+                        string nextAvailableUserName = newUserName + numericSuffix.ToString();
+                        while (service.GetByUserName(nextAvailableUserName) != null)
+                        {
+                            numericSuffix++;
+                            nextAvailableUserName = newUserName + numericSuffix.ToString();
+                        }
+                        
+                        nbErrorMessage.NotificationBoxType = NotificationBoxType.Warning;
+                        nbErrorMessage.Title = "Invalid User Name";
+                        nbErrorMessage.Text = "The User Name you selected already exists. Next available username: " + nextAvailableUserName;
+                        nbErrorMessage.Visible = true;
+                        return;
+                    }
                 }
 
                 if ( userLogin == null )
@@ -267,18 +291,15 @@ namespace RockWeb.Blocks.Security
                     {
                         userLogin.PersonId = _personId;
                     }
+                    else if ( ppPerson.PersonId.HasValue )
+                    {
+                        userLogin.PersonId = ppPerson.PersonId.Value;
+                    }
                     else
                     {
+                        nbErrorMessage.NotificationBoxType = NotificationBoxType.Danger;
                         nbErrorMessage.Title = "Invalid Situation";
-                        nbErrorMessage.Text = "The person you are editing has no person Id.";
-                        nbErrorMessage.Visible = true;
-                        return;
-                    }
-
-                    if ( service.GetByUserName( tbUserName.Text.Trim() ) != null )
-                    {
-                        nbErrorMessage.Title = "Invalid User Name";
-                        nbErrorMessage.Text = "The User Name you selected already exists.  Please select a different User Name.";
+                        nbErrorMessage.Text = "No person selected, or the person you are editing has no person Id.";
                         nbErrorMessage.Visible = true;
                         return;
                     }
@@ -286,9 +307,10 @@ namespace RockWeb.Blocks.Security
                     service.Add( userLogin );
                 }
 
-                userLogin.UserName = tbUserName.Text.Trim();
+                userLogin.UserName = newUserName;
                 userLogin.IsConfirmed = cbIsConfirmed.Checked;
                 userLogin.IsLockedOut = cbIsLockedOut.Checked;
+                userLogin.IsPasswordChangeRequired = cbIsRequirePasswordChange.Checked;
 
                 var entityType = EntityTypeCache.Read( compProvider.SelectedValue.AsGuid() );
                 if ( entityType != null )
@@ -309,6 +331,7 @@ namespace RockWeb.Blocks.Security
                                 }
                                 else
                                 {
+                                    nbErrorMessage.NotificationBoxType = NotificationBoxType.Danger;
                                     nbErrorMessage.Title = "Invalid Password";
                                     nbErrorMessage.Text = UserLoginService.FriendlyPasswordRules();
                                     nbErrorMessage.Visible = true;
@@ -317,6 +340,7 @@ namespace RockWeb.Blocks.Security
                             }
                             else
                             {
+                                nbErrorMessage.NotificationBoxType = NotificationBoxType.Danger;
                                 nbErrorMessage.Title = "Invalid Password";
                                 nbErrorMessage.Text = "Password and Confirmation do not match.";
                                 nbErrorMessage.Visible = true;
@@ -442,19 +466,21 @@ namespace RockWeb.Blocks.Security
                 sortProperty = new SortProperty( new GridViewSortEventArgs( "UserName", SortDirection.Ascending ) );
             }
 
+            gUserLogins.EntityTypeId = EntityTypeCache.Read<UserLogin>().Id;
             gUserLogins.DataSource = qry.Sort( sortProperty )
                 .Select( l => new
-                    {
-                        Id = l.Id,
-                        UserName = l.UserName,
-                        PersonId = l.PersonId,
-                        PersonName = l.Person.LastName + ", " + l.Person.NickName,
-                        ProviderName = l.EntityType.FriendlyName,
-                        CreatedDateTime = l.CreatedDateTime,
-                        LastLoginDateTime = l.LastLoginDateTime,
-                        IsConfirmed = l.IsConfirmed,
-                        IsLockedOut = l.IsLockedOut
-                    } ).ToList();
+                {
+                    Id = l.Id,
+                    UserName = l.UserName,
+                    PersonId = l.PersonId,
+                    PersonName = l.Person.LastName + ", " + l.Person.NickName,
+                    ProviderName = l.EntityType.FriendlyName,
+                    CreatedDateTime = l.CreatedDateTime,
+                    LastLoginDateTime = l.LastLoginDateTime,
+                    IsConfirmed = l.IsConfirmed,
+                    IsLockedOut = l.IsLockedOut,
+                    IsPasswordChangeRequired = l.IsPasswordChangeRequired
+                } ).ToList();
             gUserLogins.DataBind();
         }
 
@@ -464,10 +490,24 @@ namespace RockWeb.Blocks.Security
         /// <param name="attributeId">The attribute id.</param>
         protected void ShowEdit( int userLoginId )
         {
+            tbPassword.ClearPassword();
+            tbPasswordConfirm.ClearPassword();
             UserLogin userLogin = null;
+            ppPerson.Visible = false;
+
             if ( userLoginId > 0 )
             {
                 userLogin = new UserLoginService( new RockContext() ).Get( userLoginId );
+                ppPerson.PersonId = userLogin.PersonId;
+            }
+            else
+            {
+                // Shows the person picker when adding a new login outside of a person context
+                ppPerson.SetValue( null );
+                if ( !_personId.HasValue )
+                {
+                    ppPerson.Visible = true;
+                }
             }
 
             if ( userLogin == null )
@@ -478,6 +518,8 @@ namespace RockWeb.Blocks.Security
             tbUserName.Text = userLogin.UserName;
             cbIsConfirmed.Checked = userLogin.IsConfirmed ?? false;
             cbIsLockedOut.Checked = userLogin.IsLockedOut ?? false;
+            cbIsRequirePasswordChange.Checked = userLogin.IsPasswordChangeRequired ?? false;
+
             if ( userLogin.EntityType != null )
             {
                 compProvider.SetValue( userLogin.EntityType.Guid.ToString().ToUpper() );
@@ -506,6 +548,13 @@ namespace RockWeb.Blocks.Security
                 var component = AuthenticationContainer.GetComponent( entityType.Name );
                 if ( component != null )
                 {
+                    cbIsRequirePasswordChange.Visible = component.SupportsChangePassword;
+
+                    if ( !component.SupportsChangePassword )
+                    {
+                        cbIsRequirePasswordChange.Checked = false;
+                    }
+
                     if ( component.ServiceType == AuthenticationServiceType.Internal )
                     {
                         tbPassword.Enabled = true;

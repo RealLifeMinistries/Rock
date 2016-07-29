@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -209,7 +209,7 @@ $('.js-stop-immediate-propagation').click(function (event) {
 });
 
 ";
-            ScriptManager.RegisterStartupScript( this, this.GetType(), "RockPanelWidgetScript", script, true );
+            ScriptManager.RegisterStartupScript( this, typeof( PanelWidget ), "RockPanelWidgetScript", script, true );
         }
 
         /// <summary>
@@ -276,7 +276,7 @@ $('.js-stop-immediate-propagation').click(function (event) {
                 writer.RenderBeginTag( "section" );
 
                 // Header
-                writer.AddAttribute( HtmlTextWriterAttribute.Class, "panel-heading clearfix" );
+                writer.AddAttribute( HtmlTextWriterAttribute.Class, "panel-heading clearfix clickable" );
                 writer.RenderBeginTag( "header" );
 
                 // Hidden Field to track expansion
@@ -353,6 +353,8 @@ $('.js-stop-immediate-propagation').click(function (event) {
                 writer.AddAttribute( HtmlTextWriterAttribute.Class, "pull-right" );
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
 
+                RenderLabels( writer );
+
                 if ( ShowReorderIcon )
                 {
                     // Reorder Icon
@@ -395,32 +397,49 @@ $('.js-stop-immediate-propagation').click(function (event) {
 
                 writer.RenderBeginTag( HtmlTextWriterTag.Div );
 
-                // Render placeholder's child controls
-                if ( this.Controls != null )
-                {
-                    List<Control> alreadyRenderedControls = new List<Control>();
-                    alreadyRenderedControls.Add( _hfExpanded );
-                    alreadyRenderedControls.Add( _hfTitle );
-                    alreadyRenderedControls.Add( _hfTitleDisableVrm );
-                    alreadyRenderedControls.Add( _lbDelete );
-                    if ( this.HeaderControls != null )
-                    {
-                        alreadyRenderedControls.AddRange( HeaderControls );
-                    }
-
-                    foreach ( Control child in this.Controls )
-                    {
-                        if ( !alreadyRenderedControls.Contains( child ) )
-                        {
-                            child.RenderControl( writer );
-                        }
-                    }
-                }
+                RenderChildControls( writer );
 
                 writer.RenderEndTag();
 
                 writer.RenderEndTag();  // Section
             }
+        }
+
+        /// <summary>
+        /// Renders the child controls.
+        /// </summary>
+        /// <param name="writer">The writer.</param>
+        protected virtual void RenderChildControls( HtmlTextWriter writer )
+        {
+            // Render placeholder's child controls
+            if ( this.Controls != null )
+            {
+                List<Control> alreadyRenderedControls = new List<Control>();
+                alreadyRenderedControls.Add( _hfExpanded );
+                alreadyRenderedControls.Add( _hfTitle );
+                alreadyRenderedControls.Add( _hfTitleDisableVrm );
+                alreadyRenderedControls.Add( _lbDelete );
+                if ( this.HeaderControls != null )
+                {
+                    alreadyRenderedControls.AddRange( HeaderControls );
+                }
+
+                foreach ( Control child in this.Controls )
+                {
+                    if ( !alreadyRenderedControls.Contains( child ) )
+                    {
+                        child.RenderControl( writer );
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Renders the labels.
+        /// </summary>
+        /// <param name="writer">The writer.</param>
+        protected virtual void RenderLabels( HtmlTextWriter writer)
+        {
         }
     }
 }

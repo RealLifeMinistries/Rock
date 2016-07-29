@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -71,7 +71,7 @@ namespace Rock.CheckIn
             {
                 if ( Groups != null )
                 {
-                    return Groups.SelectMany( g => g.Schedules.SelectMany( s => s.PersonIds ) ).Distinct().ToList();
+                    return Groups.SelectMany( g => g.Schedules.Where( s => s.IsActive).SelectMany( s => s.PersonIds ) ).Distinct().ToList();
                 }
                 else
                 {
@@ -142,8 +142,8 @@ namespace Rock.CheckIn
                         }
 
                         var cachePolicy = new CacheItemPolicy();
-                        cachePolicy.AbsoluteExpiration = DateTimeOffset.Now.AddSeconds( 60 );
-                        cache.Set( cacheKey, locationAttendance, cachePolicy );
+                        cachePolicy.AbsoluteExpiration = DateTimeOffset.Now.AddMinutes( 5 );
+                        cache.Set( cacheKey, locationAttendance, new CacheItemPolicy() );
 
                         return locationAttendance;
                     }
@@ -204,6 +204,7 @@ namespace Rock.CheckIn
                     scheduleAttendance = new KioskScheduleAttendance();
                     scheduleAttendance.ScheduleId = attendance.ScheduleId.Value;
                     scheduleAttendance.ScheduleName = attendance.Schedule.Name;
+                    scheduleAttendance.IsActive = attendance.Schedule.IsScheduleOrCheckInActive;
                     scheduleAttendance.PersonIds = new List<int>();
                     groupAttendance.Schedules.Add( scheduleAttendance );
                 }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,12 +19,17 @@ using System;
 namespace Rock.SystemGuid
 {
     /// <summary>
-    /// System file types.  
+    /// System file types.
     /// </summary>
     public class Category
     {
 
         #region History Categories
+
+        /// <summary>
+        /// History changes for an event registration
+        /// </summary>
+        public const string HISTORY_EVENT_REGISTRATION = "813DF1A5-ADBD-481C-AC1D-884F0FA7AE77";
 
         /// <summary>
         /// History changes for person
@@ -56,6 +61,26 @@ namespace Rock.SystemGuid
         /// </summary>
         public const string HISTORY_PERSON_ACTIVITY = "0836845E-5ED8-4ABE-8787-3B61EF2F0FA5";
 
+        /// <summary>
+        /// History of person registering or being registered
+        /// </summary>
+        public const string HISTORY_PERSON_REGISTRATION = "DA9C0CC7-7B31-4E1E-BBA5-50405B2D9EFE";
+
+        /// <summary>
+        /// History of changes to batches
+        /// </summary>
+        public const string HISTORY_FINANCIAL_BATCH = "AF6A8CFF-F24F-4AA8-B126-94B6903961C0";
+
+        /// <summary>
+        /// History of changes to transaction and/or transaction details
+        /// </summary>
+        public const string HISTORY_FINANCIAL_TRANSACTION = "477EE3BE-C68F-48BD-B218-FAFC99AF56B3";
+
+        /// <summary>
+        /// The history person analytics
+        /// </summary>
+        public const string HISTORY_PERSON_ANALYTICS = "C1524D2E-3E8F-3D83-45F8-526B749D79F0";
+
         #endregion
 
         #region Schedule Categories
@@ -78,7 +103,12 @@ namespace Rock.SystemGuid
         /// The person attributes Social guid
         /// </summary>
         public const string PERSON_ATTRIBUTES_SOCIAL = "DD8F467D-B83C-444F-B04C-C681167046A1";
-
+        
+        /// <summary>
+        /// The person attribute for ERA
+        /// </summary>
+        public const string PERSON_ATTRIBUTES_ERA = "266A1EA8-425C-7BB0-4191-C2E234D60086";
+        
         #endregion
 
         #region System Email Categories
@@ -89,5 +119,15 @@ namespace Rock.SystemGuid
         public const string SYSTEM_EMAIL_WORKFLOW = "C7B9B5F1-9D90-485F-93E4-5D7D81EC2B12";
 
         #endregion
+
+        #region Merge Template Categories
+
+        /// <summary>
+        /// The Personal Merge Template Category guid
+        /// </summary>
+        public const string PERSONAL_MERGE_TEMPLATE = "A9F2F544-660B-4176-ACAD-88898416A66E";
+        
+        #endregion
+
     }
 }

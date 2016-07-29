@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -42,14 +42,6 @@ namespace Rock.Transactions
         public DateTime LastActivityDate { get; set; }
 
         /// <summary>
-        /// Gets or sets the rock user id in session.
-        /// </summary>
-        /// <value>
-        /// The rock user id in session.
-        /// </value>
-        public int? SessionUserId { get; set; }
-
-        /// <summary>
         /// Gets or sets a value indicating whether [is on line].
         /// </summary>
         /// <value>
@@ -79,14 +71,6 @@ namespace Rock.Transactions
                 {
                     user.LastActivityDateTime = LastActivityDate;
                     user.IsOnLine = IsOnLine;
-
-                    // check if this session had a previous account on-line
-                    if ( IsOnLine && SessionUserId.HasValue && SessionUserId != user.Id )
-                    {
-                        // mark old session offline
-                        var oldUser = userLoginService.Get( SessionUserId.Value );
-                        oldUser.IsOnLine = false;
-                    }
 
                     rockContext.SaveChanges();
                 }

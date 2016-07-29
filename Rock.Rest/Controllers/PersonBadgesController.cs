@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,7 @@
 // limitations under the License.
 // </copyright>
 //
+using System.Data.Entity;
 using System.Net;
 using System.Web.Http;
 using System.Linq;
@@ -25,6 +26,7 @@ using Rock.Data;
 using System.Collections.Generic;
 using System.Data;
 using System;
+using Rock.Web.Cache;
 
 namespace Rock.Rest.Controllers
 {
@@ -40,8 +42,8 @@ namespace Rock.Rest.Controllers
         /// <returns></returns>
         [Authenticate, Secured]
         [HttpGet]
-        [System.Web.Http.Route( "api/PersonBadges/InGroupOfType/{personId}/{groupTypeId}" )]
-        public GroupOfTypeResult GetInGroupOfType(int personId, Guid groupTypeId)
+        [System.Web.Http.Route( "api/PersonBadges/InGroupOfType/{personId}/{groupTypeGuid}" )]
+        public GroupOfTypeResult GetInGroupOfType(int personId, Guid groupTypeGuid)
         {
             GroupOfTypeResult result = new GroupOfTypeResult();
             result.PersonId = personId;
@@ -58,7 +60,7 @@ namespace Rock.Rest.Controllers
             }
 
             // get group type info
-            GroupType groupType = new GroupTypeService( (Rock.Data.RockContext)Service.Context ).Get( groupTypeId );
+            GroupType groupType = new GroupTypeService( (Rock.Data.RockContext)Service.Context ).Get( groupTypeGuid );
 
             if (groupType != null)
             {
@@ -69,8 +71,12 @@ namespace Rock.Rest.Controllers
 
             // determine if person is in this type of group
             GroupMemberService groupMemberService = new GroupMemberService( (Rock.Data.RockContext)Service.Context );
+            
             IQueryable<GroupMember> groupMembershipsQuery = groupMemberService.Queryable("Person,GroupRole,Group")
-                                        .Where(t => t.Group.GroupType.Guid == groupTypeId && t.PersonId == personId )
+                                        .Where(t => t.Group.GroupType.Guid == groupTypeGuid 
+                                                && t.PersonId == personId 
+                                                && t.GroupMemberStatus == GroupMemberStatus.Active 
+                                                && t.Group.IsActive)
                                         .OrderBy(g => g.GroupRole.Order);
 
             foreach (GroupMember member in groupMembershipsQuery)
@@ -82,6 +88,91 @@ namespace Rock.Rest.Controllers
                 group.RoleName = member.GroupRole.Name;
 
                 result.GroupList.Add(group);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets the attendance summary data for the 24 month attenance badge 
+        /// </summary>
+        /// <param name="personId">The person id.</param>
+        /// <returns></returns>
+        [Authenticate, Secured]
+        [HttpGet]
+        [System.Web.Http.Route( "api/PersonBadges/InGroupWithPurpose/{personId}/{definedValueGuid}" )]
+        public GroupWithPurposeResult GetGroupWithPurpose( int personId, Guid definedValueGuid )
+        {
+            GroupWithPurposeResult result = new GroupWithPurposeResult();
+            result.PersonId = personId;
+            result.PersonInGroup = false;
+            result.GroupList = new List<GroupSummary>();
+
+            // get person info
+            Person person = new PersonService( (Rock.Data.RockContext)Service.Context ).Get( personId );
+
+            if ( person != null )
+            {
+                result.NickName = person.NickName;
+                result.LastName = person.LastName;
+            }
+
+            var purposeValue = DefinedValueCache.Read( definedValueGuid );
+            result.Purpose = purposeValue.Value;
+
+            // determine if person is in a group with this purpose
+            GroupMemberService groupMemberService = new GroupMemberService( (Rock.Data.RockContext)Service.Context );
+
+            IQueryable<GroupMember> groupMembershipsQuery = groupMemberService.Queryable( "Person,GroupRole,Group" )
+                                        .Where( t => t.Group.GroupType.GroupTypePurposeValueId == purposeValue.Id
+                                                 && t.PersonId == personId
+                                                 && t.GroupMemberStatus == GroupMemberStatus.Active
+                                                 && t.Group.IsActive )
+                                        .OrderBy( g => g.GroupRole.Order );
+
+            foreach ( GroupMember member in groupMembershipsQuery )
+            {
+                result.PersonInGroup = true;
+                GroupSummary group = new GroupSummary();
+                group.GroupName = member.Group.Name;
+                group.GroupId = member.Group.Id;
+                group.RoleName = member.GroupRole.Name;
+
+                result.GroupList.Add( group );
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Returns groups that are a specified type and geofence a given person
+        /// </summary>
+        /// <param name="personId">The person id.</param>
+        /// <returns></returns>
+        [Authenticate, Secured]
+        [HttpGet]
+        [System.Web.Http.Route( "api/PersonBadges/GeofencingGroups/{personId}/{groupTypeGuid}" )]
+        public List<GroupAndLeaderInfo> GetGeofencingGroups( int personId, Guid groupTypeGuid )
+        {
+            var rockContext = (Rock.Data.RockContext)Service.Context;
+            var groupMemberService = new GroupMemberService( rockContext );
+
+            var groups = new GroupService( rockContext ).GetGeofencingGroups( personId, groupTypeGuid ).AsNoTracking();
+
+            var result = new List<GroupAndLeaderInfo>();
+            foreach ( var group in groups.OrderBy( g => g.Name ) )
+            {
+                var info = new GroupAndLeaderInfo();
+                info.GroupName = group.Name.Trim();
+                info.LeaderNames = groupMemberService
+                    .Queryable().AsNoTracking()
+                    .Where( m => 
+                        m.GroupId == group.Id &&
+                        m.GroupRole.IsLeader )
+                    .Select( m => m.Person.NickName + " " + m.Person.LastName )
+                    .ToList()
+                    .AsDelimited(", ");
+                result.Add(info);
             }
 
             return result;
@@ -238,6 +329,58 @@ namespace Rock.Rest.Controllers
         }
 
         /// <summary>
+        /// Result set for group with purpose badge
+        /// </summary>
+        public class GroupWithPurposeResult
+        {
+            /// <summary>
+            /// Gets or sets the purpose.
+            /// </summary>
+            /// <value>
+            /// The purpose.
+            /// </value>
+            public string Purpose { get; set; }
+            
+            /// <summary>
+            /// Gets or sets the person id of the individual.
+            /// </summary>
+            /// <value>
+            /// The person id.
+            /// </value>
+            public int PersonId { get; set; }
+
+            /// <summary>
+            /// Gets or sets the person nick name of the individual.
+            /// </summary>
+            /// <value>
+            /// The nick name.
+            /// </value>
+            public string NickName { get; set; }
+
+            /// <summary>
+            /// Gets or sets the person last name of the individual.
+            /// </summary>
+            /// <value>
+            /// The last name.
+            /// </value>
+            public string LastName { get; set; }
+
+            /// <summary>
+            /// Gets or sets whether the given person is in a group of this type.
+            /// </summary>
+            /// <value>
+            /// Whether the person is in a group of this type.
+            /// </value>
+            public bool PersonInGroup { get; set; }
+
+            /// <summary>
+            /// Gets or sets a list of groups the person is in.
+            /// </summary>
+            /// <value>List of groups that the person is in.</value>
+            public List<GroupSummary> GroupList { get; set; }
+        }
+
+        /// <summary>
         /// Summary of a group for use in the group of type result
         /// </summary>
         public class GroupSummary
@@ -265,6 +408,28 @@ namespace Rock.Rest.Controllers
             /// The group member role name.
             /// </value>
             public string RoleName { get; set; }
+        }
+
+        /// <summary>
+        /// Group and Leader name info
+        /// </summary>
+        public class GroupAndLeaderInfo
+        {
+            /// <summary>
+            /// Gets or sets the name of the group.
+            /// </summary>
+            /// <value>
+            /// The name of the group.
+            /// </value>
+            public string GroupName { get; set; }
+
+            /// <summary>
+            /// Gets or sets the leader names.
+            /// </summary>
+            /// <value>
+            /// The leader names.
+            /// </value>
+            public string LeaderNames { get; set; }
         }
 
         /// <summary>

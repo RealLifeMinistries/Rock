@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +15,10 @@
 // </copyright>
 //
 using System.ComponentModel;
+using System.Collections.Generic;
+using System.Linq;
 using System.Web.UI;
 using System.Web.UI.WebControls;
-
-using Rock.Constants;
 
 namespace Rock.Web.UI.Controls
 {
@@ -26,7 +26,7 @@ namespace Rock.Web.UI.Controls
     /// A <see cref="T:System.Web.UI.WebControls.DropDownList"/> control with an associated label.
     /// </summary>
     [ToolboxData( "<{0}:RockDropDownList runat=server></{0}:RockDropDownList>" )]
-    public class RockDropDownList : DropDownList, IRockControl
+    public class RockDropDownList : DropDownList, IRockControl, IDisplayRequiredIndicator
     {
         #region IRockControl implementation (NOTE: uses a different Required property than other IRockControl controls)
 
@@ -46,6 +46,23 @@ namespace Rock.Web.UI.Controls
         {
             get { return ViewState["Label"] as string ?? string.Empty; }
             set { ViewState["Label"] = value; }
+        }
+
+        /// <summary>
+        /// Gets or sets the form group class.
+        /// </summary>
+        /// <value>
+        /// The form group class.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        Description( "The CSS class to add to the form-group div." )
+        ]
+        public string FormGroupCssClass
+        {
+            get { return ViewState["FormGroupCssClass"] as string ?? string.Empty; }
+            set { ViewState["FormGroupCssClass"] = value; }
         }
 
         /// <summary>
@@ -74,6 +91,34 @@ namespace Rock.Web.UI.Controls
                 }
             }
         }
+
+        /// <summary>
+        /// Gets or sets the warning text.
+        /// </summary>
+        /// <value>
+        /// The warning text.
+        /// </value>
+        [
+        Bindable( true ),
+        Category( "Appearance" ),
+        DefaultValue( "" ),
+        Description( "The warning block." )
+        ]
+        public string Warning
+        {
+            get
+            {
+                return WarningBlock != null ? WarningBlock.Text : string.Empty;
+            }
+            set
+            {
+                if ( WarningBlock != null )
+                {
+                    WarningBlock.Text = value;
+                }
+            }
+        }
+
         /// <summary>
         /// Gets or sets a value indicating whether this <see cref="RockTextBox"/> is required.
         /// </summary>
@@ -97,6 +142,18 @@ namespace Rock.Web.UI.Controls
             {
                 ViewState["Required"] = value;
             }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to show the Required indicator when Required=true
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if [display required indicator]; otherwise, <c>false</c>.
+        /// </value>
+        public bool DisplayRequiredIndicator
+        {
+            get { return ViewState["DisplayRequiredIndicator"] as bool? ?? true; }
+            set { ViewState["DisplayRequiredIndicator"] = value; }
         }
 
         /// <summary>
@@ -143,6 +200,14 @@ namespace Rock.Web.UI.Controls
         public HelpBlock HelpBlock { get; set; }
 
         /// <summary>
+        /// Gets or sets the warning block.
+        /// </summary>
+        /// <value>
+        /// The warning block.
+        /// </value>
+        public WarningBlock WarningBlock { get; set; }
+
+        /// <summary>
         /// Gets or sets the required field validator.
         /// </summary>
         /// <value>
@@ -180,6 +245,7 @@ namespace Rock.Web.UI.Controls
             RequiredFieldValidator = new RequiredFieldValidator();
             RequiredFieldValidator.ValidationGroup = this.ValidationGroup;
             HelpBlock = new HelpBlock();
+            WarningBlock = new WarningBlock();
         }
 
         /// <summary>
@@ -238,6 +304,34 @@ namespace Rock.Web.UI.Controls
         }
 
         /// <summary>
+        /// Loads the previously saved view state of the <see cref="T:System.Web.UI.WebControls.DetailsView" /> control.
+        /// </summary>
+        /// <param name="savedState">An <see cref="T:System.Object" /> that represents the state of the <see cref="T:System.Web.UI.WebControls.ListControl" /> -derived control.</param>
+        protected override void LoadViewState( object savedState )
+        {
+            base.LoadViewState( savedState );
+            var savedAttributes = ViewState["ItemAttributes"] as List<Dictionary<string, string>>;
+            int itemPosition = 0;
+            
+            // make sure the list has the same number of items as it did when ViewState was saved
+            if ( savedAttributes.Count == this.Items.Count )
+            {
+                // don't bother doing anything if nothing has any attributes
+                if ( savedAttributes.Any( a => a.Count > 0 ) )
+                {
+                    foreach ( var item in this.Items.OfType<ListItem>() )
+                    {
+                        var itemAttributes = savedAttributes[itemPosition++];
+                        foreach ( var a in itemAttributes )
+                        {
+                            item.Attributes.Add( a.Key, a.Value );
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// Saves the current view state of the <see cref="T:System.Web.UI.WebControls.ListControl" /> -derived control and the items it contains.
         /// </summary>
         /// <returns>
@@ -245,38 +339,8 @@ namespace Rock.Web.UI.Controls
         /// </returns>
         protected override object SaveViewState()
         {
-            object[] allStates = new object[this.Items.Count + 1];
-            allStates[0] = base.SaveViewState();
-
-            int i = 1;
-            foreach ( ListItem li in this.Items )
-            {
-                allStates[i++] = li.Attributes["optiongroup"];
-            }
-
-            return allStates;
-        }
-
-        /// <summary>
-        /// Loads the previously saved view state of the <see cref="T:System.Web.UI.WebControls.DetailsView" /> control.
-        /// </summary>
-        /// <param name="savedState">An <see cref="T:System.Object" /> that represents the state of the <see cref="T:System.Web.UI.WebControls.ListControl" /> -derived control.</param>
-        protected override void LoadViewState( object savedState )
-        {
-            if ( savedState != null )
-            {
-                object[] allStates = (object[])savedState;
-                if ( allStates[0] != null )
-                {
-                    base.LoadViewState( allStates[0] );
-                }
-
-                int i = 1;
-                foreach ( ListItem li in this.Items )
-                {
-                    li.Attributes["optiongroup"] = (string)allStates[i++];
-                }
-            }
+            ViewState["ItemAttributes"] = this.Items.OfType<ListItem>().Select( a => a.Attributes.Keys.OfType<string>().ToDictionary( k => k, v => a.Attributes[v] ) ).ToList();
+            return base.SaveViewState();
         }
 
     }

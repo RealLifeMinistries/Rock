@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,14 +29,14 @@ namespace Rock.Model
     {
         /// <summary>
         /// Returns a collection of active <see cref="Rock.Model.PrayerRequest">PrayerRequests</see> that
-        /// are in a specified <see cref="Rock.Model.Category"/> or any of it's subcategories.
+        /// are in a specified <see cref="Rock.Model.Category"/> or any of its subcategories.
         /// </summary>
         /// <param name="categoryIds">A <see cref="System.Collections.Generic.List{Int32}"/> of
         /// the <see cref="Rock.Model.Category"/> IDs to retrieve PrayerRequests for.</param>
         /// <param name="onlyApproved">set false to include un-approved requests.</param>
         /// <param name="onlyUnexpired">set false to include expired requests.</param>
         /// <returns>An enumerable collection of <see cref="Rock.Model.PrayerRequest"/> that
-        /// are in the specified <see cref="Rock.Model.Category"/> or any of it's subcategories.</returns>
+        /// are in the specified <see cref="Rock.Model.Category"/> or any of its subcategories.</returns>
         public IEnumerable<PrayerRequest> GetByCategoryIds( List<int> categoryIds, bool onlyApproved = true, bool onlyUnexpired = true )
         {
             PrayerRequest prayerRequest = new PrayerRequest();
@@ -51,7 +51,7 @@ namespace Rock.Model
                 .Select( a => a.Id );
 
             // Now find the active PrayerRequests that have any of those category Ids.
-            var list = Queryable( "RequestedByPersonAlias.Person" ).Where( p => p.IsActive == true && categoryIds.Contains( p.CategoryId ?? -1 ) );
+            var list = Queryable( "RequestedByPersonAlias.Person" ).Where( p => p.IsActive == true && expandedCategoryIds.Contains( p.CategoryId ?? -1 ) );
 
             if ( onlyApproved )
             {

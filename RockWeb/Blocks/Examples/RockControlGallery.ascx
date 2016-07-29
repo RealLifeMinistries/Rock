@@ -65,6 +65,100 @@
                         In Bootstrap 3 inputs are <em>display:block;</em>. If you need these sized controls to align horizontally, consider wrapping them with the <em>form-control-group</em> class.
                     </div>
 
+                    <h2 runat="server">Horizontal Forms</h2>
+                    <p>While Rock uses a similar approach to Bootstrap, we've made horizontal forms a bit easier to help facilitate their use when creating forms in workflows and event
+                        registrations. Below is the syntax for declaring a horizontal form.
+                    </p>
+                    <div runat="server" class="r-example"><div class="form-horizontal">
+  <div class="form-group">
+    <label for="inputEmail3" class="control-label">Email</label>
+    <div class="control-wrapper">
+      <input type="email" class="form-control" id="inputEmail3" placeholder="Email">
+    </div>
+  </div>
+</div></div>
+
+                    <p>When using this in form generators you'll simply need to add the wrapping <code>&lt;div class=&quot;form-group&quot;&gt;</code> in your pre/post fields.</p>
+
+                    <p>At this point you're probably thinking 'Cool!, but the label column is a fixed size and too small.' That's a valid concern!  By default the label column will
+                        be 2 grid units with the field value as 10. We've added a couple of extension classes to extend that.</p>
+
+                    <ul>
+                        <li><strong>label-md: </strong> Label column of 4, field column of 8</li>
+                        <li><strong>label-lg: </strong> Label column of 6, field column of 6</li>
+                        <li><strong>label-xl: </strong> Label column of 8, field column of 4</li>
+                    </ul>
+
+                    <div runat="server" class="r-example">
+<div class="form-horizontal">
+  <div class="form-group">
+    <label for="inputEmail3" class="control-label">Email</label>
+    <div class="control-wrapper">
+      <input type="email" class="form-control" id="inputEmail3" placeholder="Email">
+    </div>
+  </div>
+</div>
+
+<div class="form-horizontal label-md">
+  <div class="form-group">
+    <label for="inputEmail3" class="control-label">Email</label>
+    <div class="control-wrapper">
+      <input type="email" class="form-control" id="inputEmail3" placeholder="Email">
+    </div>
+  </div>
+</div>
+
+<div class="form-horizontal label-lg">
+  <div class="form-group">
+    <label for="inputEmail3" class="control-label">Email</label>
+    <div class="control-wrapper">
+      <input type="email" class="form-control" id="inputEmail3" placeholder="Email">
+    </div>
+  </div>
+</div>
+
+<div class="form-horizontal label-xl">
+  <div class="form-group">
+    <label for="inputEmail3" class="control-label">Email</label>
+    <div class="control-wrapper">
+      <input type="email" class="form-control" id="inputEmail3" placeholder="Email">
+    </div>
+  </div>
+</div>
+
+
+                    </div>
+
+
+                    <h2 runat="server">Margins and Padding</h2>
+
+                    <div class="alert alert-warning">
+                        <p><strong>Warning!</strong></p>
+                        If you think you need to control the margin or padding, you might be 'doing it wrong.'
+                        These are for use in those cases when you know what you're doing.</em>
+                    </div>
+
+                    <h3>Format</h3>
+                    <p>
+                        The format is the type (padding or margin) followed by a dash then the position (v=vertical, h=horizontal, t=top, etc.)
+                        followed by a dash and then the sizing specifier (none, small, medium, etc).
+                    </p>
+                    <pre>.padding|margin - v|h|t|b|r|l|all - none|sm|md|lg|xl</pre>
+
+<div runat="server" class="r-example">
+<div class="well">
+    <Rock:RockTextBox ID="tbMP1" runat="server" CssClass="margin-t-xl" Label=".margin-t-xl" Placeholder="Blah..."/>
+</div>
+
+<div class="well">
+    <Rock:RockTextBox ID="tbMP2" runat="server" CssClass="padding-h-lg" Label=".padding-h-lg" Placeholder="Blah..." />
+</div>
+
+<div class="well">
+    <label class="control-label">.padding-all-xl .margin-all-lg</label>
+    <Rock:NotificationBox ID="nbMP3" runat="server" CssClass="padding-all-xl margin-all-lg" NotificationBoxType="Info" Title=".padding-all-xl .margin-all-md" Text="For God so loved the world that he gave his one and only Son..." />
+</div>
+</div>
 
                     <a id="Grid"></a>
                     <h2 runat="server">Rock:Grid</h2>
@@ -104,6 +198,11 @@
                         <Rock:ButtonDropDownList ID="bddlExample" runat="server" Label="Rock:ButtonDropDownList" />
                     </div>
 
+                    <a id="ButtonDropDownListCheckMark"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:ButtonDropDownList ID="bddlExampleCheckmark" runat="server" Label="Rock:ButtonDropDownList with Checkmark" SelectionStyle="Checkmark" Title="T-Shirt Size" />
+                    </div>
+
                     <a id="Input"></a>
                     <h1 runat="server">Input</h1>
 
@@ -128,9 +227,19 @@
                         <Rock:NumberBox ID="numbExample" runat="server" Label="Rock:NumberBox" />
                     </div>
 
+                    <a id="NumberUpDown"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:NumberUpDown ID="nudExample" runat="server" Label="Rock:NumberUpDown" Minimum="0" Maximum="5" />
+                    </div>
+
                     <a id="RockCheckBox"></a>
                     <div runat="server" class="r-example">
                         <Rock:RockCheckBox ID="cbExample" runat="server" Label="Rock:RockCheckBox" />
+                    </div>
+
+                    <a id="RockCheckBox2"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:RockCheckBox ID="cbExample2" runat="server" Label="Rock:RockCheckBox" SelectedIconCssClass="fa fa-check-square-o fa-lg" UnSelectedIconCssClass="fa fa-square-o fa-lg" />
                     </div>
 
                     <a id="RockCheckBoxList"></a>
@@ -162,6 +271,19 @@
                     <div runat="server" class="r-example">
                         <Rock:RockRating ID="rrRating" runat="server" Label="Rock:RatingInput" /><br />
                     </div>
+
+                    <a id="RangeSlider"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:RangeSlider ID="rsSlider" runat="server" Label="Rock:RangeSlider" MaxValue="250" MinValue="125" SelectedValue="200" />
+                        <br />
+                    </div>
+
+                    <div runat="server" class="r-example">
+                        <Rock:RangeSlider ID="rsSlider2" runat="server" Label="Rock:RangeSlider" />
+                        <br />
+                    </div>
+
+                    <asp:LinkButton ID="lbTestSlider" runat="server" CssClass="btn btn-default" Text="Test" OnClick="lbTestSlider_Click" />
 
                     <a id="Pickers"></a>
                     <h1 runat="server">Pickers</h1>
@@ -207,6 +329,11 @@
                         <Rock:DateRangePicker ID="drpExample" runat="server" Label="Rock:DateRangePicker" LowerValue="1/1/2012" UpperValue="12/31/2014" />
                     </div>
 
+                    <a id="SlidingDateRangePicker"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:SlidingDateRangePicker ID="sdrpExample" runat="server" Label="Rock:SlidingDateRangePicker" />
+                    </div>
+
                     <a id="BirthdayPicker"></a>
                     <div id="Div4" runat="server" class="r-example">
                         <Rock:BirthdayPicker ID="bdaypExample" runat="server" Label="Rock:BirthdayPicker" OnSelectedBirthdayChanged="birthdayPicker_SelectedBirthdayChanged" />
@@ -217,9 +344,24 @@
                         <Rock:GroupPicker ID="gpExample" runat="server" Label="Rock:GroupPicker" />
                     </div>
 
+                    <a id="GroupTypePicker"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:GroupTypePicker ID="gpGroupType" runat="server" Label="Rock:GroupTypePicker" />
+                    </div>
+                    
+                    <a id="GroupTypesPicker"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:GroupTypesPicker ID="gpGroupTypes" runat="server" Label="Rock:GroupTypesPicker" />
+                    </div>
+
                     <a id="CampusPicker"></a>
                     <div runat="server" class="r-example">
                         <Rock:CampusPicker ID="campExample" runat="server" Label="Rock:CampusPicker" />
+                    </div>
+
+                    <a id="CampusesPicker"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:CampusesPicker ID="campsExample" runat="server" Label="Rock:CampusesPicker" />
                     </div>
 
                     <a id="PagePicker"></a>
@@ -230,6 +372,16 @@
                     <a id="PersonPicker"></a>
                     <div runat="server" class="r-example">
                         <Rock:PersonPicker ID="ppExample" runat="server" Label="Rock:PersonPicker" />
+                    </div>                    
+                    
+                    <a id="PersonAndBusinessPicker"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:PersonPicker ID="ppBusinessExample" runat="server" Label="Rock:PersonPicker including businesses" IncludeBusinesses="true" />
+                    </div>
+
+                    <a id="PersonPickerEnableSelfSelection"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:PersonPicker ID="ppSelfSelect" runat="server" Label="Rock:PersonPicker with Self Selection" EnableSelfSelection="true" />
                     </div>
 
                     <a id="AccountPicker"></a>
@@ -258,8 +410,18 @@
                     </div>
 
                     <a id="GroupRolePicker"></a>
-                    <div id="Div1" runat="server" class="r-example">
+                    <div runat="server" class="r-example">
                         <Rock:GroupRolePicker ID="grpExample" runat="server" Label="Rock:GroupRolePicker" />
+                    </div>
+                    
+                    <a id="WorkflowActionPicker"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:WorkflowActionTypePicker ID="wfatpExample" runat="server" Label="Rock:WorkflowActionTypePicker" />
+                    </div>
+
+                    <a id="WorkflowTypePicker"></a>
+                    <div runat="server" class="r-example">
+                        <Rock:WorkflowTypePicker ID="wftpExample" runat="server" Label="Rock:WorkflowTypePicker" />
                     </div>
 
                     <a id="Other"></a>
@@ -277,7 +439,7 @@
 
                     <a id="GeoPickerPolygon"></a>
                     <div runat="server" class="r-example">
-                        <Rock:GeoPicker ID="geopExamplePolygon" runat="server" Label="Rock:GeoPicker (Polygon mode)" DrawingMode="Polygon" Help="You can set the style of this through the 'Map Style' block attribute." />
+                        <Rock:GeoPicker ID="geopExamplePolygon" runat="server" Label="Rock:GeoPicker (Polygon mode)" DrawingMode="Polygon" Help="You can set the style of this through the 'Map Style' block attribute." Warning="If you need to stipulate restrictions, use the warning property." />
                     </div>
 
                     <a id="MergeFieldPicker"></a>

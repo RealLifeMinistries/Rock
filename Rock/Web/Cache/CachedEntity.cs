@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -48,39 +48,18 @@ namespace Rock.Web.Cache
         {
             RockMemoryCache cache = RockMemoryCache.Default;
 
-            var newValue = new Lazy<TT>( valueFactory );
-
-            var oldValue = cache.AddOrGetExisting( key, newValue, new CacheItemPolicy() ) as Lazy<TT>;
-            try
+            object cacheValue = cache.Get( key );
+            if ( cacheValue != null )
             {
-                return ( oldValue ?? newValue ).Value;
+                return (TT)cacheValue;
             }
-            catch
+
+            TT value = valueFactory();
+            if ( value != null )
             {
-                cache.Remove( key );
-                throw;
+                cache.Set( key, value, new CacheItemPolicy() );
             }
-        }
-
-        /// <summary>
-        /// Gets an item as a Lazy type
-        /// </summary>
-        /// <typeparam name="TT">The type of the t.</typeparam>
-        /// <param name="item">The item.</param>
-        /// <returns></returns>
-        public static TT AsLazy<TT>( TT item )
-        {
-            return item;
-        }
-
-        /// <summary>
-        /// Gets an integer as a Lazy integer
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <returns></returns>
-        public static int AsLazy( int item )
-        {
-            return item;
+            return value;
         }
 
         /// <summary>
@@ -93,17 +72,15 @@ namespace Rock.Web.Cache
         {
             RockMemoryCache cache = RockMemoryCache.Default;
 
-            var newValue = new Lazy<int>( valueFactory );
-            var oldValue = cache.AddOrGetExisting( key, newValue, new CacheItemPolicy() ) as Lazy<int>;
-            try
+            object cacheValue = cache.Get( key );
+            if ( cacheValue != null )
             {
-                return ( oldValue ?? newValue ).Value;
+                return (int)cacheValue;
             }
-            catch
-            {
-                cache.Remove( key );
-                throw;
-            }
+
+            int value = valueFactory();
+            cache.Set( key, value, new CacheItemPolicy() );
+            return value;
         }
 
         /// <summary>
@@ -116,17 +93,18 @@ namespace Rock.Web.Cache
         {
             RockMemoryCache cache = RockMemoryCache.Default;
 
-            var newValue = new Lazy<List<int>>( valueFactory );
-            var oldValue = cache.AddOrGetExisting( key, newValue, new CacheItemPolicy() ) as Lazy<List<int>>;
-            try
+            var value = cache.Get( key ) as List<int>;
+            if ( value != null )
             {
-                return ( oldValue ?? newValue ).Value;
+                return value;
             }
-            catch
+
+            value = valueFactory();
+            if ( value != null )
             {
-                cache.Remove( key );
-                throw;
+                cache.Set( key, value, new CacheItemPolicy() );
             }
+            return value;
         }
 
         /// <summary>
@@ -181,6 +159,33 @@ namespace Rock.Web.Cache
         public virtual Guid Guid { get; set; }
 
         /// <summary>
+        /// Gets or sets an optional int foreign identifier.  This can be used for importing or syncing data to a foreign system
+        /// </summary>
+        /// <value>
+        /// The foreign identifier.
+        /// </value>
+        [DataMember]
+        public int? ForeignId { get; set; }
+
+        /// <summary>
+        /// Gets or sets an optional Guid foreign identifier.  This can be used for importing or syncing data to a foreign system
+        /// </summary>
+        /// <value>
+        /// The foreign identifier.
+        /// </value>
+        [DataMember]
+        public Guid? ForeignGuid { get; set; }
+
+        /// <summary>
+        /// Gets or sets an optional string foreign identifier.  This can be used for importing or syncing data to a foreign system
+        /// </summary>
+        /// <value>
+        /// The foreign identifier.
+        /// </value>
+        [DataMember]
+        public string ForeignKey { get; set; }
+
+        /// <summary>
         /// Copies from model.
         /// </summary>
         /// <param name="model">The model.</param>
@@ -188,9 +193,12 @@ namespace Rock.Web.Cache
         {
             this.Id = model.Id;
             this.Guid = model.Guid;
+            this.ForeignId = model.ForeignId;
+            this.ForeignGuid = model.ForeignGuid;
+            this.ForeignKey = model.ForeignKey;
 
             RockMemoryCache cache = RockMemoryCache.Default;
-            cache.Set( model.Guid.ToString(), new Lazy<int>( () => AsLazy( model.Id ) ), new CacheItemPolicy() );
+            cache.Set( model.Guid.ToString(), model.Id, new CacheItemPolicy() );
         }
 
     }

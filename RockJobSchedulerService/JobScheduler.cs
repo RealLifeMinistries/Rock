@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -31,6 +31,8 @@ using Quartz.Impl.Matchers;
 using Rock.Jobs;
 using Rock.Model;
 using Rock.Data;
+using System.Timers;
+using Rock.Transactions;
 
 namespace RockJobSchedulerService
 {
@@ -41,6 +43,9 @@ namespace RockJobSchedulerService
     {
         // global Quartz scheduler for jobs
         IScheduler sched = null;
+        private Timer _timer;
+
+        private bool _queueInUse = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="JobScheduler"/> class.
@@ -60,6 +65,10 @@ namespace RockJobSchedulerService
         protected override void OnStart( string[] args )
         {
             StartJobScheduler();
+
+            _timer = new Timer( 1000 * 60 ); // every minute
+            _timer.Elapsed += new System.Timers.ElapsedEventHandler( timer_Elapsed );
+            _timer.Start();
         }
 
         /// <summary>
@@ -99,28 +108,44 @@ namespace RockJobSchedulerService
 
             foreach ( ServiceJob job in activeJobs )
             {
+                const string errorLoadingStatus = "Error Loading Job";
                 try
                 {
                     IJobDetail jobDetail = jobService.BuildQuartzJob( job );
                     ITrigger jobTrigger = jobService.BuildQuartzTrigger( job );
 
                     sched.ScheduleJob( jobDetail, jobTrigger );
+
+                    //// if the last status was an error, but we now loaded successful, clear the error
+                    // also, if the last status was 'Running', clear that status because it would have stopped if the app restarted
+                    if ( job.LastStatus == errorLoadingStatus || job.LastStatus == "Running" )
+                    {
+                        job.LastStatusMessage = string.Empty;
+                        job.LastStatus = string.Empty;
+                        rockContext.SaveChanges();
+                    }
                 }
                 catch ( Exception ex )
                 {
-                    // get path to the services directory
+                    ExceptionLogService.LogException( ex, null );
+                         
+                     // get path to the services directory
                     string path = System.Reflection.Assembly.GetExecutingAssembly().Location;
                     path = System.IO.Path.GetDirectoryName( path );
-
-                    // create a friendly error message
-                    string message = string.Format( "Error loading the job: {0}.  Ensure that the correct version of the job's assembly ({1}.dll) in the services directory ({2}) of your server.", job.Name, job.Assembly, path );
-                    message = message + "\n\n\n\n" + ex.Message;
-                    //throw new JobLoadFailedException( message );
+                
+                    // create the error message
+                    string message = string.Format( "Error loading the job: {0}.\n\n{1}\n\n Job Assembly: {2}, Path: {3}", job.Name, ex.Message, job.Assembly, path );
                     job.LastStatusMessage = message;
-                    job.LastStatus = "Error Loading Job";
-
+                    job.LastStatus = errorLoadingStatus;
                     rockContext.SaveChanges();
                 }
+
+                // set up the listener to report back from jobs as they complete
+                sched.ListenerManager.AddJobListener( new RockJobListener(), EverythingMatcher<JobKey>.AllJobs() );
+
+                // start the scheduler
+                sched.Start();
+
             }
 
             // set up the listener to report back from jobs as they complete
@@ -135,9 +160,54 @@ namespace RockJobSchedulerService
         /// </summary>
         protected override void OnStop()
         {
+            _timer.Stop();
+            DrainTransactionQueue();
+
             if ( sched != null )
             {
-                sched.Shutdown();
+                sched.Shutdown( false );
+            }
+        }
+
+        /// <summary>
+        /// Handles the Elapsed event of the timer control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        void timer_Elapsed( object sender, EventArgs e )
+        {
+            _timer.Stop();
+
+            DrainTransactionQueue();
+
+            _timer.Start();
+        }
+
+        private void DrainTransactionQueue()
+        {
+            if ( !_queueInUse )
+            {
+                _queueInUse = true;
+
+                while ( RockQueue.TransactionQueue.Count != 0 )
+                {
+                    ITransaction transaction;
+                    if ( RockQueue.TransactionQueue.TryDequeue( out transaction ) )
+                    {
+                        if ( transaction != null )
+                        {
+                            try
+                            {
+                                transaction.Execute();
+                            }
+                            catch ( Exception ex )
+                            {
+                                ExceptionLogService.LogException( new Exception( string.Format( "Exception in Global.DrainTransactionQueue(): {0}", transaction.GetType().Name ), ex ), null, null, null, null );
+                            }
+                        }
+                    }
+                }
+                _queueInUse = false;
             }
         }
     }

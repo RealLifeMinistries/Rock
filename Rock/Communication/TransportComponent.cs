@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
+using System.Net.Mail;
 using Rock.Extension;
 using Rock.Model;
 using Rock.Web.Cache;
@@ -76,7 +76,33 @@ namespace Rock.Communication
         /// <param name="body">The body.</param>
         /// <param name="appRoot">The application root.</param>
         /// <param name="themeRoot">The theme root.</param>
-        public abstract void Send( List<string> recipients, string from, string subject, string body, string appRoot = null, string themeRoot = null );
+        public abstract void Send(List<string> recipients, string from, string subject, string body, string appRoot = null, string themeRoot = null);
+
+        /// <summary>
+        /// Sends the specified recipients.
+        /// </summary>
+        /// <param name="recipients">The recipients.</param>
+        /// <param name="from">From.</param>
+        /// <param name="subject">The subject.</param>
+        /// <param name="body">The body.</param>
+        /// <param name="appRoot">The application root.</param>
+        /// <param name="themeRoot">The theme root.</param>
+        /// /// <param name="attachments">Attachments.</param>
+        public abstract void Send(List<string> recipients, string from, string subject, string body, string appRoot = null, string themeRoot = null, List<Attachment> attachments = null);
+
+
+        /// <summary>
+        /// Sends the specified recipients.
+        /// </summary>
+        /// <param name="recipients">The recipients.</param>
+        /// <param name="from">From.</param>
+        /// <param name="fromName">From name.</param>
+        /// <param name="subject">The subject.</param>
+        /// <param name="body">The body.</param>
+        /// <param name="appRoot">The application root.</param>
+        /// <param name="themeRoot">The theme root.</param>
+        /// <param name="attachments">The attachments.</param>
+        public abstract void Send( List<string> recipients, string from, string fromName, string subject, string body, string appRoot = null, string themeRoot = null, List<Attachment> attachments = null );
     }
    
 }

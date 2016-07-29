@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,20 +20,94 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Web.UI;
 using System.Web.UI.WebControls;
-
 using Rock.Data;
 using Rock.Model;
+using Rock.Reporting;
 using Rock.Web.Cache;
 using Rock.Web.UI.Controls;
 
 namespace Rock.Field.Types
 {
     /// <summary>
-    /// Field Type to select a single (or null) CampusFieldType
+    /// Field Type to select a single (or null) Campus
     /// Stored as Campus's Guid
     /// </summary>
     public class CampusFieldType : FieldType, IEntityFieldType
     {
+
+        #region Configuration
+
+        private const string INCLUDE_INACTIVE_KEY = "includeInactive";
+
+        /// <summary>
+        /// Returns a list of the configuration keys
+        /// </summary>
+        /// <returns></returns>
+        public override List<string> ConfigurationKeys()
+        {
+            var configKeys = base.ConfigurationKeys();
+            configKeys.Add( INCLUDE_INACTIVE_KEY );
+            return configKeys;
+        }
+
+        /// <summary>
+        /// Creates the HTML controls required to configure this type of field
+        /// </summary>
+        /// <returns></returns>
+        public override List<Control> ConfigurationControls()
+        {
+            var controls = base.ConfigurationControls();
+
+            // Add checkbox for deciding if the list should include inactive items
+            var cb = new RockCheckBox();
+            controls.Add( cb );
+            cb.AutoPostBack = true;
+            cb.CheckedChanged += OnQualifierUpdated;
+            cb.Label = "Include Inactive";
+            cb.Text = "Yes";
+            cb.Help = "When set, inactive campuses will be included in the list.";
+
+            return controls;
+        }
+
+        /// <summary>
+        /// Gets the configuration value.
+        /// </summary>
+        /// <param name="controls">The controls.</param>
+        /// <returns></returns>
+        public override Dictionary<string, ConfigurationValue> ConfigurationValues( List<Control> controls )
+        {
+            Dictionary<string, ConfigurationValue> configurationValues = new Dictionary<string, ConfigurationValue>();
+            configurationValues.Add( INCLUDE_INACTIVE_KEY, new ConfigurationValue( "Include Inactive", "When set, inactive campuses will be included in the list.", string.Empty ) );
+
+            if ( controls != null )
+            {
+                if ( controls.Count > 0 && controls[0] != null && controls[0] is CheckBox )
+                {
+                    configurationValues[INCLUDE_INACTIVE_KEY].Value = ( (CheckBox)controls[0] ).Checked.ToString();
+                }
+            }
+
+            return configurationValues;
+        }
+
+        /// <summary>
+        /// Sets the configuration value.
+        /// </summary>
+        /// <param name="controls"></param>
+        /// <param name="configurationValues"></param>
+        public override void SetConfigurationValues( List<Control> controls, Dictionary<string, ConfigurationValue> configurationValues )
+        {
+            if ( controls != null && configurationValues != null )
+            {
+                if ( controls.Count > 0 && controls[0] != null && controls[0] is CheckBox && configurationValues.ContainsKey( INCLUDE_INACTIVE_KEY ) )
+                {
+                    ( (CheckBox)controls[0] ).Checked = configurationValues[INCLUDE_INACTIVE_KEY].Value.AsBoolean();
+                }
+            }
+        }
+
+        #endregion
 
         #region Formatting
 
@@ -77,7 +151,13 @@ namespace Rock.Field.Types
         {
             var campusPicker = new CampusPicker { ID = id };
 
-            var campusList = CampusCache.All();
+            var allCampuses = CampusCache.All();
+
+            bool includeInactive = ( configurationValues != null && configurationValues.ContainsKey( INCLUDE_INACTIVE_KEY ) && configurationValues[INCLUDE_INACTIVE_KEY].Value.AsBoolean() );
+
+            var campusList = allCampuses
+                .Where( c => !c.IsActive.HasValue || c.IsActive.Value || includeInactive )
+                .ToList();
 
             if ( campusList.Any() )
             {
@@ -145,14 +225,19 @@ namespace Rock.Field.Types
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
-        /// <param name="required"></param>
+        /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        public override Control FilterCompareControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
         {
             var lbl = new Label();
             lbl.ID = string.Format( "{0}_lIs", id );
             lbl.AddCssClass( "data-view-filter-label" );
             lbl.Text = "Is";
+            
+            // hide the compare control when in SimpleFilter mode
+            lbl.Visible = filterMode != FilterMode.SimpleFilter;
+            
             return lbl;
         }
 
@@ -161,9 +246,10 @@ namespace Rock.Field.Types
         /// </summary>
         /// <param name="configurationValues">The configuration values.</param>
         /// <param name="id">The identifier.</param>
-        /// <param name="required"></param>
+        /// <param name="required">if set to <c>true</c> [required].</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override Control FilterValueControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required )
+        public override Control FilterValueControl( Dictionary<string, ConfigurationValue> configurationValues, string id, bool required, FilterMode filterMode )
         {
             var cbList = new RockCheckBoxList();
             cbList.ID = string.Format( "{0}_cbList", id );
@@ -186,11 +272,26 @@ namespace Rock.Field.Types
         }
 
         /// <summary>
+        /// Formats the filter value value.
+        /// </summary>
+        /// <param name="configurationValues">The configuration values.</param>
+        /// <param name="value">The value.</param>
+        /// <returns></returns>
+        public override string FormatFilterValueValue( Dictionary<string, ConfigurationValue> configurationValues, string value )
+        {
+            var campusGuids = value.SplitDelimitedValues().AsGuidList();
+
+            var campuses = campusGuids.Select( a => CampusCache.Read( a ) ).Where( c => c != null );
+            return campuses.Select( a => a.Name ).ToList().AsDelimited( ", ", " or " );
+        }
+
+        /// <summary>
         /// Gets the filter compare value.
         /// </summary>
         /// <param name="control">The control.</param>
+        /// <param name="filterMode">The filter mode.</param>
         /// <returns></returns>
-        public override string GetFilterCompareValue( Control control )
+        public override string GetFilterCompareValue( Control control, FilterMode filterMode )
         {
             return null;
         }

@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -130,7 +130,7 @@ namespace Rock.Web.Cache
                 this.ApiId = RestAction.ApiId;
                 this.Path = RestAction.Path;
 
-                SetCache( RestAction.ApiId, new Lazy<int>( () => AsLazy( model.Id ) ), new CacheItemPolicy() );
+                SetCache( RestAction.ApiId, model.Id, new CacheItemPolicy() );
             }
         }
 
@@ -182,11 +182,11 @@ namespace Rock.Web.Cache
 
         private static RestActionCache LoadById2( int id, RockContext rockContext )
         {
-            var RestActionService = new RestActionService( rockContext );
-            var RestActionModel = RestActionService.Get( id );
-            if ( RestActionModel != null )
+            var restActionService = new RestActionService( rockContext );
+            var restActionModel = restActionService.Get( id );
+            if ( restActionModel != null )
             {
-                return new RestActionCache( RestActionModel );
+                return new RestActionCache( restActionModel );
             }
 
             return null;
@@ -303,10 +303,10 @@ namespace Rock.Web.Cache
         {
             if ( id.HasValue )
             {
-                var RestAction = Read( id.Value );
-                if ( RestAction != null )
+                var restAction = Read( id.Value );
+                if ( restAction != null )
                 {
-                    return RestAction.Method;
+                    return restAction.Method;
                 }
             }
 

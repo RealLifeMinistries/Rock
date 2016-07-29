@@ -5,13 +5,13 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 // <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,6 +52,12 @@ namespace Rock.Model
         {
             errorMessage = string.Empty;
  
+            if ( new Service<ConnectionRequest>( Context ).Queryable().Any( a => a.AssignedGroupId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", Group.FriendlyTypeName, ConnectionRequest.FriendlyTypeName );
+                return false;
+            }  
+ 
             if ( new Service<FinancialPersonSavedAccount>( Context ).Queryable().Any( a => a.GroupId == item.Id ) )
             {
                 errorMessage = string.Format( "This {0} is assigned to a {1}.", Group.FriendlyTypeName, FinancialPersonSavedAccount.FriendlyTypeName );
@@ -63,10 +69,18 @@ namespace Rock.Model
                 errorMessage = string.Format( "This {0} contains one or more child {1}.", Group.FriendlyTypeName, Group.FriendlyTypeName.Pluralize().ToLower() );
                 return false;
             }  
+            
+            // ignoring GroupRequirement,GroupId 
  
             if ( new Service<Person>( Context ).Queryable().Any( a => a.GivingGroupId == item.Id ) )
             {
                 errorMessage = string.Format( "This {0} is assigned to a {1}.", Group.FriendlyTypeName, Person.FriendlyTypeName );
+                return false;
+            }  
+ 
+            if ( new Service<Registration>( Context ).Queryable().Any( a => a.GroupId == item.Id ) )
+            {
+                errorMessage = string.Format( "This {0} is assigned to a {1}.", Group.FriendlyTypeName, Registration.FriendlyTypeName );
                 return false;
             }  
  
@@ -112,17 +126,26 @@ namespace Rock.Model
         public static void CopyPropertiesFrom( this Group target, Group source )
         {
             target.Id = source.Id;
+            target.AddUserAccountsDuringSync = source.AddUserAccountsDuringSync;
             target.AllowGuests = source.AllowGuests;
             target.CampusId = source.CampusId;
             target.Description = source.Description;
+            target.ExitSystemEmailId = source.ExitSystemEmailId;
+            target.ForeignGuid = source.ForeignGuid;
+            target.ForeignKey = source.ForeignKey;
+            target.GroupCapacity = source.GroupCapacity;
             target.GroupTypeId = source.GroupTypeId;
             target.IsActive = source.IsActive;
+            target.IsPublic = source.IsPublic;
             target.IsSecurityRole = source.IsSecurityRole;
             target.IsSystem = source.IsSystem;
+            target.MustMeetRequirementsToAddMember = source.MustMeetRequirementsToAddMember;
             target.Name = source.Name;
             target.Order = source.Order;
             target.ParentGroupId = source.ParentGroupId;
             target.ScheduleId = source.ScheduleId;
+            target.SyncDataViewId = source.SyncDataViewId;
+            target.WelcomeSystemEmailId = source.WelcomeSystemEmailId;
             target.CreatedDateTime = source.CreatedDateTime;
             target.ModifiedDateTime = source.ModifiedDateTime;
             target.CreatedByPersonAliasId = source.CreatedByPersonAliasId;

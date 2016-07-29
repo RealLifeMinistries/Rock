@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -164,14 +164,7 @@ namespace Rock.Model
 
             set
             {
-                if ( string.IsNullOrWhiteSpace( value ) )
-                {
-                    AdditionalMergeFields = new List<string>();
-                }
-                else
-                {
-                    AdditionalMergeFields = JsonConvert.DeserializeObject<List<string>>( value );
-                }
+                AdditionalMergeFields = value.FromJsonOrNull<List<string>>() ?? new List<string>();
             }
         }
 
@@ -323,6 +316,38 @@ namespace Rock.Model
         }
 
         /// <summary>
+        /// Gets the recipient count.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public int GetRecipientCount( RockContext rockContext )
+        {
+            var count = new CommunicationRecipientService( rockContext ).Queryable().Where( a => a.CommunicationId == this.Id ).Count();
+
+            return count;
+        }
+
+        /// <summary>
+        /// Returns true if this communication has any pending recipients
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public bool HasPendingRecipients( RockContext rockContext )
+        {
+            return new CommunicationRecipientService( rockContext ).Queryable().Where( a => a.CommunicationId == this.Id && a.Status == Model.CommunicationRecipientStatus.Pending ).Any();
+        }
+
+        /// <summary>
+        /// Returns a queryable of the Recipients for this communication
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public IQueryable<CommunicationRecipient> GetRecipientsQry( RockContext rockContext )
+        {
+            return new CommunicationRecipientService( rockContext ).Queryable().Where( a => a.CommunicationId == this.Id );
+        }
+
+        /// <summary>
         /// Returns a <see cref="System.String" /> that represents this instance.
         /// </summary>
         /// <returns>
@@ -368,7 +393,7 @@ namespace Rock.Model
                 recipient = new CommunicationRecipientService( rockContext ).Queryable( "Communication,PersonAlias.Person" )
                     .Where( r =>
                         r.CommunicationId == communicationId &&
-                        ( !r.PersonAlias.Person.IsDeceased.HasValue || !r.PersonAlias.Person.IsDeceased.Value ) &&
+                        ( r.PersonAlias.Person.IsDeceased == false ) &&
                         ( r.Status == CommunicationRecipientStatus.Pending ||
                             ( r.Status == CommunicationRecipientStatus.Sending && r.ModifiedDateTime < delayTime ) ) )
                     .FirstOrDefault();

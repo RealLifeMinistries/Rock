@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,14 +61,61 @@ namespace Rock.Financial
         }
 
         /// <summary>
+        /// Gets a value indicating whether the gateway requires the name on card for CC processing
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <returns></returns>
+        /// <value>
+        ///   <c>true</c> if [name on card required]; otherwise, <c>false</c>.
+        /// </value>
+        public override bool PromptForNameOnCard( FinancialGateway financialGateway )
+        {
+            return false;
+        }
+
+        /// <summary>
+        /// Prompts the name of for bank account.
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <returns></returns>
+        public override bool PromptForBankAccountName( FinancialGateway financialGateway )
+        {
+            return false;
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether [address required].
+        /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
+        /// <returns></returns>
+        /// <value>
+        ///   <c>true</c> if [address required]; otherwise, <c>false</c>.
+        /// </value>
+        public override bool PromptForBillingAddress( FinancialGateway financialGateway )
+        {
+            return false;
+        }
+
+        /// <summary>
         /// Charges the specified payment info.
         /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="paymentInfo">The payment info.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public override FinancialTransaction Charge( PaymentInfo paymentInfo, out string errorMessage )
+        public override FinancialTransaction Charge( FinancialGateway financialGateway, PaymentInfo paymentInfo, out string errorMessage )
         {
             errorMessage = string.Empty;
+
+            CreditCardPaymentInfo ccPayment = paymentInfo as CreditCardPaymentInfo;
+            if ( ccPayment != null )
+            {
+                if ( ccPayment.Code == "911" )
+                {
+                    errorMessage = "Error processing Credit Card!";
+                    return null;
+                }
+            }
 
             var transaction = new FinancialTransaction();
             transaction.TransactionCode = "T" + RockDateTime.Now.ToString("yyyyMMddHHmmssFFF");
@@ -76,13 +123,31 @@ namespace Rock.Financial
         }
 
         /// <summary>
+        /// Credits the specified transaction.
+        /// </summary>
+        /// <param name="transaction">The transaction.</param>
+        /// <param name="amount">The amount.</param>
+        /// <param name="comment">The comment.</param>
+        /// <param name="errorMessage">The error message.</param>
+        /// <returns></returns>
+        public override FinancialTransaction Credit( FinancialTransaction transaction, decimal amount, string comment, out string errorMessage )
+        {
+            errorMessage = string.Empty;
+
+            var refundTransaction = new FinancialTransaction();
+            refundTransaction.TransactionCode = "T" + RockDateTime.Now.ToString( "yyyyMMddHHmmssFFF" );
+            return transaction;
+        }
+
+        /// <summary>
         /// Adds the scheduled payment.
         /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="schedule">The schedule.</param>
         /// <param name="paymentInfo">The payment info.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public override FinancialScheduledTransaction AddScheduledPayment( PaymentSchedule schedule, PaymentInfo paymentInfo, out string errorMessage )
+        public override FinancialScheduledTransaction AddScheduledPayment( FinancialGateway financialGateway, PaymentSchedule schedule, PaymentInfo paymentInfo, out string errorMessage )
         {
             errorMessage = string.Empty;
 
@@ -151,11 +216,12 @@ namespace Rock.Financial
         /// <summary>
         /// Gets the payments that have been processed for any scheduled transactions
         /// </summary>
+        /// <param name="financialGateway">The financial gateway.</param>
         /// <param name="startDate">The start date.</param>
         /// <param name="endDate">The end date.</param>
         /// <param name="errorMessage">The error message.</param>
         /// <returns></returns>
-        public override List<Payment> GetPayments( DateTime startDate, DateTime endDate, out string errorMessage )
+        public override List<Payment> GetPayments( FinancialGateway financialGateway, DateTime startDate, DateTime endDate, out string errorMessage )
         {
             errorMessage = string.Empty;
             return new List<Payment>();

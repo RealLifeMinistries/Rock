@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -201,6 +201,7 @@ namespace RockWeb.Blocks.Finance
             rAccountFilter.SaveUserPreference( "Account Name", txtAccountName.Text );
             rAccountFilter.SaveUserPreference( "Campus", ddlCampus.SelectedValue );
             rAccountFilter.SaveUserPreference( "Active", ddlIsActive.SelectedValue );
+            rAccountFilter.SaveUserPreference( "Public", ddlIsPublic.SelectedValue );
             rAccountFilter.SaveUserPreference( "Tax Deductible", ddlIsTaxDeductible.SelectedValue );
             BindGrid();
         }
@@ -230,6 +231,12 @@ namespace RockWeb.Blocks.Finance
             if ( int.TryParse( rAccountFilter.GetUserPreference( "Campus" ), out campusId ) )
             {
                 accountQuery = accountQuery.Where( account => account.Campus.Id == campusId );
+            }
+
+            string publicFilter = rAccountFilter.GetUserPreference( "Public" );
+            if ( !string.IsNullOrWhiteSpace( publicFilter ) )
+            {
+                accountQuery = accountQuery.Where( account => ( account.IsPublic ?? false ) == ( publicFilter == "Yes" ) );
             }
 
             string activeFilter = rAccountFilter.GetUserPreference( "Active" );
@@ -273,6 +280,7 @@ namespace RockWeb.Blocks.Finance
             }
 
             ddlIsActive.SelectedValue = rAccountFilter.GetUserPreference( "Active" );
+            ddlIsPublic.SelectedValue = rAccountFilter.GetUserPreference( "Public" );
             ddlIsTaxDeductible.SelectedValue = rAccountFilter.GetUserPreference( "Tax Deductible" );
         }
 

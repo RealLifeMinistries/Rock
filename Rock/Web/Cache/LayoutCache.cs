@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -37,9 +37,9 @@ namespace Rock.Web.Cache
         {
         }
 
-        private LayoutCache( Layout Layout )
+        private LayoutCache( Layout layout )
         {
-            CopyFromModel( Layout );
+            CopyFromModel( layout );
         }
 
         #endregion
@@ -128,12 +128,12 @@ namespace Rock.Web.Cache
 
             if ( model is Layout )
             {
-                var Layout = (Layout)model;
-                this.IsSystem = Layout.IsSystem;
-                this.SiteId = Layout.SiteId;
-                this.FileName = Layout.FileName;
-                this.Name = Layout.Name;
-                this.Description = Layout.Description;
+                var layout = (Layout)model;
+                this.IsSystem = layout.IsSystem;
+                this.SiteId = layout.SiteId;
+                this.FileName = layout.FileName;
+                this.Name = layout.Name;
+                this.Description = layout.Description;
             }
         }
 
@@ -185,12 +185,11 @@ namespace Rock.Web.Cache
 
         private static LayoutCache LoadById2( int id, RockContext rockContext )
         {
-            var LayoutService = new LayoutService( rockContext );
-            var LayoutModel = LayoutService.Get( id );
-            if ( LayoutModel != null )
+            var layoutService = new LayoutService( rockContext );
+            var layoutModel = layoutService.Get( id );
+            if ( layoutModel != null )
             {
-                LayoutModel.LoadAttributes( rockContext );
-                return new LayoutCache( LayoutModel );
+                return new LayoutCache( layoutModel );
             }
 
             return null;
@@ -263,6 +262,5 @@ namespace Rock.Web.Cache
         }
 
         #endregion
-
     }
 }

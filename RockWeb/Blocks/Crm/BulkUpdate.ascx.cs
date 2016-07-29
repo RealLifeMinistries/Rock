@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,6 +70,8 @@ namespace RockWeb.Blocks.Crm
         {
             base.OnInit( e );
 
+            var personEntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.Person ) ).Id;
+
             ddlTitle.BindToDefinedType( DefinedTypeCache.Read( new Guid( Rock.SystemGuid.DefinedType.PERSON_TITLE ) ), true );
             ddlStatus.BindToDefinedType( DefinedTypeCache.Read( new Guid( Rock.SystemGuid.DefinedType.PERSON_CONNECTION_STATUS ) ) );
             ddlMaritalStatus.BindToDefinedType( DefinedTypeCache.Read( new Guid( Rock.SystemGuid.DefinedType.PERSON_MARITAL_STATUS ) ) );
@@ -78,7 +80,43 @@ namespace RockWeb.Blocks.Crm
             ddlInactiveReason.BindToDefinedType( DefinedTypeCache.Read( new Guid( Rock.SystemGuid.DefinedType.PERSON_RECORD_STATUS_REASON ) ) );
             ddlReviewReason.BindToDefinedType( DefinedTypeCache.Read( new Guid( Rock.SystemGuid.DefinedType.PERSON_REVIEW_REASON ) ), true );
 
+            ddlTagList.Items.Clear();
+            ddlTagList.DataTextField = "Name";
+            ddlTagList.DataValueField = "Id";
+            var currentPersonAliasIds = CurrentPerson.Aliases.Select( a => a.Id ).ToList();
+
+            var tagList = new TagService( new RockContext() ).Queryable()
+                                            .Where( t =>
+                                                        t.EntityTypeId == personEntityTypeId
+                                                        && (t.OwnerPersonAliasId == null || currentPersonAliasIds.Contains( t.OwnerPersonAliasId.Value )) )
+                                            .Select( t => new   {
+                                                                    Id = t.Id,
+                                                                    Type = t.OwnerPersonAliasId == null ? "Personal Tags" : "Organization Tags",
+                                                                    Name = t.Name
+                                                                } )
+                                            .OrderByDescending(t => t.Type)
+                                            .ThenBy( t => t.Name)
+                                            .ToList();
+            foreach (var tag in tagList )
+            {
+                ListItem item = new ListItem( tag.Name, tag.Id.ToString() );
+                item.Attributes["OptionGroup"] = tag.Type;
+                ddlTagList.Items.Add( item );
+            }
+            ddlTagList.Items.Insert( 0, "" );
+
             ScriptManager.RegisterStartupScript( ddlGradePicker, ddlGradePicker.GetType(), "grade-selection-" + BlockId.ToString(), ddlGradePicker.GetJavascriptForYearPicker( ypGraduation ), true );
+
+            ddlNoteType.Items.Clear();
+            var noteTypes = NoteTypeCache.GetByEntity( personEntityTypeId, string.Empty, string.Empty, true );
+            foreach ( var noteType in noteTypes )
+            {
+                if ( noteType.UserSelectable && noteType.IsAuthorized( Rock.Security.Authorization.EDIT, CurrentPerson ) )
+                {
+                    ddlNoteType.Items.Add( new ListItem( noteType.Name, noteType.Id.ToString() ) );
+                }
+            }
+            pwNote.Visible = ddlNoteType.Items.Count > 0;
 
             string script = @"
     $('a.remove-all-individuals').click(function( e ){
@@ -337,7 +375,8 @@ namespace RockWeb.Blocks.Crm
         protected void cvSelection_ServerValidate( object source, ServerValidateEventArgs args )
         {
             int? groupId = gpGroup.SelectedValue.AsIntegerOrNull();
-            args.IsValid = SelectedFields.Any() || !string.IsNullOrWhiteSpace( tbNote.Text ) || ( groupId.HasValue && groupId > 0 ); 
+            int? tagId = ddlTagList.SelectedValue.AsIntegerOrNull();
+            args.IsValid = SelectedFields.Any() || !string.IsNullOrWhiteSpace( tbNote.Text ) || ( groupId.HasValue && groupId > 0 ) || tagId.HasValue; 
         }
 
         /// <summary>
@@ -545,10 +584,11 @@ namespace RockWeb.Blocks.Crm
 
                 #region Note
 
-                if ( !string.IsNullOrWhiteSpace( tbNote.Text ) && CurrentPerson != null )
+                if ( !string.IsNullOrWhiteSpace( tbNote.Text ) && CurrentPerson != null && ddlNoteType.SelectedItem != null )
                 {
-                    changes.Add( string.Format( "Add a <span class='field-name'>{0}Note{1}</span> of <p><span class='field-value'>{2}</span></p>.",
-                        ( cbIsPrivate.Checked ? "Private " : "" ), ( cbIsAlert.Checked ? " (Alert)" : "" ), tbNote.Text.ConvertCrLfToHtmlBr() ) );
+                    string noteTypeName = ddlNoteType.SelectedItem.Text;
+                    changes.Add( string.Format( "Add a <span class='field-name'>{0}{1}{2}</span> of <p><span class='field-value'>{3}</span></p>.",
+                        ( cbIsPrivate.Checked ? "Private " : "" ), noteTypeName, ( cbIsAlert.Checked ? " (Alert)" : "" ), tbNote.Text.ConvertCrLfToHtmlBr() ) );
                 }
 
                 #endregion
@@ -614,6 +654,16 @@ namespace RockWeb.Blocks.Crm
 
                 #endregion
 
+                #region Tag
+                if ( !string.IsNullOrWhiteSpace( ddlTagList.SelectedValue ) )
+                {
+                    changes.Add( string.Format( "{0} {1} <span class='field-name'>{2}</span> tag.", 
+                        ddlTagAction.SelectedValue,
+                        ddlTagAction.SelectedValue == "Add" ? "to" : "from",
+                        ddlTagList.SelectedItem.Text ) );
+                }
+                #endregion
+
                 StringBuilder sb = new StringBuilder();
                 sb.AppendFormat( "<p>You are about to make the following updates to {0} individuals:</p>", Individuals.Count().ToString( "N0" ) );
                 sb.AppendLine();
@@ -628,6 +678,9 @@ namespace RockWeb.Blocks.Crm
 
                 pnlEntry.Visible = false;
                 pnlConfirm.Visible = true;
+
+                ScriptManager.RegisterStartupScript( Page, this.GetType(), "ScrollPage", "ResetScrollPosition();", true );
+
 
             }
         }
@@ -675,7 +728,7 @@ namespace RockWeb.Blocks.Crm
 
                 int? newCampusId = cpCampus.SelectedCampusId;
 
-                bool? newEmailActive = null;
+                bool newEmailActive = true;
                 if ( !string.IsNullOrWhiteSpace( ddlIsEmailActive.SelectedValue ) )
                 {
                     newEmailActive = ddlIsEmailActive.SelectedValue == "Active";
@@ -756,7 +809,7 @@ namespace RockWeb.Blocks.Crm
 
                     if ( SelectedFields.Contains( ddlIsEmailActive.ClientID ) )
                     {
-                        History.EvaluateChange( changes, "Email Is Active", person.IsEmailActive ?? true, newEmailActive.Value );
+                        History.EvaluateChange( changes, "Email Is Active", person.IsEmailActive, newEmailActive );
                         person.IsEmailActive = newEmailActive;
                     }
 
@@ -861,13 +914,17 @@ namespace RockWeb.Blocks.Crm
 
                             foreach ( int id in ids.Where( id => !alreadyFollowingIds.Contains( id ) ) )
                             {
-                                var following = new Following
+                                var person = people.FirstOrDefault( p => p.Id == id );
+                                if ( person != null && person.PrimaryAliasId.HasValue )
                                 {
-                                    EntityTypeId = personAliasEntityTypeId,
-                                    EntityId = ( people.FirstOrDefault( p => p.Id == id ).PrimaryAliasId ) ?? 0,
-                                    PersonAliasId = CurrentPersonAlias.Id
-                                };
-                                followingService.Add( following );
+                                    var following = new Following
+                                    {
+                                        EntityTypeId = personAliasEntityTypeId,
+                                        EntityId = person.PrimaryAliasId.Value,
+                                        PersonAliasId = CurrentPersonAlias.Id
+                                    };
+                                    followingService.Add( following );
+                                }
                             }
                         }
                         else
@@ -997,8 +1054,7 @@ namespace RockWeb.Blocks.Crm
                     bool isAlert = cbIsAlert.Checked;
                     bool isPrivate = cbIsPrivate.Checked;
 
-                    var noteTypeService = new NoteTypeService( rockContext );
-                    var noteType = noteTypeService.Get( Rock.SystemGuid.NoteType.PERSON_TIMELINE.AsGuid() );
+                    var noteType = NoteTypeCache.Read( ddlNoteType.SelectedValueAsId() ?? 0 );
                     if ( noteType != null )
                     {
                         var notes = new List<Note>();
@@ -1012,24 +1068,13 @@ namespace RockWeb.Blocks.Crm
                             note.Caption = isPrivate ? "You - Personal Note" : string.Empty;
                             note.Text = tbNote.Text;
                             note.IsAlert = cbIsAlert.Checked;
-                            note.NoteType = noteType;
+                            note.IsPrivateNote = isPrivate;
+                            note.NoteTypeId = noteType.Id;
                             notes.Add( note );
                             noteService.Add( note );
                         }
 
-                        rockContext.WrapTransaction( () =>
-                        {
-                            rockContext.SaveChanges();
-                            foreach ( var note in notes )
-                            {
-                                note.AllowPerson( Authorization.EDIT, CurrentPerson, rockContext );
-                                if ( isPrivate )
-                                {
-                                    note.MakePrivate( Authorization.VIEW, CurrentPerson, rockContext );
-                                }
-                            }
-                        } );
-
+                        rockContext.SaveChanges();
                     }
                 }
 
@@ -1045,17 +1090,35 @@ namespace RockWeb.Blocks.Crm
                     {
                         var groupMemberService = new GroupMemberService( rockContext );
 
-                        var existingMembers = groupMemberService.Queryable( "Group" )
-                            .Where( m =>
-                                m.GroupId == group.Id &&
-                                ids.Contains( m.PersonId ) )
-                            .ToList();
+                        var existingMembersQuery = groupMemberService.Queryable("Group")
+                                                                     .Where(m => m.GroupId == group.Id
+                                                                                 && ids.Contains(m.PersonId));
 
                         string action = ddlGroupAction.SelectedValue;
                         if ( action == "Remove" )
                         {
-                            groupMemberService.DeleteRange( existingMembers );
-                            rockContext.SaveChanges();
+                            var existingIds = existingMembersQuery.Select( gm => gm.Id ).Distinct().ToList();
+
+                            Action<RockContext, List<int>> deleteAction = (context, items) =>
+                                                                                  {
+                                                                                      // Load the batch of GroupMember items into the context and delete them.
+                                                                                      groupMemberService = new GroupMemberService(context);
+
+                                                                                      var batchGroupMembers = groupMemberService.Queryable().Where(x => items.Contains(x.Id)).ToList();
+
+                                                                                      // also unregister them from any registration groups
+                                                                                      RegistrationRegistrantService registrantService = new RegistrationRegistrantService( context );
+                                                                                      foreach ( var registrant in registrantService.Queryable().Where( r => r.GroupMemberId.HasValue && items.Contains( r.GroupMemberId.Value ) ) )
+                                                                                      {
+                                                                                         registrant.GroupMemberId = null;
+                                                                                      }
+                                                                                      
+                                                                                      groupMemberService.DeleteRange( batchGroupMembers );
+                                                                                      
+                                                                                      context.SaveChanges();
+                                                                                  };
+
+                            ProcessBatchUpdate( existingIds, 50, deleteAction );
                         }
                         else
                         {
@@ -1086,19 +1149,30 @@ namespace RockWeb.Blocks.Crm
                                 {
                                     var newGroupMembers = new List<GroupMember>();
 
-                                    var existingIds = existingMembers.Select( m => m.PersonId ).Distinct().ToList();
-                                    foreach ( int id in ids.Where( id => !existingIds.Contains( id ) ) )
-                                    {
-                                        var groupMember = new GroupMember();
-                                        groupMember.GroupId = group.Id;
-                                        groupMember.GroupRoleId = roleId.Value;
-                                        groupMember.GroupMemberStatus = status;
-                                        groupMember.PersonId = id;
-                                        groupMemberService.Add( groupMember );
-                                        newGroupMembers.Add( groupMember );
-                                    }
+                                    var existingIds = existingMembersQuery.Select( m => m.PersonId ).Distinct().ToList();
+                                    
+                                    var personKeys = ids.Where(id => !existingIds.Contains(id)).ToList();
 
-                                    rockContext.SaveChanges();
+                                    Action<RockContext, List<int>> addAction = ( context, items ) =>
+                                    {
+                                        groupMemberService = new GroupMemberService( context );
+                                        
+                                        foreach ( int id in items )
+                                        {
+                                            var groupMember = new GroupMember();
+                                            groupMember.GroupId = group.Id;
+                                            groupMember.GroupRoleId = roleId.Value;
+                                            groupMember.GroupMemberStatus = status;
+                                            groupMember.PersonId = id;
+                                            groupMemberService.Add(groupMember);
+                                            
+                                            newGroupMembers.Add(groupMember);
+                                        }
+
+                                        context.SaveChanges();
+                                    };
+
+                                    ProcessBatchUpdate( personKeys, 50, addAction );
 
                                     if ( selectedGroupAttributes.Any() )
                                     {
@@ -1116,9 +1190,9 @@ namespace RockWeb.Blocks.Crm
                             {
                                 if ( SelectedFields.Contains( ddlGroupRole.ClientID ) && roleId.HasValue )
                                 {
-                                    foreach ( var member in existingMembers.Where( m => m.GroupRoleId != roleId.Value ) )
+                                    foreach ( var member in existingMembersQuery.Where( m => m.GroupRoleId != roleId.Value ) )
                                     {
-                                        if ( !existingMembers.Where( m => m.PersonId == member.PersonId && m.GroupRoleId == roleId.Value ).Any() )
+                                        if ( !existingMembersQuery.Any( m => m.PersonId == member.PersonId && m.GroupRoleId == roleId.Value ) )
                                         {
                                             member.GroupRoleId = roleId.Value;
                                         }
@@ -1127,7 +1201,7 @@ namespace RockWeb.Blocks.Crm
 
                                 if ( SelectedFields.Contains( ddlGroupMemberStatus.ClientID ) )
                                 {
-                                    foreach ( var member in existingMembers )
+                                    foreach ( var member in existingMembersQuery )
                                     {
                                         member.GroupMemberStatus = status;
                                     }
@@ -1137,13 +1211,23 @@ namespace RockWeb.Blocks.Crm
 
                                 if ( selectedGroupAttributes.Any() )
                                 {
-                                    foreach ( var groupMember in existingMembers )
+                                    Action<RockContext, List<GroupMember>> updateAction = ( context, items ) =>
                                     {
-                                        foreach ( var attribute in selectedGroupAttributes )
+                                        foreach ( var groupMember in items )
                                         {
-                                            Rock.Attribute.Helper.SaveAttributeValue( groupMember, attribute, selectedGroupAttributeValues[attribute.Key], rockContext );
+                                            foreach (var attribute in selectedGroupAttributes)
+                                            {
+                                                Rock.Attribute.Helper.SaveAttributeValue( groupMember, attribute, selectedGroupAttributeValues[attribute.Key], context );
+                                            }
                                         }
-                                    }
+
+                                        context.SaveChanges();
+                                    };
+
+                                    // Process the Attribute updates in batches.
+                                    var existingMembers = existingMembersQuery.ToList();
+
+                                    ProcessBatchUpdate( existingMembers, 50, updateAction );
                                 }
                             }
                         }
@@ -1152,12 +1236,84 @@ namespace RockWeb.Blocks.Crm
 
                 #endregion
 
-                pnlEntry.Visible = false;
+                #region Tag
+                var personEntityTypeId = EntityTypeCache.Read( typeof( Rock.Model.Person ) ).Id;
+
+                if ( !string.IsNullOrWhiteSpace( ddlTagList.SelectedValue ) )
+                {
+                    int tagId = ddlTagList.SelectedValue.AsInteger();
+                    var taggedItemService = new TaggedItemService( rockContext );
+
+                    // get guids of selected individuals
+                    var personGuids = new PersonService( rockContext ).Queryable()
+                                        .Where( p =>
+                                            ids.Contains( p.Id ) )
+                                        .Select( p => p.Guid )
+                                        .ToList();
+                        
+                    if ( ddlTagAction.SelectedValue == "Add" )
+                    {
+                        foreach ( var personGuid in personGuids )
+                        {
+                            if ( !taggedItemService.Queryable().Where( t => t.TagId == tagId && t.EntityGuid == personGuid ).Any() )
+                            {
+                                TaggedItem taggedItem = new TaggedItem();
+                                taggedItem.TagId = tagId;
+                                taggedItem.EntityGuid = personGuid;
+
+                                taggedItemService.Add( taggedItem );
+                                rockContext.SaveChanges();
+                            }
+                        }
+                    }
+                    else // remove
+                    {
+                        foreach(var personGuid in personGuids )
+                        {
+                            var taggedPerson = taggedItemService.Queryable().Where( t => t.TagId == tagId && t.EntityGuid == personGuid ).FirstOrDefault();
+                            if (taggedPerson != null )
+                            {
+                                taggedItemService.Delete( taggedPerson );
+                            }
+                        }
+                        rockContext.SaveChanges();
+                    }
+                }
+                #endregion
+
+                    pnlEntry.Visible = false;
                 pnlConfirm.Visible = false;
 
-                nbResult.Text = string.Format( "{0} {1} succesfully updated.",
+                nbResult.Text = string.Format( "{0} {1} successfully updated.",
                     ids.Count().ToString( "N0" ), ( ids.Count() > 1 ? "people were" : "person was" ) ); ;
                 pnlResult.Visible = true;
+            }
+        }
+
+        /// <summary>
+        /// Process database updates for the supplied list of items in batches to improve performance for large datasets.
+        /// </summary>
+        /// <param name="itemsToProcess"></param>
+        /// <param name="batchSize"></param>
+        /// <param name="processingAction"></param>
+        private void ProcessBatchUpdate<TListItem>( List<TListItem> itemsToProcess, int batchSize, Action<RockContext, List<TListItem>> processingAction )
+        {
+            int remainingCount = itemsToProcess.Count();
+
+            int batchesProcessed = 0;
+
+            while (remainingCount > 0)
+            {
+                var batchItems = itemsToProcess.Skip(batchesProcessed * batchSize).Take( batchSize ).ToList();
+                                
+                using (var batchContext = new RockContext())
+                {
+                    processingAction.Invoke(batchContext, batchItems);
+                }
+
+                batchesProcessed++;
+
+                remainingCount -= batchItems.Count();
             }
         }
 
@@ -1311,7 +1467,7 @@ namespace RockWeb.Blocks.Crm
                         string labelText = string.Format( "<span class='js-select-item'><i class='fa {0}'></i></span> {1}", iconCss, attributeCache.Name );
                         Control control = attributeCache.AddControl( pw.Controls, string.Empty, string.Empty, setValues, true, false, labelText );
 
-                        if ( !( control is RockCheckBox ) )
+                        if ( !( control is RockCheckBox ) && !( control is PersonPicker ) )
                         {
                             var webControl = control as WebControl;
                             if ( webControl != null )

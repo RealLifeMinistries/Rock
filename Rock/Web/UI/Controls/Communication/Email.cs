@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,10 +33,10 @@ namespace Rock.Web.UI.Controls.Communication
         #region UI Controls
 
         private RockTextBox tbFromName;
-        private RockTextBox tbFromAddress;
+        private EmailBox ebFromAddress;
         private RockLiteral lFromName;
         private RockLiteral lFromAddress;
-        private RockTextBox tbReplyToAddress;
+        private EmailBox ebReplyToAddress;
         private RockTextBox tbSubject;
         private HtmlEditor htmlMessage;
         private RockTextBox tbTextMessage;
@@ -72,8 +72,8 @@ namespace Rock.Web.UI.Controls.Communication
                 EnsureChildControls();
                 var data = new Dictionary<string, string>();
                 data.Add( "FromName", tbFromName.Text );
-                data.Add( "FromAddress", tbFromAddress.Text );
-                data.Add( "ReplyTo", tbReplyToAddress.Text );
+                data.Add( "FromAddress", ebFromAddress.Text );
+                data.Add( "ReplyTo", ebReplyToAddress.Text );
                 data.Add( "Subject", tbSubject.Text );
                 data.Add( "HtmlMessage", htmlMessage.Text );
                 data.Add( "TextMessage", tbTextMessage.Text );
@@ -85,8 +85,8 @@ namespace Rock.Web.UI.Controls.Communication
             {
                 EnsureChildControls();
                 tbFromName.Text = GetDataValue( value, "FromName" );
-                tbFromAddress.Text = GetDataValue( value, "FromAddress" );
-                tbReplyToAddress.Text = GetDataValue( value, "ReplyTo" );
+                ebFromAddress.Text = GetDataValue( value, "FromAddress" );
+                ebReplyToAddress.Text = GetDataValue( value, "ReplyTo" );
                 tbSubject.Text = GetDataValue( value, "Subject" ); ;
                 htmlMessage.Text = GetDataValue( value, "HtmlMessage" );
                 tbTextMessage.Text = GetDataValue( value, "TextMessage" );
@@ -168,20 +168,20 @@ namespace Rock.Web.UI.Controls.Communication
             lFromName.Label = "From Name";
             Controls.Add( lFromName );
 
-            tbFromAddress = new RockTextBox();
-            tbFromAddress.ID = string.Format( "tbFromAddress_{0}", this.ID );
-            tbFromAddress.Label = "From Address";
-            Controls.Add( tbFromAddress );
+            ebFromAddress = new EmailBox();
+            ebFromAddress.ID = string.Format( "ebFromAddress_{0}", this.ID );
+            ebFromAddress.Label = "From Address";
+            Controls.Add( ebFromAddress );
 
             lFromAddress = new RockLiteral();
             lFromAddress.ID = string.Format( "lFromAddress_{0}", this.ID );
             lFromAddress.Label = "From Address";
             Controls.Add( lFromAddress );
 
-            tbReplyToAddress = new RockTextBox();
-            tbReplyToAddress.ID = string.Format( "tbReplyToAddress_{0}", this.ID );
-            tbReplyToAddress.Label = "Reply To Address";
-            Controls.Add( tbReplyToAddress );
+            ebReplyToAddress = new EmailBox();
+            ebReplyToAddress.ID = string.Format( "ebReplyToAddress_{0}", this.ID );
+            ebReplyToAddress.Label = "Reply To Address";
+            Controls.Add( ebReplyToAddress );
 
             tbSubject = new RockTextBox();
             tbSubject.ID = string.Format( "tbSubject_{0}", this.ID );
@@ -234,7 +234,8 @@ namespace Rock.Web.UI.Controls.Communication
             {
                 EnsureChildControls();
                 tbFromName.ValidationGroup = value;
-                tbFromAddress.ValidationGroup = value;
+                ebFromAddress.ValidationGroup = value;
+                ebReplyToAddress.ValidationGroup = value;
                 tbSubject.ValidationGroup = value;
             }
         }
@@ -253,9 +254,9 @@ namespace Rock.Web.UI.Controls.Communication
                 lFromName.Text = sender.FullName;
             }
 
-            if ( string.IsNullOrEmpty( tbFromAddress.Text ) )
+            if ( string.IsNullOrEmpty( ebFromAddress.Text ) )
             {
-                tbFromAddress.Text = sender.Email;
+                ebFromAddress.Text = sender.Email;
                 lFromAddress.Text = sender.Email;
             }
         }
@@ -267,7 +268,7 @@ namespace Rock.Web.UI.Controls.Communication
         public override void RenderControl( HtmlTextWriter writer )
         {
             tbFromName.Required = !IsTemplate;
-            tbFromAddress.Required = !IsTemplate;
+            ebFromAddress.Required = !IsTemplate;
             tbSubject.Required = !IsTemplate;
 
             writer.AddAttribute( HtmlTextWriterAttribute.Class, "row" );
@@ -279,8 +280,8 @@ namespace Rock.Web.UI.Controls.Communication
             if ( !UseSimpleMode )
             {
                 tbFromName.RenderControl( writer );
-                tbFromAddress.RenderControl( writer );
-                tbReplyToAddress.RenderControl( writer );
+                ebFromAddress.RenderControl( writer );
+                ebReplyToAddress.RenderControl( writer );
             }
             else
             {
@@ -407,6 +408,24 @@ function removeAttachment(source, hf, fileId)
     $(source).closest($('li')).remove();
 }";
             ScriptManager.RegisterStartupScript( this, this.GetType(), "removeAttachment", script, true );
+        }
+
+        /// <summary>
+        /// Called when [communication save].
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        public override void OnCommunicationSave( RockContext rockContext )
+        {
+            var binaryFileIds = hfAttachments.Value.SplitDelimitedValues().AsIntegerList();
+            if ( binaryFileIds.Any() )
+            {
+                var binaryFileService = new BinaryFileService( rockContext );
+                foreach( var binaryFile in binaryFileService.Queryable()
+                    .Where( f => binaryFileIds.Contains( f.Id ) ) )
+                {
+                    binaryFile.IsTemporary = false;
+                }
+            }
         }
 
         #endregion

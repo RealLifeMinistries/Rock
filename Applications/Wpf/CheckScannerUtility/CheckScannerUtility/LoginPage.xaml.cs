@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ using System.Net;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using Rock.Model;
+using Rock.Client;
 using Rock.Net;
 
 namespace Rock.Apps.CheckScannerUtility
@@ -70,6 +70,13 @@ namespace Rock.Apps.CheckScannerUtility
             string userName = txtUsername.Text;
             string password = txtPassword.Password;
 
+            if ( string.IsNullOrWhiteSpace( userName ) )
+            {
+                lblLoginWarning.Content = "Username cannot be blank";
+                lblLoginWarning.Visibility = Visibility.Visible;
+                return;
+            }
+
             // start a background thread to Login since this could take a little while and we want a Wait cursor
             BackgroundWorker bw = new BackgroundWorker();
             bw.DoWork += delegate( object s, DoWorkEventArgs ee )
@@ -91,7 +98,6 @@ namespace Rock.Apps.CheckScannerUtility
                     }
 
                     Person person = rockRestClient.GetData<Person>( string.Format( "api/People/GetByUserName/{0}", userName ) );
-                    person.Aliases = rockRestClient.GetData<List<PersonAlias>>( "api/PersonAlias/", "PersonId eq " + person.Id );
                     RockConfig rockConfig = RockConfig.Load();
                     rockConfig.RockBaseUrl = txtRockUrl.Text;
                     rockConfig.Username = txtUsername.Text;
@@ -107,6 +113,25 @@ namespace Rock.Apps.CheckScannerUtility
                     }
                     else
                     {
+                        try
+                        {
+                            batchPage.LoadLookups();
+                            batchPage.LoadFinancialBatchesGrid();
+                        }
+                        catch ( HttpErrorException ex )
+                        {
+                            if ( ex.Response != null && ex.Response.StatusCode.Equals( HttpStatusCode.Unauthorized ) )
+                            {
+                                lblLoginWarning.Content = "Not Authorized for Financial Batches";
+                                lblLoginWarning.Visibility = Visibility.Visible;
+                                return;
+                            }
+                            else
+                            {
+                                throw ex;
+                            }
+                        }
+
                         this.NavigationService.Navigate( batchPage );
                     }
                 }
@@ -207,6 +232,17 @@ namespace Rock.Apps.CheckScannerUtility
             {
                 btnLogin_Click( null, null );
             }
+        }
+
+        /// <summary>
+        /// (EasterEgg) Handles the MouseDoubleClick event of the LoginLabel control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="MouseButtonEventArgs"/> instance containing the event data.</param>
+        private void LoginLabel_MouseDoubleClick( object sender, MouseButtonEventArgs e )
+        {
+            lblRockUrl.Visibility = Visibility.Visible;
+            txtRockUrl.Visibility = Visibility.Visible;
         }
     }
 }

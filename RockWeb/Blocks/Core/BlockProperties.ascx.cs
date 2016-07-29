@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,7 @@ using Rock.Web.Cache;
 using Rock.Web.UI;
 using Rock.Security;
 using Rock.Data;
+using System.Web;
 
 namespace RockWeb.Blocks.Core
 {
@@ -84,6 +85,23 @@ namespace RockWeb.Blocks.Core
 
                 if ( _block.IsAuthorized( Authorization.ADMINISTRATE, CurrentPerson ) )
                 {
+                    var blockType = BlockTypeCache.Read( _block.BlockTypeId );
+                    if ( blockType != null && !blockType.IsInstancePropertiesVerified )
+                    {
+                        System.Web.UI.Control control = Page.LoadControl( blockType.Path );
+                        if ( control is RockBlock )
+                        {
+                            using ( var rockContext = new RockContext() )
+                            {
+                                var rockBlock = control as RockBlock;
+                                int? blockEntityTypeId = EntityTypeCache.Read( typeof( Block ) ).Id;
+                                Rock.Attribute.Helper.UpdateAttributes( rockBlock.GetType(), blockEntityTypeId, "BlockTypeId", blockType.Id.ToString(), rockContext );
+                            }
+
+                            blockType.IsInstancePropertiesVerified = true;
+                        }
+                    }
+
                     phAttributes.Controls.Clear();
                     phAdvancedAttributes.Controls.Clear();
 
@@ -118,7 +136,7 @@ namespace RockWeb.Blocks.Core
             }
             catch ( SystemException ex )
             {
-                DisplayError( ex.Message, "<pre>" + ex.StackTrace + "</pre>" );
+                DisplayError( ex.Message, "<pre>" + HttpUtility.HtmlEncode( ex.StackTrace ) + "</pre>" );
             }
 
             base.OnInit( e );
@@ -142,7 +160,10 @@ namespace RockWeb.Blocks.Core
                 tbCssClass.Text = _block.CssClass;
                 cePreHtml.Text = _block.PreHtml;
                 cePostHtml.Text = _block.PostHtml;
-                tbCacheDuration.Text = _block.OutputCacheDuration.ToString();
+
+                // Hide the Cache duration block for now;
+                tbCacheDuration.Visible = false;
+                //tbCacheDuration.Text = _block.OutputCacheDuration.ToString();
             }
 
             base.OnLoad( e );
@@ -187,7 +208,7 @@ namespace RockWeb.Blocks.Core
                 block.CssClass = tbCssClass.Text;
                 block.PreHtml = cePreHtml.Text;
                 block.PostHtml = cePostHtml.Text;
-                block.OutputCacheDuration = Int32.Parse( tbCacheDuration.Text );
+                block.OutputCacheDuration = 0; //Int32.Parse( tbCacheDuration.Text );
                 rockContext.SaveChanges();
 
                 Rock.Attribute.Helper.GetEditValues( phAttributes, block );
