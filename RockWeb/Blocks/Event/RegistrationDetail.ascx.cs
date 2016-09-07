@@ -631,6 +631,10 @@ namespace RockWeb.Blocks.Event
                         }
                     }
                 }
+                else
+                {
+                    rockContext.SaveChanges();
+                }
 
                 // Reload registration
                 Registration = GetRegistration( Registration.Id );
@@ -1964,7 +1968,8 @@ namespace RockWeb.Blocks.Event
                     registration.RegistrationInstance != null &&
                     registration.RegistrationInstance.AccountId.HasValue &&
                     registration.PersonAliasId.HasValue &&
-                    RegistrationTemplateState != null )
+                    RegistrationTemplateState != null &&
+                    EditAllowed )
                 {
                     lbAddPayment.Visible = true;
                     lbProcessPayment.Visible = RegistrationTemplateState.FinancialGateway != null;

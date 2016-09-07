@@ -1,4 +1,4 @@
-﻿using System;
+﻿ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -315,24 +315,12 @@ namespace Rock.Lava.Blocks
                         var items = queryResult.ToList();
                         var itemsSecured = new List<IEntity>();
 
-                        Person person = null;
-                        var principal = HttpContext.Current.User;
+                        Person person = GetCurrentPerson( context );
 
-                        if ( principal != null && principal.Identity != null )
-                        {
-                            var userLoginService = new Rock.Model.UserLoginService( new RockContext() );
-                            var userLogin = userLoginService.GetByUserName( principal.Identity.Name );
-
-                            if ( userLogin != null )
-                            {
-                                person = userLogin.Person;
-                            }
-                        }
-
-                        foreach (IEntity item in items )
+                        foreach ( IEntity item in items )
                         {
                             ISecured itemSecured = item as ISecured;
-                            if ( itemSecured == null || itemSecured.IsAuthorized(Authorization.VIEW,  person))
+                            if ( itemSecured == null || itemSecured.IsAuthorized( Authorization.VIEW, person ) )
                             {
                                 itemsSecured.Add( item );
                             }
@@ -432,6 +420,14 @@ namespace Rock.Lava.Blocks
         #endregion
 
         /// <summary>
+        /// Method that will be run at Rock startup
+        /// </summary>
+        public override void OnStartup()
+        {
+            RegisterEntityCommands();
+        }
+
+        /// <summary>
         /// Helper method to register the entity commands.
         /// </summary>
         public static void RegisterEntityCommands()
@@ -481,6 +477,39 @@ namespace Rock.Lava.Blocks
 
                 Template.RegisterTag<Rock.Lava.Blocks.RockEntity>( entityName );
             }
+        }
+
+        /// <summary>
+        /// Gets the current person.
+        /// </summary>
+        /// <param name="context">The context.</param>
+        /// <returns></returns>
+        private static Person GetCurrentPerson( DotLiquid.Context context )
+        {
+            Person currentPerson = null;
+
+            // First check for a person override value included in lava context
+            if ( context.Scopes != null )
+            {
+                foreach ( var scopeHash in context.Scopes )
+                {
+                    if ( scopeHash.ContainsKey( "CurrentPerson" ) )
+                    {
+                        currentPerson = scopeHash["CurrentPerson"] as Person;
+                    }
+                }
+            }
+
+            if ( currentPerson == null )
+            {
+                var httpContext = System.Web.HttpContext.Current;
+                if ( httpContext != null && httpContext.Items.Contains( "CurrentPerson" ) )
+                {
+                    currentPerson = httpContext.Items["CurrentPerson"] as Person;
+                }
+            }
+
+            return currentPerson;
         }
 
         /// <summary>

@@ -28,6 +28,14 @@ namespace Rock.Lava.Blocks
         string _markup = string.Empty;
 
         /// <summary>
+        /// Method that will be run at Rock startup
+        /// </summary>
+        public override void OnStartup()
+        {
+            Template.RegisterTag<WebRequest>( "webrequest" );
+        }
+
+        /// <summary>
         /// Initializes the specified tag name.
         /// </summary>
         /// <param name="tagName">Name of the tag.</param>
@@ -98,7 +106,16 @@ namespace Rock.Lava.Blocks
                     // add body, this will be ignored if other parameters exist
                     if ( !string.IsNullOrWhiteSpace( parms["body"] ) )
                     {
-                        request.AddParameter( parms["requestcontenttype"], parms["body"], ParameterType.RequestBody );
+                        if ( parms.ContainsKey( "requestcontenttype" ) )
+                        {
+                            request.AddParameter( parms["requestcontenttype"], parms["body"], ParameterType.RequestBody );
+                        }
+                        else
+                        {
+                            result.Write( "When using the 'body' parameter you must also provide a 'requestcontenttype' also." );
+                            base.Render( context,  result );
+                            return ;
+                        }
                     }
 
                     IRestResponse response = client.Execute( request );
