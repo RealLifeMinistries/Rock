@@ -49,11 +49,7 @@ namespace Rock.Workflow.Action
 
             var message = GetAttributeValue( action, "Message" ).ResolveMergeFields( GetMergeFields( action ) );
 
-            if (!string.IsNullOrWhiteSpace(message))
-            {
-                action.Activity.Workflow.AddLogEntry(message, true);
-            }
-            
+            action.Activity.Workflow.AddLogEntry( message, true );
 
             return true;
         }

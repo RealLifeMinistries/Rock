@@ -113,6 +113,8 @@ namespace RockWeb.Blocks.Cms
 
                     ddlStatus.Visible = contentChannel.RequiresApproval;
 
+                    ddlStatus.Visible = contentChannel.RequiresApproval;
+
                     if ( contentChannel.ContentChannelType.IncludeTime )
                     {
                         gItems.Columns[2].Visible = true;
@@ -193,7 +195,7 @@ namespace RockWeb.Blocks.Cms
             else
             {
                 upnlContent.Visible = false;
-            }
+            }            
         }
 
         /// <summary>

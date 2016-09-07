@@ -60,7 +60,7 @@ namespace RockWeb.Blocks.Cms
             ScriptManager.RegisterStartupScript( ddlGradePicker, ddlGradePicker.GetType(), "grade-selection-" + BlockId.ToString(), ddlGradePicker.GetJavascriptForYearPicker( ypGraduation ), true );
 
             RockPage.AddCSSLink( ResolveRockUrl( "~/Styles/fluidbox.css" ) );
-            //RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
+            RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/imagesloaded.min.js" ) );
             RockPage.AddScriptLink( ResolveRockUrl( "~/Scripts/jquery.fluidbox.min.js" ) );
         }
 
@@ -341,7 +341,11 @@ namespace RockWeb.Blocks.Cms
                             }
 
                             groupMember.Person.SetBirthDate( birthdate );
-                            groupMember.Person.GradeOffset = ddlGradePicker.SelectedValueAsInt();
+                            if ( ddlGradePicker.Visible )
+                            {
+                                groupMember.Person.GradeOffset = ddlGradePicker.SelectedValueAsInt();
+                            }
+
                             var role = group.GroupType.Roles.Where( r => r.Id == ( rblRole.SelectedValueAsInt() ?? 0 ) ).FirstOrDefault();
                             if ( role != null )
                             {
@@ -614,7 +618,7 @@ namespace RockWeb.Blocks.Cms
                                                         .FirstOrDefault();
                                         if ( familyGroup != null )
                                         {
-                                            Guid? addressTypeGuid = GetAttributeValue( "LocationType" ).AsGuidOrNull();
+                                            Guid? addressTypeGuid = GetAttributeValue( "AddressType" ).AsGuidOrNull();
                                             if ( addressTypeGuid.HasValue )
                                             {
                                                 var groupLocationService = new GroupLocationService( rockContext );
@@ -741,11 +745,14 @@ namespace RockWeb.Blocks.Cms
                                gr.Id == selectedId ).Any() )
                 {
                     attributeGuidList = GetAttributeValue( "PersonAttributes(adults)" ).SplitDelimitedValues().AsGuidList();
+                    ddlGradePicker.Visible = false;
                 }
                 else
                 {
                     attributeGuidList = GetAttributeValue( "PersonAttributes(children)" ).SplitDelimitedValues().AsGuidList();
+                    ddlGradePicker.Visible = true;
                 }
+
                 if ( attributeGuidList.Any() )
                 {
                     pnlPersonAttributes.Visible = true;

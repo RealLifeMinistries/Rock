@@ -48,10 +48,7 @@ namespace Rock.Workflow.Action
     [WorkflowAttribute("Location", "The attribute to set to the location of the attendance (optional).", false, "", "", 3, null,
         new string[] { "Rock.Field.Types.LocationFieldType" })]
 
-    [WorkflowAttribute( "Schedule", "The attribute to set to the schedule of the attendance (optional).", false, "", "", 4, null,
-        new string[] { "Rock.Field.Types.ScheduleFieldType" } )]
-
-    [BooleanField("Add To Group", "Adds the person to the group if they are not already a member.", true, "", 5)]
+    [BooleanField("Add To Group", "Adds the person to the group if they are not already a member.", true, "", 4)]
     
     public class PostAttendanceToGroup : ActionComponent
     {
@@ -143,18 +140,6 @@ namespace Rock.Workflow.Action
                 if ( locationAttribute != null )
                 {
                     locationGuid = action.GetWorklowAttributeValue(locationAttributeGuid).AsGuid();
-                }
-            }
-
-            //// get Schedule
-            Guid scheduleGuid = Guid.Empty;
-            Guid scheduleAttributeGuid = GetAttributeValue( action, "Schedule" ).AsGuid();
-            if ( !scheduleAttributeGuid.IsEmpty() )
-            {
-                var scheduleAttribute = AttributeCache.Read( scheduleAttributeGuid, rockContext );
-                if ( scheduleAttribute != null )
-                {
-                    scheduleGuid = action.GetWorklowAttributeValue( scheduleAttributeGuid ).AsGuid();
                 }
             }
 

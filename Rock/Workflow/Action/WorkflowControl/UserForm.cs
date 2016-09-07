@@ -48,7 +48,7 @@ namespace Rock.Workflow.Action
         public override bool Execute( RockContext rockContext, WorkflowAction action, object entity, out List<string> errorMessages )
         {
             errorMessages = new List<string>();
-
+            
             if ( !action.LastProcessedDateTime.HasValue &&
                 action.ActionType != null &&
                 action.ActionType.WorkflowForm != null &&
@@ -75,10 +75,15 @@ namespace Rock.Workflow.Action
 
                     if ( action.Activity.AssignedGroupId.HasValue )
                     {
+                        // Custom Code
+                        List<string> roleNamesToSendEmailTo = new List<string> { "Leader Home Group", "Apprentice Home Group", "Men's Breakout Home Group", "Women's Breakout Home Group", "Group Admin Home Group" };
+                        //End Custom Code
                         var personList = new GroupMemberService(rockContext).GetByGroupId( action.Activity.AssignedGroupId.Value )
                             .Where( m =>
                                 m.GroupMemberStatus == GroupMemberStatus.Active &&
-                                m.Person.Email != "" )
+                                m.Person.Email != "" 
+                                && roleNamesToSendEmailTo.Contains(m.GroupRole.Name) // Added Custom Code
+                                )
                             .Select( m => m.Person )
                             .ToList();
 
