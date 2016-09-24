@@ -1,11 +1,11 @@
 ﻿// <copyright>
-// Copyright 2013 by the Spark Development Network
+// Copyright by the Spark Development Network
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
+// Licensed under the Rock Community License (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// http://www.rockrms.com/license
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,6 +24,8 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using Rock.Data;
 using Rock.Security;
 using Rock.Web.Cache;
@@ -31,7 +33,7 @@ using Rock.Web.Cache;
 namespace Rock.Model
 {
     /// <summary>
-    /// 
+    /// The person doing the registration. For example, Dad signing his kids up for camp. Dad is the Registration person and the kids would be Registrants
     /// </summary>
     [Table( "Registration" )]
     [DataContract]
@@ -125,6 +127,34 @@ namespace Rock.Model
         /// </value>
         [DataMember]
         public int? GroupId { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether this instance is temporary.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance is temporary; otherwise, <c>false</c>.
+        /// </value>
+        public bool IsTemporary { get; set; }
+
+        /// <summary>
+        /// Gets or sets the last payment reminder date time.
+        /// </summary>
+        /// <value>
+        /// The last payment reminder date time.
+        /// </value>
+        [DataMember]
+        public DateTime? LastPaymentReminderDateTime
+        {
+            get
+            {
+                return _lastPaymentReminderDateTime.HasValue ? _lastPaymentReminderDateTime : this.CreatedDateTime;
+            }
+            set
+            {
+                _lastPaymentReminderDateTime = value;
+            }
+        }
+        private DateTime? _lastPaymentReminderDateTime;
 
         #endregion
 
@@ -754,7 +784,7 @@ Registration By: {0} Total Cost/Fees:{1}
         /// <value>
         /// The field values.
         /// </value>
-        public Dictionary<int, object> FieldValues { get; set; }
+        public Dictionary<int, FieldValueObject> FieldValues { get; set; }
 
         /// <summary>
         /// Gets or sets the fee values.
@@ -775,7 +805,7 @@ Registration By: {0} Total Cost/Fees:{1}
             GroupMemberId = null;
             GroupName = string.Empty;
             FamilyGuid = Guid.Empty;
-            FieldValues = new Dictionary<int, object>();
+            FieldValues = new Dictionary<int, FieldValueObject>();
             FeeValues = new Dictionary<int, List<FeeInfo>>();
         }
 
@@ -808,7 +838,7 @@ Registration By: {0} Total Cost/Fees:{1}
                             object dbValue = GetRegistrantValue( null, person, family, field, rockContext );
                             if ( dbValue != null )
                             {
-                                FieldValues.Add( field.Id, dbValue );
+                                FieldValues.Add( field.Id, new FieldValueObject( field, dbValue ) );
                             }
                         }
                     }
@@ -865,7 +895,7 @@ Registration By: {0} Total Cost/Fees:{1}
                         object dbValue = GetRegistrantValue( registrant, person, family, field, rockContext );
                         if ( dbValue != null )
                         {
-                            FieldValues.Add( field.Id, dbValue );
+                            FieldValues.Add( field.Id, new FieldValueObject( field, dbValue ) );
                         }
                     }
 
@@ -919,6 +949,7 @@ Registration By: {0} Total Cost/Fees:{1}
                             }
                         case RegistrationPersonFieldType.Email: return person.Email;
                         case RegistrationPersonFieldType.Birthdate: return person.BirthDate;
+                        case RegistrationPersonFieldType.Grade: return person.GraduationYear;
                         case RegistrationPersonFieldType.Gender: return person.Gender;
                         case RegistrationPersonFieldType.MaritalStatus: return person.MaritalStatusValueId;
                         case RegistrationPersonFieldType.MobilePhone:
@@ -1047,11 +1078,103 @@ Registration By: {0} Total Cost/Fees:{1}
                         .Select( f => f.Id ) )
                     .FirstOrDefault();
 
-                return FieldValues.ContainsKey( fieldId ) ? FieldValues[fieldId] : null;
+                return FieldValues.ContainsKey( fieldId ) ? FieldValues[fieldId].FieldValue : null;
             }
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    [Serializable]
+    [Newtonsoft.Json.JsonConverter( typeof( FieldValueConverter ) )]
+    public class FieldValueObject
+    {
+        /// <summary>
+        /// Gets or sets the field source.
+        /// </summary>
+        /// <value>
+        /// The field source.
+        /// </value>
+        public RegistrationFieldSource FieldSource { get; set; }
+
+        /// <summary>
+        /// Gets or sets the type of the person field.
+        /// </summary>
+        /// <value>
+        /// The type of the person field.
+        /// </value>
+        public RegistrationPersonFieldType PersonFieldType { get; set; }
+
+        /// <summary>
+        /// Gets or sets the field value.
+        /// </summary>
+        /// <value>
+        /// The field value.
+        /// </value>
+        public object FieldValue { get; set; }
+
+        /// <summary>
+        /// Gets the type of the field value.
+        /// </summary>
+        /// <value>
+        /// The type of the field value.
+        /// </value>
+        public Type FieldValueType
+        {
+            get
+            {
+                Type valueType = typeof( string );
+                if ( FieldSource == RegistrationFieldSource.PersonField )
+                {
+                    switch ( PersonFieldType )
+                    {
+                        case RegistrationPersonFieldType.Campus:
+                        case RegistrationPersonFieldType.MaritalStatus:
+                        case RegistrationPersonFieldType.Grade:
+                                return typeof( int? );
+
+                        case RegistrationPersonFieldType.Address:
+                                return typeof( Location );
+
+                        case RegistrationPersonFieldType.Birthdate:
+                                return typeof( DateTime? );
+
+                        case RegistrationPersonFieldType.Gender:
+                                return  typeof( Gender );
+
+                        case RegistrationPersonFieldType.MobilePhone:
+                        case RegistrationPersonFieldType.HomePhone:
+                        case RegistrationPersonFieldType.WorkPhone:
+                                return typeof( PhoneNumber );
+                    }
+                }
+                return typeof( string );
+            }
+        }
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FieldValueObject"/> class.
+        /// </summary>
+        public FieldValueObject()
+        {
+
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="FieldValueObject"/> class.
+        /// </summary>
+        /// <param name="field">The field.</param>
+        /// <param name="fieldValue">The field value.</param>
+        public FieldValueObject( RegistrationTemplateFormField field, object fieldValue)
+        {
+            FieldSource = field.FieldSource;
+            PersonFieldType = field.PersonFieldType;
+            FieldValue = fieldValue;
+        }
+
+        
     }
 
     /// <summary>
@@ -1182,6 +1305,103 @@ Registration By: {0} Total Cost/Fees:{1}
         /// The minimum payment.
         /// </value>
         public decimal MinPayment { get; set; }
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public class FieldValueConverter : JsonConverter
+    {
+        /// <summary>
+        /// Determines whether this instance can convert the specified object type.
+        /// </summary>
+        /// <param name="objectType">Type of the object.</param>
+        /// <returns>
+        ///   <c>true</c> if this instance can convert the specified object type; otherwise, <c>false</c>.
+        /// </returns>
+        public override bool CanConvert( Type objectType )
+        {
+            return objectType.IsAssignableFrom( typeof( string ) );
+        }
+
+        /// <summary>
+        /// Reads the JSON representation of the object.
+        /// </summary>
+        /// <param name="reader">The <see cref="T:Newtonsoft.Json.JsonReader" /> to read from.</param>
+        /// <param name="objectType">Type of the object.</param>
+        /// <param name="existingValue">The existing value of object being read.</param>
+        /// <param name="serializer">The calling serializer.</param>
+        /// <returns>
+        /// The object value.
+        /// </returns>
+        public override object ReadJson( JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer )
+        {
+            if ( reader.TokenType == JsonToken.Null )
+            {
+                return null;
+            }
+
+            FieldValueObject fieldValueObject = new FieldValueObject();
+
+            try
+            {
+                reader.Read();
+                while ( reader.TokenType == JsonToken.PropertyName )
+                {
+                    string str = reader.Value.ToString();
+                    if ( string.Equals( str, "FieldSource", StringComparison.OrdinalIgnoreCase ) )
+                    {
+                        reader.Read();
+                        fieldValueObject.FieldSource = (RegistrationFieldSource)serializer.Deserialize( reader, typeof( RegistrationFieldSource ) );
+                    }
+                    else if ( string.Equals( str, "PersonFieldType", StringComparison.OrdinalIgnoreCase ) )
+                    {
+                        reader.Read();
+                        fieldValueObject.PersonFieldType = (RegistrationPersonFieldType)serializer.Deserialize( reader, typeof( RegistrationPersonFieldType ) );
+                    }
+                    else if ( string.Equals( str, "FieldValue", StringComparison.OrdinalIgnoreCase ) )
+                    {
+                        reader.Read();
+                        fieldValueObject.FieldValue = serializer.Deserialize( reader, fieldValueObject.FieldValueType );
+                    }
+                    reader.Read();
+                }
+            }
+            catch { }
+
+            return fieldValueObject;
+        }
+
+        /// <summary>
+        /// Writes the JSON representation of the object.
+        /// </summary>
+        /// <param name="writer">The <see cref="T:Newtonsoft.Json.JsonWriter" /> to write to.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="serializer">The calling serializer.</param>
+        public override void WriteJson( JsonWriter writer, object value, JsonSerializer serializer )
+        {
+            var fieldValueObject = value as FieldValueObject;
+            if ( fieldValueObject != null )
+            {
+                DefaultContractResolver contractResolver = serializer.ContractResolver as DefaultContractResolver;
+                writer.WriteStartObject();
+                
+                writer.WritePropertyName( ( contractResolver != null ? contractResolver.GetResolvedPropertyName( "FieldSource" ) : "FieldSource" ) );
+                serializer.Serialize( writer, fieldValueObject.FieldSource );
+
+                writer.WritePropertyName( ( contractResolver != null ? contractResolver.GetResolvedPropertyName( "PersonFieldType" ) : "PersonFieldType" ) );
+                serializer.Serialize( writer, fieldValueObject.PersonFieldType );
+
+                writer.WritePropertyName( ( contractResolver != null ? contractResolver.GetResolvedPropertyName( "FieldValue" ) : "FieldValue" ) );
+                serializer.Serialize( writer, fieldValueObject.FieldValue, fieldValueObject.FieldValueType );
+
+                writer.WriteEndObject();
+            }
+            else
+            {
+                serializer.Serialize( writer, value );
+            }
+        }
     }
 
     /// <summary>
