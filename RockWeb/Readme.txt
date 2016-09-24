@@ -1,3 +1,65 @@
+Rock McKinley 5.4
+
++ Fixed issue with CalendarLava block not using correct date range when the Date Range filter is used (Fixes #1771).
++ Fixed issue with a new communication not requiring an approval when recipients are added manually (Fixes #1768).
++ Added better error handling to the Process Workflow job so that one exception does not stop the job from processing additional workflows.
++ Updated check-in label printing so that if person is checking into two or more grouptypes that share the same label configured to be printed once per person, that it will only print once per person (Fixes #1755).
++ Fixed security on the registration instance detail block to stop people from adding/deleting registrants when they did not have proper security (Fixes #1732).
++ Updated the FilterGroupsByGradeAndAge so that it does not remove/exclude groups that don't have a defined age or grade range.
++ Fixed exception that would occur when renaming a block from the zone block list.
++ Fixed issue with check-in not refreshing attendance cache correctly when used to calculate threshold values.
++ Updated giving/registration to strip any non-numeric characters from credit card number before submitting (Fixes #1728).
++ Updated the Rock Update block to require that Microsoft .NET Framework 4.5.2 or greater be installed before Rock can be updated to next version.
+
+
+Rock McKinley 5.3
+
++ Fixed the date filter on pledge analytics block (Fixes #1617).
++ Fixed bug with 'Filter Groups by LastName' check-in workflow action which occurred when a group did not have the necessary attributes.
++ Fixed memory issue with check-in welcome screen.
++ Made Entity TypeId and TypeName accessible in Lava (#1691).
++ Fixed issue with attribute filters incorrectly filtering results and not showing correctly when used in simple view mode.
++ Fixed one-time future payments with NMI to use correct frequency and number of payments.
++ Fixed exception that would occur when using NMI gateway and trying to create a scheduled transaction with a monthly frequency.
++ Updated phone number model to force number being saved correctly whenever it is added/updated.
++ Removed LavaIgnore on AttributeValue EntityId.
++ Fixed 'content channel view' block to no longer break when invalid Lava is provided (now it politely tells you that your Lava doesn't make the grade).
++ Fixed scrolling issue with windows 10 multi-touch devices in check-in (fixes #1660).
++ Fixed issue with Family Checkin not displaying the current service time when selecting area/group/location.
++ Updated the list of acceptable security protocols for external SSL connections. 
++ Fixed issues with the Connection workflow actions (Fixes #1649).
++ Updated Dynamic Data block to hide grid filters when more than one grid is displayed. (Fixes #1642).
++ Fixed issue with some workflow action type attributes not saving value correctly if using the RockTextOrDropDownList and multiple row textbox.
++ Fixed BirthDate showing a year of 0001 if a person's record doesn't have a BirthYear specified.
++ Disabled the word merge button on the Transaction Report block. This block is used on the external site where Word merging is not needed or desired.
++ Fixed exception that would occur if multiple less variables with the same name existed.
++ Fixed Group security so that all users do not have View access by default.
++ Updated Event Item Occurrence List By Audience lava file to use the external url link if it exists.
+
+
+Rock McKinley 5.2
+
++ Fixed bug in individual check-in that would cause Rock to restart if user clicks the Back button (due to stack overflow error).
+
+
+Rock McKinley 5.1
+
++ Fixed issue with Family check-in incorrectly navigating to individual check-in page when clicking 'Back' (Fixes #1620).
++ Fixed issue with workflow triggers not getting started (Fixes #1623).
++ Fixed display of heirarchal group types in check-in manager.
++ Fixed display of group type path on the location schedule screen in check-in manager mode (Fixes #121).
++ Fixed positioning of Save button on check-in admin schedule view (Fixes #1609).
++ Updated the saving of attributes so that it does not clear foreign key values and the created by information (Fixes #1596).
++ Fixed new route for check-in to use correct page.
++ Updated the Check-in Manager to allow changing the location threshold value.
++ Updated family check-in to fix issue with schedules not getting selected correctly when only one schedule option is available.
++ Fixed issue with family checkin that would result in first service's selection getting cleared if checking child into multiple services and each service had different location options.
++ Fixed issue with family check-in that would result in ability level being asked twice if selecting multiple service times, and different locations options were available for each service.
++ Fixed issue with View possibly getting created with wrong schema name.
++ Fixed the check-in Grade Required attribute to have correct entity qualifier
++ Fixed exception that would occur if any PreHtml or PostHtml text included any opening and closing brackets (i.e. Lava or Style definitions).
+
+
 Rock McKinley 5.0
 
 API
@@ -227,6 +289,7 @@ MISC
 + Updated person picker results to display a person's connection status.
 + Added option to the Person Attribute/FieldType so that the 'Enable Self Detection' option of the person picker can be enabled.
 + Added ability to set qualifier column/value on the Categories block to further filter entities that categories belong to.
+
 
 Rock McKinley 4.6
 
