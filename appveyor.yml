@@ -31,8 +31,11 @@ before_build:
     nuget restore Rock.sln
 
     $src = "C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2\Facades"
+
     $dst = "C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5.2"
+
     Get-ChildItem $src | Copy-Item -Destination $dst -Force
+
  
 # build configuration
 build:
@@ -43,7 +46,3 @@ build:
 # flag to stop building if an error throws
 matrix:
   fast_finish: true
-# test
-test:
-  assemblies:
-    - Rock.Tests\**\*.dll
