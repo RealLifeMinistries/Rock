@@ -45,9 +45,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock.Version", "Rock.Versio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock.SignNow", "Rock.SignNow\Rock.SignNow.csproj", "{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.reallifeministries.GroupMatching", "com.reallifeministries.GroupMatching\com.reallifeministries.GroupMatching.csproj", "{2B66458C-122C-4168-84E5-17EC9AD63558}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.reallifeministries.RockExtensions", "com.reallifeministries.RockExtensions\com.reallifeministries.RockExtensions.csproj", "{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.reallifeministries.GroupMatching", "com.reallifeministries.GroupMatching\com.reallifeministries.GroupMatching.csproj", "{2B66458C-122C-4168-84E5-17EC9AD63558}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -99,14 +99,14 @@ Global
 		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2B66458C-122C-4168-84E5-17EC9AD63558}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2B66458C-122C-4168-84E5-17EC9AD63558}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2B66458C-122C-4168-84E5-17EC9AD63558}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2B66458C-122C-4168-84E5-17EC9AD63558}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B66458C-122C-4168-84E5-17EC9AD63558}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B66458C-122C-4168-84E5-17EC9AD63558}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B66458C-122C-4168-84E5-17EC9AD63558}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B66458C-122C-4168-84E5-17EC9AD63558}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
