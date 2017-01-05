@@ -174,5 +174,26 @@ namespace Rock.Lava
             pageProperties.Add( "Description", rockPage.MetaDescription );
             return pageProperties;
         }
+
+        /// <summary>
+        /// Gets a list of custom lava commands.
+        /// </summary>
+        /// <returns></returns>
+        public static List<string> GetLavaCommands()
+        {
+            var lavaCommands = new List<string>();
+
+            try
+            {
+                foreach ( var blockType in Rock.Reflection.FindTypes( typeof( Rock.Lava.Blocks.RockLavaBlockBase ) ).Select( a => a.Value ).ToList() )
+                {
+                    lavaCommands.Add( blockType.Name );
+                    var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+                }
+            }
+            catch { }
+
+            return lavaCommands;
+        }
     }
 }

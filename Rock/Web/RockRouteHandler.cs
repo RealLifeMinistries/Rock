@@ -16,9 +16,8 @@
 //
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
-using System.Runtime.Caching;
-using System.Text.RegularExpressions;
 using System.Web.Compilation;
 using System.Web.Routing;
 using Rock.Model;
@@ -46,6 +45,8 @@ namespace Rock.Web
 
             try
             {
+                var siteCookie = requestContext.HttpContext.Request.Cookies["last_site"];
+
                 string pageId = "";
                 int routeId = 0;
 
@@ -56,21 +57,68 @@ namespace Rock.Web
                 {
                     pageId = (string)requestContext.RouteData.Values["PageId"];
                 }
+
                 // Pages that use a custom URL route will have the page id in the RouteDate.DataTokens collection
-                else if ( requestContext.RouteData.DataTokens["PageId"] != null )
+                else if ( requestContext.RouteData.DataTokens["PageRoutes"] != null )
                 {
-                    pageId = (string)requestContext.RouteData.DataTokens["PageId"];
-                    routeId = Int32.Parse( (string)requestContext.RouteData.DataTokens["RouteId"] );
+                    var pageAndRouteIds = requestContext.RouteData.DataTokens["PageRoutes"] as List<PageAndRouteId>;
+                    if ( pageAndRouteIds != null && pageAndRouteIds.Count > 0 )
+                    {
+                        // Default to first site/page
+                        if ( pageAndRouteIds.Count >= 1 )
+                        {
+                            var pageAndRouteId = pageAndRouteIds.First();
+                            pageId = pageAndRouteId.PageId.ToJson();
+                            routeId = pageAndRouteId.RouteId;
+                        }
+
+                        // Then check to see if any can be matched by site
+                        if ( pageAndRouteIds.Count > 1 )
+                        {
+                            SiteCache site = SiteCache.GetSiteByDomain( requestContext.HttpContext.Request.Url.Host );
+                            if ( site == null )
+                            {
+                                // Use last site
+                                if ( siteCookie != null && siteCookie.Value != null )
+                                {
+                                    site = SiteCache.Read( siteCookie.Value.AsInteger() );
+                                }
+                            }
+
+                            if ( site != null )
+                            {
+                                foreach ( var pageAndRouteId in pageAndRouteIds )
+                                {
+                                    var pageCache = PageCache.Read( pageAndRouteId.PageId );
+                                    if ( pageCache != null && pageCache.Layout != null && pageCache.Layout.SiteId == site.Id )
+                                    {
+                                        pageId = pageAndRouteId.PageId.ToJson();
+                                        routeId = pageAndRouteId.RouteId;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     foreach ( var routeParm in requestContext.RouteData.Values )
                     {
                         parms.Add( routeParm.Key, (string)routeParm.Value );
                     }
                 }
+
                 // If page has not been specified get the site by the domain and use the site's default page
-                else
+                if ( string.IsNullOrEmpty( pageId ) )
                 {
                     SiteCache site = SiteCache.GetSiteByDomain( requestContext.HttpContext.Request.Url.Host );
+                    if ( site == null )
+                    {
+                        // Use last site
+                        if ( siteCookie != null && siteCookie.Value != null )
+                        {
+                            site = SiteCache.Read( siteCookie.Value.AsInteger() );
+                        }
+                    }
 
                     // if not found use the default site
                     if ( site == null )
@@ -154,6 +202,15 @@ namespace Rock.Web
                 {
                     // try to get site's 404 page
                     SiteCache site = SiteCache.GetSiteByDomain( requestContext.HttpContext.Request.Url.Host );
+                    if ( site == null )
+                    {
+                        // Use last site
+                        if ( siteCookie != null && siteCookie.Value != null )
+                        {
+                            site = SiteCache.Read( siteCookie.Value.AsInteger() );
+                        }
+                    }
+
                     if ( site != null && site.PageNotFoundPageId != null )
                     {
                         if ( Convert.ToBoolean( GlobalAttributesCache.Read().GetValue( "Log404AsException" ) ) )
@@ -176,6 +233,16 @@ namespace Rock.Web
                 string theme = page.Layout.Site.Theme;
                 string layout = page.Layout.FileName;
                 string layoutPath = PageCache.FormatPath( theme, layout );
+
+                if ( siteCookie == null )
+                {
+                    siteCookie = new System.Web.HttpCookie( "last_site", page.Layout.SiteId.ToString() );
+                }
+                else
+                {
+                    siteCookie.Value = page.Layout.SiteId.ToString();
+                }
+                requestContext.HttpContext.Response.SetCookie( siteCookie );
 
                 try
                 {
@@ -220,6 +287,28 @@ namespace Rock.Web
                 return errorPage;
             }
         }
+    }
+
+    /// <summary>
+    /// Helper for storing page an route ids in a System.Web.Routing.Route datatoken
+    /// </summary>
+    public class PageAndRouteId
+    {
+        /// <summary>
+        /// Gets or sets the page identifier.
+        /// </summary>
+        /// <value>
+        /// The page identifier.
+        /// </value>
+        public int PageId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the route identifier.
+        /// </summary>
+        /// <value>
+        /// The route identifier.
+        /// </value>
+        public int RouteId { get; set; }
     }
 
     /// <summary>
