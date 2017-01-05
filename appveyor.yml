@@ -46,3 +46,8 @@ build:
 # flag to stop building if an error throws
 matrix:
   fast_finish: true
+artifacts:
+- path: /RockWeb
+  name: WebSitePkg
+deploy_script:
+- ps: get-childitem -path "c:/inetpub/wwwroot" -filter *.config | copy-item -destination "c:/inetpub/wwwroot/rock" | copy-item -destination "c:/inetpub/wwwroot/rocksandbox"
