@@ -179,28 +179,7 @@ namespace RockWeb.Blocks.Cms
                 nbInvalidHtml.Visible = true;
                 return;
             }
-
-            // check if the new content is valid
-            // NOTE: This is a limited check that will only warn of invalid HTML the first 
-            // time a user clicks the save button. Any errors encountered on the second runthrough
-            // are assumed to be intentional.
-            HtmlDocument doc = new HtmlDocument();
-            doc.LoadHtml( newContent );
-            if ( doc.ParseErrors.Count() > 0 && !nbInvalidHtml.Visible )
-            {
-                var reasons = doc.ParseErrors.Select( r => r.Reason ).ToList();
-                StringBuilder sb = new StringBuilder();
-                sb.AppendLine( "Warning: The HTML has the following errors:<ul>" );
-                foreach ( var reason in reasons )
-                {
-                    sb.AppendLine( String.Format( "<li>{0}</li>", reason.EncodeHtml() ) );
-                }
-                sb.AppendLine( "</ul> <br/> If you wish to save anyway, click the save button again." );
-                nbInvalidHtml.Text = sb.ToString();
-                nbInvalidHtml.Visible = true;
-                return;
-            }
-
+           
             //// create a new record only in the following situations:
             ////   - this is the first time this htmlcontent block got content (new block and edited for the first time)
             ////   - the content was changed, versioning is enabled, and OverwriteVersion is not checked

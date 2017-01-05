@@ -195,11 +195,7 @@ namespace RockWeb.Blocks.Cms
             else
             {
                 upnlContent.Visible = false;
-            }
-            else
-            {
-                upnlContent.Visible = false;
-            }
+            }            
         }
 
         /// <summary>
