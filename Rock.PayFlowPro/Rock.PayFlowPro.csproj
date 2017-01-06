@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{05F3587D-86DD-4CF3-A80A-D8CF598E1FD1}</ProjectGuid>
+    <ProjectGuid>{A005D091-140E-4EC4-BCDF-CF7D42BB702C}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Rock.PayFlowPro</RootNamespace>
