@@ -1,8 +1,22 @@
 var bodyScroll;
 
+$(function () {
+    $(window).on('resize', function () {
+        resizeBody();
+    });
+});
+
 Sys.Application.add_load(function () {
 
+    if (bodyScroll) {
+        try {
+            bodyScroll.destroy();
+        } catch (e) {}
+        bodyScroll = null;
+    }
+
     resizeBody();
+
     bodyScroll = new IScroll('.checkin-scroll-panel', {
         scrollbars: true,
         mouseWheel: true,
@@ -10,10 +24,6 @@ Sys.Application.add_load(function () {
         shrinkScrollbars: 'scale',
         fadeScrollbars: false,
         scrollbars: 'custom'
-    });
-
-    $(window).on('resize', function () {
-        resizeBody();
     });
 
 });
