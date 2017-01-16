@@ -179,7 +179,7 @@ namespace RockWeb.Blocks.Cms
                 nbInvalidHtml.Visible = true;
                 return;
             }
-           
+
             //// create a new record only in the following situations:
             ////   - this is the first time this htmlcontent block got content (new block and edited for the first time)
             ////   - the content was changed, versioning is enabled, and OverwriteVersion is not checked

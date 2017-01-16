@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{CF8C694A-55A0-434F-BC96-3450B96EC12A}</ProjectGuid>
+    <ProjectGuid>{EEE3C919-71C8-4160-A3C6-49DB39394A84}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Rock.Mandrill</RootNamespace>

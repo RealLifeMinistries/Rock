@@ -1,6 +1,6 @@
 ﻿This directory is for storing custom third-party plugins.
 
-Folder structure should be similar to...
+Folder structure should be similiar to...
 
 RockWeb
     Plugins

@@ -447,13 +447,6 @@ namespace RockWeb.Blocks.Cms
                 btnCompileTheme.Text = "Theme Doesn't Support Compiling";
             }
 
-            // set theme compile button
-            if ( ! new RockTheme(site.Theme ).AllowsCompile) 
-            {
-                btnCompileTheme.Enabled = false;
-                btnCompileTheme.Text = "Theme Doesn't Support Compiling";
-            }
-
             pnlDetails.Visible = true;
             hfSiteId.Value = site.Id.ToString();
 
