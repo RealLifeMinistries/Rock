@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{F3692909-952D-4C4A-B2D2-D90D0083CF53}</ProjectGuid>
+    <ProjectGuid>{0A624087-2AE4-4E31-9154-DB488AFE75AB}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Rock.NMI</RootNamespace>

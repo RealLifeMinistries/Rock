@@ -81,7 +81,7 @@ namespace Rock.Field.Types
         {
             // use the plain email address as the sort value
             return value;
-        }       
+        }
 
         #endregion
 

@@ -81,7 +81,7 @@ namespace Rock.Workflow.Action
             }
 
             // Get the note
-            string noteValue = GetAttributeValue( action, "Note" );
+            string noteValue = GetAttributeValue( action, "Note", true );
             string note = string.Empty;
             Guid? noteGuid = noteValue.AsGuidOrNull();
             if ( noteGuid.HasValue )
