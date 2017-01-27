@@ -29,6 +29,11 @@ namespace Rock.SystemGuid
         public const string GLOBAL_EMAIL_LINK_PREFERENCE = "F1BECEF9-1047-E89F-4CC8-8F856750E5D0";
 
         /// <summary>
+        /// The global enabled lava commands
+        /// </summary>
+        public const string GLOBAL_ENABLED_LAVA_COMMANDS = "933CFB7D-C9E1-BDAE-40AD-231002A91626";
+
+        /// <summary>
         /// The Facebook link attribute
         /// </summary>
         public const string PERSON_FACEBOOK = "2B8A03D3-B7DC-4DA3-A31E-826D655435D5";
@@ -98,6 +103,20 @@ namespace Rock.SystemGuid
         /// The eRA times given in last 6 weeks attribute
         /// </summary>
         public const string PERSON_ERA_TIMES_GIVEN_6 = "AC11EF53-AE55-79A0-4CAD-43721750E988";
+        #endregion
+
+        #region Check-in Attributes
+
+        /// <summary>
+        /// Group attribute to store the age range of the group
+        /// </summary>
+        public const string GROUP_AGE_RANGE = "43511B8F-71D9-423A-85BF-D1CD08C1998E";
+
+        /// <summary>
+        /// Group attribute to store the birthdate range of the group
+        /// </summary>
+        public const string GROUP_BIRTHDATE_RANGE = "F1A43EAB-D682-403F-A05E-CCFFBF879F32";
+
         #endregion
     }
 }

@@ -2372,6 +2372,58 @@ namespace Rock.Model
             return string.Empty;
         }
 
+        /// <summary>
+        /// Gets the home locations for all the person id's passed in. If a person is in 
+        /// more than one family or that family has more than one home address a single 
+        /// location is provided.
+        /// </summary>
+        /// <param name="personIds">The person ids.</param>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public static Dictionary<int, Location> GetHomeLocations( List<int> personIds, RockContext rockContext = null )
+        {
+            var personHomeAddresses = new Dictionary<int, Location>();
+
+            if ( personIds != null )
+            {
+
+                rockContext = rockContext ?? new RockContext();
+
+                Guid? homeAddressGuid = Rock.SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_HOME.AsGuidOrNull();
+                Guid? familyGuid = new Guid( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY );
+
+                if ( homeAddressGuid.HasValue && familyGuid.HasValue )
+                {
+                    var homeAddressDv = DefinedValueCache.Read( homeAddressGuid.Value );
+                    var familyGroupType = GroupTypeCache.Read( familyGuid.Value );
+                    if ( homeAddressDv != null && familyGroupType != null )
+                    {
+                        var personLocations = new GroupMemberService( rockContext ).Queryable()
+                                .Where( m =>
+                                     personIds.Contains( m.PersonId )
+                                     && m.Group.GroupTypeId == familyGroupType.Id )
+                                .Select( m => new {
+                                    m.PersonId,
+                                    Location = m.Group.GroupLocations
+                                                                     .Where( gl => gl.GroupLocationTypeValueId == homeAddressDv.Id )
+                                                                     .Select( gl => gl.Location )
+                                                                     .FirstOrDefault()
+                                } ).ToList();
+
+                        foreach ( var personLocation in personLocations )
+                        {
+                            if ( !personHomeAddresses.ContainsKey( personLocation.PersonId ) )
+                            {
+                                personHomeAddresses.Add( personLocation.PersonId, personLocation.Location );
+                            }
+                        }
+                    }
+                }
+            }
+
+            return personHomeAddresses;
+        }
+
         #endregion
     }
 
@@ -2462,6 +2514,17 @@ namespace Rock.Model
         {
             rockContext = rockContext ?? new RockContext();
             return new PersonService( rockContext ).GetFamilies( person != null ? person.Id : 0 );
+        }
+
+        /// <summary>
+        /// Gets the family for the person. If multiple families the first family is selected with an active family having preference over an inactive one.
+        /// </summary>
+        /// <param name="person">The person.</param>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public static Group GetFamily( this Person person, RockContext rockContext = null )
+        {
+            return person.GetFamilies( rockContext ).OrderByDescending( g => g.IsActive ).FirstOrDefault();
         }
 
         /// <summary>

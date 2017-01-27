@@ -33,7 +33,7 @@ namespace Rock.Field.Types
     /// Stored as either a single DefinedValue.Guid or a comma-delimited list of DefinedValue.Guids (if AllowMultiple)
     /// </summary>
     [Serializable]
-    public class DefinedValueFieldType : FieldType, IEntityFieldType
+    public class DefinedValueFieldType : FieldType, IEntityFieldType, IEntityQualifierFieldType
     {
         #region Configuration
 
@@ -159,6 +159,31 @@ namespace Rock.Field.Types
 
         #endregion
 
+        #region EntityQualifierConfiguration
+
+        /// <summary>
+        /// Gets the configuration values for this field using the EntityTypeQualiferColumn and EntityTypeQualifierValues
+        /// </summary>
+        /// <param name="entityTypeQualifierColumn">The entity type qualifier column.</param>
+        /// <param name="entityTypeQualifierValue">The entity type qualifier value.</param>
+        /// <returns></returns>
+        public Dictionary<string, Rock.Field.ConfigurationValue> GetConfigurationValuesFromEntityQualifier(string entityTypeQualifierColumn, string entityTypeQualifierValue)
+        {
+            Dictionary<string, ConfigurationValue> configurationValues = new Dictionary<string, ConfigurationValue>();
+            configurationValues.Add( DEFINED_TYPE_KEY, new ConfigurationValue( "Defined Type", "The Defined Type to select values from", string.Empty ) );
+            configurationValues.Add( ALLOW_MULTIPLE_KEY, new ConfigurationValue( "Allow Multiple Values", "When set, allows multiple defined type values to be selected.", string.Empty ) );
+            configurationValues.Add( DISPLAY_DESCRIPTION, new ConfigurationValue( "Display Descriptions", "When set, the defined value descriptions will be displayed instead of the values.", string.Empty ) );
+
+            if ( entityTypeQualifierColumn.Equals("DefinedTypeId", StringComparison.OrdinalIgnoreCase ))
+            {
+                configurationValues[DEFINED_TYPE_KEY].Value = entityTypeQualifierValue;
+            }
+
+            return configurationValues;
+        }
+
+        #endregion
+
         #region Formatting
 
         /// <summary>
@@ -262,7 +287,6 @@ namespace Rock.Field.Types
             else
             {
                 editControl = new DefinedValuePicker { ID = id, DisplayDescriptions = useDescription, DefinedTypeId = definedTypeId };
-                editControl.Items.Add( new ListItem() );
             }
                 
             if ( definedTypeId.HasValue )
@@ -408,7 +432,7 @@ namespace Rock.Field.Types
                 overrideConfigValues.Add( keyVal.Key, keyVal.Value );
             }
 
-            overrideConfigValues.AddOrReplace( ALLOW_MULTIPLE_KEY, new ConfigurationValue( ( !allowMultiple ).ToString() ) );
+            overrideConfigValues.AddOrReplace( ALLOW_MULTIPLE_KEY, new ConfigurationValue( ( true ).ToString() ) );
 
             return base.FilterValueControl( overrideConfigValues, id, required, filterMode );
         }
@@ -594,12 +618,61 @@ namespace Rock.Field.Types
         public override Expression AttributeFilterExpression( Dictionary<string, ConfigurationValue> configurationValues, List<string> filterValues, ParameterExpression parameterExpression )
         {
             bool allowMultiple = configurationValues != null && configurationValues.ContainsKey( ALLOW_MULTIPLE_KEY ) && configurationValues[ALLOW_MULTIPLE_KEY].Value.AsBoolean();
+            List<string> selectedValues;
             if ( allowMultiple || filterValues.Count != 1 )
             {
-                return base.AttributeFilterExpression( configurationValues, filterValues, parameterExpression );
+                ComparisonType comparisonType = filterValues[0].ConvertToEnum<ComparisonType>( ComparisonType.Contains );
+
+                // if it isn't either "Contains" or "Not Contains", just use the base AttributeFilterExpression
+                if ( !( new ComparisonType[] { ComparisonType.Contains, ComparisonType.DoesNotContain }).Contains(comparisonType))
+                {
+                    return base.AttributeFilterExpression( configurationValues, filterValues, parameterExpression );
+                }
+
+                //// OR up the where clauses for each of the selected values 
+                // and make sure to wrap commas around things so we don't collide with partial matches
+                // so it'll do something like this:
+                //
+                // WHERE ',' + Value + ',' like '%,bacon,%'
+                // OR ',' + Value + ',' like '%,lettuce,%'
+                // OR ',' + Value + ',' like '%,tomato,%'
+
+                if ( filterValues.Count > 1 )
+                {
+                    selectedValues = filterValues[1].Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).ToList();
+                }
+                else
+                {
+                    selectedValues = new List<string>();
+                }
+
+                Expression comparison = null;
+
+                foreach ( var selectedValue in selectedValues )
+                {
+                    var searchValue = "," + selectedValue + ",";
+                    var qryToExtract = new AttributeValueService( new Data.RockContext() ).Queryable().Where( a => ( "," + a.Value + "," ).Contains( searchValue ) );
+                    var valueExpression = FilterExpressionExtractor.Extract<AttributeValue>( qryToExtract, parameterExpression, "a" );
+
+                    if ( comparisonType != ComparisonType.Contains )
+                    {
+                        valueExpression = Expression.Not( valueExpression );
+                    }
+
+                    if ( comparison == null )
+                    {
+                        comparison = valueExpression;
+                    }
+                    else
+                    {
+                        comparison = Expression.Or( comparison, valueExpression );
+                    }
+                }
+
+                return comparison;
             }
 
-            List<string> selectedValues = filterValues[0].Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).ToList();
+            selectedValues = filterValues[0].Split( new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries ).ToList();
             if ( selectedValues.Any() )
             {
                 MemberExpression propertyExpression = Expression.Property( parameterExpression, "Value" );
