@@ -48,7 +48,6 @@ namespace RockWeb.Blocks.Groups
     [DefinedValueField( "2E6540EA-63F0-40FE-BE50-F2A84735E600", "Connection Status", "The connection status to use for new individuals (default: 'Web Prospect'.)", true, false, "368DD475-242C-49C4-A42C-7278BE690CC2", "", 3 )]
     [DefinedValueField( "8522BADD-2871-45A5-81DD-C76DA07E2E7E", "Record Status", "The record status to use for new individuals (default: 'Pending'.)", true, false, "283999EC-7346-42E3-B807-BCE9B2BABB49", "", 4 )]
     [WorkflowTypeField( "Workflow", "An optional workflow to start when registration is created. The GroupMember will set as the workflow 'Entity' when processing is started.", false, false, "", "", 5 )]
-    [BooleanField( "Enable Debug", "Shows the fields available to merge in lava.", false, "", 6 )]
     [CodeEditorField( "Lava Template", "The lava template to use to format the group details.", CodeEditorMode.Lava, CodeEditorTheme.Rock, 400, true, @"
 ", "", 7 )]
     [LinkedPage("Result Page", "An optional page to redirect user to after they have been registered for the group.", false, "", "", 8)]
@@ -194,10 +193,7 @@ namespace RockWeb.Blocks.Groups
                 Person spouse = null;
                 Group family = null;
                 GroupLocation homeLocation = null;
-
-                var changes = new List<string>();
-                var spouseChanges = new List<string>();
-                var familyChanges = new List<string>();
+                bool isMatch = false;
 
                 // Only use current person if the name entered matches the current person's name and autofill mode is true
                 if ( _autoFill )
@@ -207,6 +203,7 @@ namespace RockWeb.Blocks.Groups
                         tbLastName.Text.Trim().Equals( CurrentPerson.LastName.Trim(), StringComparison.OrdinalIgnoreCase ) )
                     {
                         person = personService.Get( CurrentPerson.Id );
+                        isMatch = true;
                     }
                 }
 
@@ -217,6 +214,7 @@ namespace RockWeb.Blocks.Groups
                     if ( matches.Count() == 1 )
                     {
                         person = matches.First();
+                        isMatch = true;
                     }
                 }
 
@@ -240,7 +238,6 @@ namespace RockWeb.Blocks.Groups
                 else
                 {
                     // updating current existing person
-                    History.EvaluateChange( changes, "Email", person.Email, tbEmail.Text );
                     person.Email = tbEmail.Text;
 
                     // Get the current person's families
@@ -274,56 +271,63 @@ namespace RockWeb.Blocks.Groups
                 // If using a 'Full' view, save the phone numbers and address
                 if ( !IsSimple )
                 {
-                    SetPhoneNumber( rockContext, person, pnHome, null, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid(), changes );
-                    SetPhoneNumber( rockContext, person, pnCell, cbSms, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid(), changes );
-
-                    string oldLocation = homeLocation != null ? homeLocation.Location.ToString() : string.Empty;
-                    string newLocation = string.Empty;
-
-                    var location = new LocationService( rockContext ).Get( acAddress.Street1, acAddress.Street2, acAddress.City, acAddress.State, acAddress.PostalCode, acAddress.Country );
-                    if ( location != null )
+                    if ( !isMatch || !string.IsNullOrWhiteSpace( pnHome.Number ) )
                     {
-                        if ( homeLocation == null )
+                        SetPhoneNumber( rockContext, person, pnHome, null, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid() );
+                    }
+                    if ( !isMatch || !string.IsNullOrWhiteSpace( pnHome.Number ) )
+                    {
+                        SetPhoneNumber( rockContext, person, pnCell, cbSms, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid() );
+                    }
+
+                    if ( !isMatch || !string.IsNullOrWhiteSpace( acAddress.Street1 ) )
+                    {
+                        string oldLocation = homeLocation != null ? homeLocation.Location.ToString() : string.Empty;
+                        string newLocation = string.Empty;
+
+                        var location = new LocationService( rockContext ).Get( acAddress.Street1, acAddress.Street2, acAddress.City, acAddress.State, acAddress.PostalCode, acAddress.Country );
+                        if ( location != null )
                         {
-                            homeLocation = new GroupLocation();
-                            homeLocation.GroupLocationTypeValueId = _homeAddressType.Id;
-                            family.GroupLocations.Add( homeLocation );
+                            if ( homeLocation == null )
+                            {
+                                homeLocation = new GroupLocation();
+                                homeLocation.GroupLocationTypeValueId = _homeAddressType.Id;
+                                family.GroupLocations.Add( homeLocation );
+                            }
+                            else
+                            {
+                                oldLocation = homeLocation.Location.ToString();
+                            }
+
+                            homeLocation.Location = location;
+                            newLocation = location.ToString();
                         }
                         else
                         {
-                            oldLocation = homeLocation.Location.ToString();
-                        }
-
-                        homeLocation.Location = location;
-                        newLocation = location.ToString();
-                    }
-                    else
-                    {
-                        if ( homeLocation != null )
-                        {
-                            homeLocation.Location = null;
-                            family.GroupLocations.Remove( homeLocation );
-                            new GroupLocationService( rockContext ).Delete( homeLocation );
+                            if ( homeLocation != null )
+                            {
+                                homeLocation.Location = null;
+                                family.GroupLocations.Remove( homeLocation );
+                                new GroupLocationService( rockContext ).Delete( homeLocation );
+                            }
                         }
                     }
-
-                    History.EvaluateChange( familyChanges, "Home Location", oldLocation, newLocation );
 
                     // Check for the spouse
                     if ( IsFullWithSpouse && !string.IsNullOrWhiteSpace(tbSpouseFirstName.Text) && !string.IsNullOrWhiteSpace(tbSpouseLastName.Text) )
                     {
-                        spouse = person.GetSpouse();
+                        spouse = person.GetSpouse( rockContext );
+                        bool isSpouseMatch = true;
+
                         if ( spouse == null ||
                             !tbSpouseFirstName.Text.Trim().Equals( spouse.FirstName.Trim(), StringComparison.OrdinalIgnoreCase ) ||
                             !tbSpouseLastName.Text.Trim().Equals( spouse.LastName.Trim(), StringComparison.OrdinalIgnoreCase ) )
                         {
                             spouse = new Person();
+                            isSpouseMatch = false;
 
                             spouse.FirstName = tbSpouseFirstName.Text.FixCase();
-                            History.EvaluateChange( spouseChanges, "First Name", string.Empty, spouse.FirstName );
-
                             spouse.LastName = tbSpouseLastName.Text.FixCase();
-                            History.EvaluateChange( spouseChanges, "Last Name", string.Empty, spouse.LastName );
 
                             spouse.ConnectionStatusValueId = _dvcConnectionStatus.Id;
                             spouse.RecordStatusValueId = _dvcRecordStatus.Id;
@@ -342,36 +346,29 @@ namespace RockWeb.Blocks.Groups
                             person.MaritalStatusValueId = _married.Id;
                         }
 
-                        History.EvaluateChange( changes, "Email", person.Email, tbEmail.Text );
                         spouse.Email = tbSpouseEmail.Text;
 
-                        SetPhoneNumber( rockContext, spouse, pnHome, null, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid(), spouseChanges );
-                        SetPhoneNumber( rockContext, spouse, pnSpouseCell, cbSpouseSms, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid(), spouseChanges );
+                        if ( !isSpouseMatch || !string.IsNullOrWhiteSpace( pnHome.Number ) )
+                        {
+                            SetPhoneNumber( rockContext, spouse, pnHome, null, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_HOME.AsGuid() );
+                        }
+
+                        if ( !isSpouseMatch || !string.IsNullOrWhiteSpace( pnSpouseCell.Number ) )
+                        {
+                            SetPhoneNumber( rockContext, spouse, pnSpouseCell, cbSpouseSms, Rock.SystemGuid.DefinedValue.PERSON_PHONE_TYPE_MOBILE.AsGuid() );
+                        }
                     }
                 }
 
                 // Save the person/spouse and change history 
                 rockContext.SaveChanges();
-                HistoryService.SaveChanges( rockContext, typeof( Person ),
-                    Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(), person.Id, changes );
-                HistoryService.SaveChanges( rockContext, typeof( Person ),
-                    Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(), person.Id, familyChanges );
-                if ( spouse != null )
-                {
-
-                    HistoryService.SaveChanges( rockContext, typeof( Person ),
-                        Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(), spouse.Id, spouseChanges );
-                    HistoryService.SaveChanges( rockContext, typeof( Person ),
-                        Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(), spouse.Id, familyChanges );
-                }
 
                 // Check to see if a workflow should be launched for each person
-                WorkflowType workflowType = null;
+                WorkflowTypeCache workflowType = null;
                 Guid? workflowTypeGuid = GetAttributeValue( "Workflow" ).AsGuidOrNull();
                 if ( workflowTypeGuid.HasValue )
                 {
-                    var workflowTypeService = new WorkflowTypeService( rockContext );
-                    workflowType = workflowTypeService.Get( workflowTypeGuid.Value );
+                    workflowType = WorkflowTypeCache.Read( workflowTypeGuid.Value );
                 }
 
                 // Save the registrations ( and launch workflows )
@@ -387,13 +384,6 @@ namespace RockWeb.Blocks.Groups
                 var mergeFields = new Dictionary<string, object>();
                 mergeFields.Add( "Group", _group );
                 mergeFields.Add( "GroupMembers", newGroupMembers );
-
-                bool showDebug = UserCanEdit && GetAttributeValue( "EnableDebug" ).AsBoolean();
-                lResultDebug.Visible = showDebug;
-                if ( showDebug )
-                {
-                    lResultDebug.Text = mergeFields.lavaDebugInfo( _rockContext );
-                }
 
                 string template = GetAttributeValue( "ResultLavaTemplate" );
                 lResult.Text = template.ResolveMergeFields( mergeFields );
@@ -419,13 +409,6 @@ namespace RockWeb.Blocks.Groups
                 // Show lava content
                 var mergeFields = new Dictionary<string, object>();
                 mergeFields.Add( "Group", _group );
-
-                bool showDebug = UserCanEdit && GetAttributeValue( "EnableDebug" ).AsBoolean();
-                lLavaOutputDebug.Visible = showDebug;
-                if ( showDebug )
-                {
-                    lLavaOutputDebug.Text = mergeFields.lavaDebugInfo( _rockContext );
-                }
 
                 string template = GetAttributeValue( "LavaTemplate" );
                 lLavaOverview.Text = template.ResolveMergeFields( mergeFields );
@@ -510,14 +493,16 @@ namespace RockWeb.Blocks.Groups
                     // If the group has a GroupCapacity, check how far we are from hitting that.
                     if ( _group.GroupCapacity.HasValue )
                     {
-                        openGroupSpots = _group.GroupCapacity.Value - _group.Members.Count();
+                        openGroupSpots = _group.GroupCapacity.Value - _group.ActiveMembers().Count();
                     }
 
                     // When someone registers for a group on the front-end website, they automatically get added with the group's default
                     // GroupTypeRole. If that role exists and has a MaxCount, check how far we are from hitting that.
                     if ( _defaultGroupRole != null && _defaultGroupRole.MaxCount.HasValue )
                     {
-                        openRoleSpots = _defaultGroupRole.MaxCount.Value - _group.Members.Where( m => m.GroupRoleId == _defaultGroupRole.Id ).Count();
+                        openRoleSpots = _defaultGroupRole.MaxCount.Value - _group.Members
+                            .Where( m => m.GroupRoleId == _defaultGroupRole.Id && m.GroupMemberStatus == GroupMemberStatus.Active )
+                            .Count();
                     }
 
                     // Between the group's GroupCapacity and DefaultGroupRole.MaxCount, grab the one we're closest to hitting, and how close we are to
@@ -554,36 +539,54 @@ namespace RockWeb.Blocks.Groups
         /// <param name="person">The person.</param>
         /// <param name="workflowType">Type of the workflow.</param>
         /// <param name="groupMembers">The group members.</param>
-        private void AddPersonToGroup( RockContext rockContext, Person person, WorkflowType workflowType, List<GroupMember> groupMembers )
+        private void AddPersonToGroup( RockContext rockContext, Person person, WorkflowTypeCache workflowType, List<GroupMember> groupMembers )
         {
             if (person != null )
             {
+                GroupMember groupMember = null;
                 if ( !_group.Members
                     .Any( m => 
                         m.PersonId == person.Id &&
                         m.GroupRoleId == _defaultGroupRole.Id))
                 {
                     var groupMemberService = new GroupMemberService(rockContext);
-                    var groupMember = new GroupMember();
+                    groupMember = new GroupMember();
                     groupMember.PersonId = person.Id;
                     groupMember.GroupRoleId = _defaultGroupRole.Id;
                     groupMember.GroupMemberStatus = (GroupMemberStatus)GetAttributeValue("GroupMemberStatus").AsInteger();
                     groupMember.GroupId = _group.Id;
                     groupMemberService.Add( groupMember );
                     rockContext.SaveChanges();
-
-                    if ( workflowType != null )
+                }
+                else
+                {
+                    GroupMemberStatus status = ( GroupMemberStatus ) GetAttributeValue( "GroupMemberStatus" ).AsInteger();
+                    groupMember = _group.Members.Where( m =>
+                       m.PersonId == person.Id &&
+                       m.GroupRoleId == _defaultGroupRole.Id ).FirstOrDefault();
+                    if (groupMember.GroupMemberStatus != status)
                     {
-                        try
-                        {
-                            List<string> workflowErrors;
-                            var workflow = Workflow.Activate( workflowType, person.FullName );
-                            new WorkflowService( rockContext ).Process( workflow, groupMember, out workflowErrors );
-                        }
-                        catch (Exception ex)
-                        {
-                            ExceptionLogService.LogException( ex, this.Context );
-                        }
+                        var groupMemberService = new GroupMemberService( rockContext );
+
+                        // reload this group member in the current context
+                        groupMember = groupMemberService.Get( groupMember.Id );
+                        groupMember.GroupMemberStatus = status;
+                        rockContext.SaveChanges();
+                    }
+
+                }
+
+                if ( groupMember != null && workflowType != null && ( workflowType.IsActive ?? true ) )
+                {
+                    try
+                    {
+                        List<string> workflowErrors;
+                        var workflow = Workflow.Activate( workflowType, person.FullName );
+                        new WorkflowService( rockContext ).Process( workflow, groupMember, out workflowErrors );
+                    }
+                    catch ( Exception ex )
+                    {
+                        ExceptionLogService.LogException( ex, this.Context );
                     }
                 }
             }
@@ -701,8 +704,7 @@ namespace RockWeb.Blocks.Groups
         /// <param name="pnbNumber">The PNB number.</param>
         /// <param name="cbSms">The cb SMS.</param>
         /// <param name="phoneTypeGuid">The phone type unique identifier.</param>
-        /// <param name="changes">The changes.</param>
-        private void SetPhoneNumber( RockContext rockContext, Person person, PhoneNumberBox pnbNumber, RockCheckBox cbSms, Guid phoneTypeGuid, List<string> changes )
+        private void SetPhoneNumber( RockContext rockContext, Person person, PhoneNumberBox pnbNumber, RockCheckBox cbSms, Guid phoneTypeGuid )
         {
             var phoneType = DefinedValueCache.Read( phoneTypeGuid );
             if ( phoneType != null )
@@ -744,10 +746,6 @@ namespace RockWeb.Blocks.Groups
                             .ForEach( n => n.IsMessagingEnabled = false );
                     }
                 }
-
-                History.EvaluateChange( changes,
-                    string.Format( "{0} Phone", phoneType.Value ),
-                    oldPhoneNumber, phoneNumber.NumberFormattedWithCountryCode );
             }
         }
 

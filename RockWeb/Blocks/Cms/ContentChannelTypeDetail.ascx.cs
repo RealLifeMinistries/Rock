@@ -222,9 +222,11 @@ namespace RockWeb.Blocks.Cms
             if ( contentType != null )
             {
                 contentType.Name = tbName.Text;
-                contentType.DateRangeType = (ContentChannelDateType)int.Parse( ddlDateRangeType.SelectedValue );
+                contentType.DateRangeType = ddlDateRangeType.SelectedValue.ConvertToEnum<ContentChannelDateType>();
                 contentType.IncludeTime = cbIncludeTime.Checked;
                 contentType.DisablePriority = cbDisablePriority.Checked;
+                contentType.DisableContentField = cbDisableContentField.Checked;
+                contentType.DisableStatus = cbDisableStatus.Checked;
 
                 if ( !Page.IsValid || !contentType.IsValid )
                 {
@@ -303,9 +305,9 @@ namespace RockWeb.Blocks.Cms
         }
 
         /// <summary>
-        /// Gs the marketing campaign ad attribute type_ show edit.
+        /// gs the channel attributes show edit.
         /// </summary>
-        /// <param name="attributeId">The attribute id.</param>
+        /// <param name="attributeGuid">The attribute unique identifier.</param>
         protected void gChannelAttributes_ShowEdit( Guid attributeGuid )
         {
             Attribute attribute;
@@ -419,7 +421,7 @@ namespace RockWeb.Blocks.Cms
         }
 
         /// <summary>
-        /// Binds the marketing campaign ad attribute type grid.
+        /// Binds the channel attributes grid.
         /// </summary>
         private void BindChannelAttributesGrid()
         {
@@ -456,9 +458,9 @@ namespace RockWeb.Blocks.Cms
         }
 
         /// <summary>
-        /// Gs the marketing campaign ad attribute type_ show edit.
+        /// gs the item attributes show edit.
         /// </summary>
-        /// <param name="attributeId">The attribute id.</param>
+        /// <param name="attributeGuid">The attribute unique identifier.</param>
         protected void gItemAttributes_ShowEdit( Guid attributeGuid )
         {
             Attribute attribute;
@@ -478,6 +480,9 @@ namespace RockWeb.Blocks.Cms
             edtItemAttributes.ReservedKeyNames = ItemAttributesState.Where( a => !a.Guid.Equals( attributeGuid ) ).Select( a => a.Key ).ToList();
 
             edtItemAttributes.SetAttributeProperties( attribute, typeof( ContentChannelItem ) );
+
+            // always enable the display of the indexing option as the channel decides whether or not to index not the type
+            edtItemAttributes.IsIndexingEnabledVisible = true;
 
             ShowDialog( "ItemAttributes", true );
         }
@@ -572,7 +577,7 @@ namespace RockWeb.Blocks.Cms
         }
 
         /// <summary>
-        /// Binds the marketing campaign ad attribute type grid.
+        /// Binds the item attributes grid.
         /// </summary>
         private void BindItemAttributesGrid()
         {
@@ -608,7 +613,7 @@ namespace RockWeb.Blocks.Cms
         /// <summary>
         /// Shows the detail.
         /// </summary>
-        /// <param name="contentTypeId">The marketing campaign ad type identifier.</param>
+        /// <param name="contentTypeId">The content type identifier.</param>
         public void ShowDetail( int contentTypeId )
         {
             var rockContext = new RockContext();
@@ -636,8 +641,12 @@ namespace RockWeb.Blocks.Cms
             tbName.Text = contentType.Name;
             ddlDateRangeType.BindToEnum<ContentChannelDateType>();
             ddlDateRangeType.SetValue( (int)contentType.DateRangeType );
+            ddlDateRangeType_SelectedIndexChanged( null, null );
+
             cbIncludeTime.Checked = contentType.IncludeTime;
             cbDisablePriority.Checked = contentType.DisablePriority;
+            cbDisableContentField.Checked = contentType.DisableContentField;
+            cbDisableStatus.Checked = contentType.DisableStatus;
 
             // load attribute data 
             ChannelAttributesState = new List<Attribute>();
@@ -756,5 +765,14 @@ namespace RockWeb.Blocks.Cms
 
         #endregion
 
-}
+        /// <summary>
+        /// Handles the SelectedIndexChanged event of the ddlDateRangeType control.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
+        protected void ddlDateRangeType_SelectedIndexChanged( object sender, EventArgs e )
+        {
+            cbIncludeTime.Visible = ddlDateRangeType.SelectedValueAsEnum<ContentChannelDateType>() != ContentChannelDateType.NoDates;
+        }
+    }
 }

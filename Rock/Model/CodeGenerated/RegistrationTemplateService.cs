@@ -120,6 +120,7 @@ namespace Rock.Model
             target.PaymentReminderTimeSpan = source.PaymentReminderTimeSpan;
             target.RegistrantsSameFamily = source.RegistrantsSameFamily;
             target.RegistrantTerm = source.RegistrantTerm;
+            target.RegistrationInstructions = source.RegistrationInstructions;
             target.RegistrationTerm = source.RegistrationTerm;
             target.RegistrationWorkflowTypeId = source.RegistrationWorkflowTypeId;
             target.ReminderEmailTemplate = source.ReminderEmailTemplate;
@@ -134,6 +135,10 @@ namespace Rock.Model
             target.SuccessText = source.SuccessText;
             target.SuccessTitle = source.SuccessTitle;
             target.WaitListEnabled = source.WaitListEnabled;
+            target.WaitListTransitionEmailTemplate = source.WaitListTransitionEmailTemplate;
+            target.WaitListTransitionFromEmail = source.WaitListTransitionFromEmail;
+            target.WaitListTransitionFromName = source.WaitListTransitionFromName;
+            target.WaitListTransitionSubject = source.WaitListTransitionSubject;
             target.CreatedDateTime = source.CreatedDateTime;
             target.ModifiedDateTime = source.ModifiedDateTime;
             target.CreatedByPersonAliasId = source.CreatedByPersonAliasId;

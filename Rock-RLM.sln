@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock", "Rock\Rock.csproj", "{8F8C2A79-24F4-4157-8B99-45F75FA85799}"
 EndProject
@@ -16,11 +16,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock.Version", "Rock.Versio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock.Rest", "Rock.Rest\Rock.Rest.csproj", "{B89DFD33-CE93-44E1-8616-C31ACDFE89CB}"
 EndProject
-Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "RockWeb", "http://localhost:6229", "{3ADB92E5-342B-458D-B779-369FC8A66CF6}"
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "RockWeb(1)", "http://localhost:6229", "{3ADB92E5-342B-458D-B779-369FC8A66CF6}"
 	ProjectSection(WebsiteProperties) = preProject
 		UseIISExpress = "true"
 		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.5.2"
-		ProjectReferences = "{957b1dbe-b921-4fae-8e5e-b7ad7f01b161}|Rock.Migrations.dll;{b89dfd33-ce93-44e1-8616-c31acdfe89cb}|Rock.Rest.dll;{381a2fc8-6f4f-4b66-a9b4-14932d43b76a}|Rock.Version.dll;{05f3587d-86dd-4cf3-a80a-d8cf598e1fd1}|Rock.PayFlowPro.dll;{cb9372cd-9c1d-47ab-92d8-702d4d68324f}|DotLiquid.dll;{eee3c919-71c8-4160-a3c6-49db39394a84}|Rock.Mandrill.dll;{681d7ce2-d156-4414-abec-06cb5f47adec}|Rock.Mailgun.dll;{0a624087-2ae4-4e31-9154-db488afe75ab}|Rock.NMI.dll;{2adf3975-dae6-49c0-9a8d-ebd5fb2b887a}|com.reallifeministries.RockExtensions.dll;{8f8c2a79-24f4-4157-8b99-45f75fa85799}|Rock.dll;"
+		ProjectReferences = "{957b1dbe-b921-4fae-8e5e-b7ad7f01b161}|Rock.Migrations.dll;{b89dfd33-ce93-44e1-8616-c31acdfe89cb}|Rock.Rest.dll;{381a2fc8-6f4f-4b66-a9b4-14932d43b76a}|Rock.Version.dll;{05f3587d-86dd-4cf3-a80a-d8cf598e1fd1}|Rock.PayFlowPro.dll;{cb9372cd-9c1d-47ab-92d8-702d4d68324f}|DotLiquid.dll;{eee3c919-71c8-4160-a3c6-49db39394a84}|Rock.Mandrill.dll;{681d7ce2-d156-4414-abec-06cb5f47adec}|Rock.Mailgun.dll;{0a624087-2ae4-4e31-9154-db488afe75ab}|Rock.NMI.dll;{8f8c2a79-24f4-4157-8b99-45f75fa85799}|Rock.dll;{c1dd2402-5fb2-411e-bf8d-5d9cb3a58e8b}|Rock.Slingshot.dll;{962944DE-8BF4-4175-B55A-E75CF7918272}|Rock.Slingshot.Model.dll;{1f5956f2-2b0f-49b8-aaf1-2cc28f01426a}|Rock.SignNow.dll;{69AC175C-3997-4514-8C9E-5D24811928C2}|SignNowSDK.dll;"
 		Debug.AspNetCompiler.VirtualPath = "/localhost_6229"
 		Debug.AspNetCompiler.PhysicalPath = "RockWeb\"
 		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_6229\"
@@ -51,6 +51,14 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.reallifeministries.GroupMatching", "com.reallifeministries.GroupMatching\com.reallifeministries.GroupMatching.csproj", "{2B66458C-122C-4168-84E5-17EC9AD63558}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "com.reallifeministries.RockExtensions", "com.reallifeministries.RockExtensions\com.reallifeministries.RockExtensions.csproj", "{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock.Slingshot.Model", "Rock.Slingshot.Model\Rock.Slingshot.Model.csproj", "{962944DE-8BF4-4175-B55A-E75CF7918272}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock.Slingshot", "Rock.Slingshot\Rock.Slingshot.csproj", "{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Rock.SignNow", "Rock.SignNow\Rock.SignNow.csproj", "{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SignNowSDK", "SignNowSDK\SignNowSDK.csproj", "{69AC175C-3997-4514-8C9E-5D24811928C2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -186,6 +194,54 @@ Global
 		{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}.Release|x86.ActiveCfg = Release|Any CPU
 		{2ADF3975-DAE6-49C0-9A8D-EBD5FB2B887A}.Release|x86.Build.0 = Release|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Debug|x86.Build.0 = Debug|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Release|Any CPU.Build.0 = Release|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Release|x86.ActiveCfg = Release|Any CPU
+		{962944DE-8BF4-4175-B55A-E75CF7918272}.Release|x86.Build.0 = Release|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Debug|x86.Build.0 = Debug|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Release|x86.ActiveCfg = Release|Any CPU
+		{C1DD2402-5FB2-411E-BF8D-5D9CB3A58E8B}.Release|x86.Build.0 = Release|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Debug|x86.Build.0 = Debug|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|x86.ActiveCfg = Release|Any CPU
+		{1F5956F2-2B0F-49B8-AAF1-2CC28F01426A}.Release|x86.Build.0 = Release|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Debug|x86.Build.0 = Debug|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Release|x86.ActiveCfg = Release|Any CPU
+		{69AC175C-3997-4514-8C9E-5D24811928C2}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

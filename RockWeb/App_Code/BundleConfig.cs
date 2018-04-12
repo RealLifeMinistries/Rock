@@ -26,12 +26,12 @@ public class BundleConfig
     /// Registers the bundles.
     /// </summary>
     /// <param name="bundles">The bundles.</param>
-	public static void RegisterBundles( BundleCollection bundles )
+	public static void RegisterBundles(BundleCollection bundles)
     {
         // start with a clean bundles (this seems to have fixed the javascript errors that would occur on the first time you debug after opening the solution)
         bundles.ResetAll();
 
-        bundles.Add( new ScriptBundle( "~/bundles/WebFormsJs" ).Include(
+        bundles.Add(new ScriptBundle("~/bundles/WebFormsJs").Include(
             "~/Scripts/WebForms/WebForms.js",
             "~/Scripts/WebForms/WebUIValidation.js",
             "~/Scripts/WebForms/MenuStandards.js",
@@ -39,57 +39,59 @@ public class BundleConfig
             "~/Scripts/WebForms/GridView.js",
             "~/Scripts/WebForms/DetailsView.js",
             "~/Scripts/WebForms/TreeView.js",
-            "~/Scripts/WebForms/WebParts.js" ) );
+            "~/Scripts/WebForms/WebParts.js"));
 
-        bundles.Add( new ScriptBundle( "~/Scripts/Bundles/RockLibs" ).Include(
+        bundles.Add(new ScriptBundle("~/Scripts/Bundles/RockLibs").Include(
             "~/Scripts/jquery-ui-1.10.0.custom.min.js",
             "~/Scripts/bootstrap.min.js",
             "~/Scripts/bootstrap-timepicker.js",
             "~/Scripts/bootstrap-datepicker.js",
+            "~/Scripts/bootstrap-limit.js",
             "~/Scripts/bootstrap-modalmanager.js",
             "~/Scripts/bootstrap-modal.js",
             "~/Scripts/bootbox.min.js",
+            "~/Scripts/chosen.jquery.min.js",
             "~/Scripts/typeahead.min.js",
             "~/Scripts/jquery.fileupload.js",
-            "~/Scripts/jquery.tinyscrollbar.js",
+            "~/Scripts/iscroll.js",
             "~/Scripts/jcrop.min.js",
-            "~/Scripts/ResizeSensor.js",       
+            "~/Scripts/ResizeSensor.js",
             "~/Scripts/ion.rangeSlider/js/ion-rangeSlider/ion.rangeSlider.min.js",
-            "~/Scripts/Rock/Extensions/*.js" ) );
+            "~/Scripts/Rock/Extensions/*.js"));
 
-        bundles.Add( new ScriptBundle( "~/Scripts/Bundles/RockUi" ).Include(
+        bundles.Add(new ScriptBundle("~/Scripts/Bundles/RockUi").Include(
             "~/Scripts/Rock/dialogs.js",
             "~/Scripts/Rock/settings.js",
             "~/Scripts/Rock/utility.js",
-            "~/Scripts/Rock/Controls/*.js" ) );
+            "~/Scripts/Rock/Controls/*.js"));
 
-        bundles.Add( new ScriptBundle( "~/Scripts/Bundles/RockValidation" ).Include(
-            "~/Scripts/Rock/Validate/*.js" ) );
+        bundles.Add(new ScriptBundle("~/Scripts/Bundles/RockValidation").Include(
+            "~/Scripts/Rock/Validate/*.js"));
 
         // Creating a separate "Admin" bundle specifically for JS functionality that needs
         // to be included for administrative users
-        bundles.Add( new ScriptBundle( "~/Scripts/Bundles/RockAdmin" ).Include( 
-            "~/Scripts/Rock/Admin/*.js" ) );
+        bundles.Add(new ScriptBundle("~/Scripts/Bundles/RockAdmin").Include(
+            "~/Scripts/Rock/Admin/*.js"));
 
         // Creating a separate "RockHtmlEditorPlugins" bundle specifically for JS functionality that needs
         // to be included for HtmlEditor
-        bundles.Add( new ScriptBundle( "~/Scripts/Bundles/RockHtmlEditorPlugins" ).Include(
-            "~/Scripts/summernote/plugins/*.js" ) );
+        bundles.Add(new ScriptBundle("~/Scripts/Bundles/RockHtmlEditorPlugins").Include(
+            "~/Scripts/summernote/plugins/*.js"));
 
         // make sure the ConcatenationToken is what we want.  This is supposed to be the default, but it occassionally was an empty string.
-        foreach ( var bundle in bundles )
+        foreach (var bundle in bundles)
         {
             bundle.ConcatenationToken = ";\r\n";
         }
 
-        var cfg = (System.Web.Configuration.CompilationSection)ConfigurationManager.GetSection( "system.web/compilation" );
-        if ( cfg.Debug )
+        var cfg = (System.Web.Configuration.CompilationSection)ConfigurationManager.GetSection("system.web/compilation");
+        if (cfg.Debug)
         {
             // remove the js minification if debugging
-            foreach ( var bundle in bundles )
+            foreach (var bundle in bundles)
             {
                 bundle.Transforms.Clear();
             }
         }
-	}
+    }
 }

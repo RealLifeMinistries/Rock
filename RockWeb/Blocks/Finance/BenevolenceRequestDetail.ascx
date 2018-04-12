@@ -22,7 +22,8 @@
                             <Rock:DatePicker ID="dpRequestDate" runat="server" Label="Request Date" SourceTypeName="Rock.Model.BenevolenceRequest, Rock" PropertyName="RequestDateTime" />
                         </div>
                         <div class="col-md-3">
-                            <Rock:RockDropDownList ID="ddlCaseWorker" runat="server" Label="Case Worker" SourceTypeName="Rock.Model.BenevolenceRequest, Rock" PropertyName="CaseWorkerPersonAlias" />
+                            <Rock:PersonPicker ID="ppCaseWorker" runat="server" Label="Case Worker" Visible="false" />
+                            <Rock:RockDropDownList ID="ddlCaseWorker" runat="server" Label="Case Worker" EnhanceForLongLists="true" />
                         </div>
                         <div class="col-md-3">
                             <Rock:CampusPicker ID="cpCampus" runat="server" Label="Campus" />
@@ -80,7 +81,7 @@
                 <Rock:PanelWidget ID="pwRequest" runat="server" Title="Request Details" Expanded="true">
                     <Rock:DataTextBox ID="dtbRequestText" runat="server" Label="Description of Request" TextMode="MultiLine" Rows="4" SourceTypeName="Rock.Model.BenevolenceRequest, Rock" PropertyName="RequestText" />
                 
-                    <asp:PlaceHolder ID="phAttributes" runat="server" EnableViewState="false"></asp:PlaceHolder>
+                    <Rock:DynamicPlaceHolder ID="phAttributes" runat="server" />
 
                     <Rock:RockControlWrapper ID="rcwDocuments" runat="server" Label="Related Documents">
                         <asp:DataList ID="dlDocuments" runat="server" CellPadding="4" RepeatDirection="Horizontal" RepeatColumns="4" >
@@ -115,8 +116,8 @@
                     </Rock:Grid>
                 </Rock:PanelWidget>
 
-                <asp:LinkButton ID="lbSave" runat="server" Text="Save" CssClass="btn btn-primary" OnClick="lbSave_Click" />
-                <asp:LinkButton ID="lbCancel" runat="server" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="lbCancel_Click" />
+                <asp:LinkButton ID="lbSave" runat="server" AccessKey="s" ToolTip="Alt+s" Text="Save" CssClass="btn btn-primary" OnClick="lbSave_Click" />
+                <asp:LinkButton ID="lbCancel" runat="server" AccessKey="c" ToolTip="Alt+c" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="lbCancel_Click" />
                 <asp:LinkButton ID="lbPrint" runat="server" Text="<i class='fa fa-print'></i>" CssClass="btn btn-sm btn-default pull-right" OnClick="lbPrint_Click" />
             </div>
 

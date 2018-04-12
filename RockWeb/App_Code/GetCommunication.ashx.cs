@@ -10,7 +10,7 @@
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// See the License for the specific language governing spermissions and
 // limitations under the License.
 // </copyright>
 //
@@ -69,7 +69,7 @@ namespace RockWeb
                     string encodedKey = context.Request.QueryString["p"];
                     if ( !string.IsNullOrWhiteSpace( encodedKey ) )
                     {
-                        //person = new PersonService( rockContext ).GetByImpersonationToken( encodedKey, true, null );
+                        person = new PersonService( rockContext ).GetByImpersonationToken( encodedKey, true, null );
                     }
 
                     if ( person == null )
@@ -121,11 +121,11 @@ namespace RockWeb
                         if ( recipient != null )
                         {
                             // write an 'opened' interaction
-                            //var interactionService = new InteractionService( rockContext );
+                            var interactionService = new InteractionService(rockContext);
 
-                            //InteractionComponent interactionComponent = new InteractionComponentService( rockContext )
-                            //                    .GetComponentByEntityId( Rock.SystemGuid.InteractionChannel.COMMUNICATION.AsGuid(),
-                            //                        communication.Id, communication.Subject );
+                            InteractionComponent interactionComponent = new InteractionComponentService(rockContext)
+                                                .GetComponentByEntityId(Rock.SystemGuid.InteractionChannel.COMMUNICATION.AsGuid(),
+                                                    communication.Id, communication.Subject);
                             rockContext.SaveChanges();
 
                             var ipAddress = Rock.Web.UI.RockPage.GetClientIpAddress();
@@ -135,9 +135,9 @@ namespace RockWeb
                             UAParser.ClientInfo client = UAParser.Parser.GetDefault().Parse( userAgent );
                             var clientOs = client.OS.ToString();
                             var clientBrowser = client.UserAgent.ToString();
-                            //var clientType = InteractionDeviceType.GetClientType( userAgent );
+                            var clientType = InteractionDeviceType.GetClientType(userAgent);
 
-                            //interactionService.AddInteraction( interactionComponent.Id, recipient.Id, "Opened", "", recipient.PersonAliasId, RockDateTime.Now, clientBrowser, clientOs, clientType, userAgent, ipAddress, null );
+                            interactionService.AddInteraction(interactionComponent.Id, recipient.Id, "Opened", "", recipient.PersonAliasId, RockDateTime.Now, clientBrowser, clientOs, clientType, userAgent, ipAddress, null);
 
                             rockContext.SaveChanges();
                             

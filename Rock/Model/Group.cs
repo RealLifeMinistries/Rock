@@ -17,15 +17,18 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity;
+using System.Data.Entity.Infrastructure;
 using System.Data.Entity.ModelConfiguration;
 using System.Linq;
 using System.Runtime.Serialization;
+using System.Text;
 using Rock.Data;
 using Rock.Security;
+using Rock.UniversalSearch;
+using Rock.UniversalSearch.IndexModels;
 using Rock.Web.Cache;
 
 namespace Rock.Model
@@ -36,9 +39,13 @@ namespace Rock.Model
     /// <remarks>
     /// In Rock any collection or defined subset of people are considered a group.
     /// </remarks>
+    [RockDomain( "Group" )]
     [Table( "Group" )]
     [DataContract]
-    public partial class Group : Model<Group>, IOrdered
+
+    // Support Analytics Tables, but only for GroupType Family
+    [Analytics( "GroupTypeId", "10", true, true )]
+    public partial class Group : Model<Group>, IOrdered, IHasActiveFlag, IRockIndexable
     {
         #region Entity Properties
 
@@ -136,11 +143,12 @@ namespace Rock.Model
         [Required]
         [DataMember( IsRequired = true )]
         [Previewable]
-        public bool IsActive		
-        {		
-            get { return _isActive; }		
-            set { _isActive = value; }		
-        }		
+        public bool IsActive
+        {
+            get { return _isActive; }
+            set { _isActive = value; }
+        }
+
         private bool _isActive = true;
 
         /// <summary>
@@ -164,52 +172,13 @@ namespace Rock.Model
         public bool? AllowGuests { get; set; }
 
         /// <summary>
-        /// Gets or sets the welcome system email template.
-        /// </summary>
-        /// <value>
-        /// The welcome system email.
-        /// </value>
-        [HideFromReporting]
-        [DataMember]
-        public int? WelcomeSystemEmailId { get; set; }
-
-        /// <summary>
-        /// Gets or sets the exit system email template.
-        /// </summary>
-        /// <value>
-        /// The exit system email.
-        /// </value>
-        [HideFromReporting]
-        [DataMember]
-        public int? ExitSystemEmailId { get; set; }
-
-        /// <summary>
-        /// Gets or sets the data view to sync with.
-        /// </summary>
-        /// <value>
-        /// The sync data view.
-        /// </value>
-        [HideFromReporting]
-        [DataMember]
-        public int? SyncDataViewId { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether a user account should be generated when a person is added through the sync.
-        /// </summary>
-        /// <value>
-        /// The add user accounts through sync.
-        /// </value>
-        [HideFromReporting]
-        [DataMember]
-        public bool? AddUserAccountsDuringSync { get; set; }
-
-        /// <summary>
         /// Gets or sets whether a group member can only be added if all the GroupRequirements have been met
         /// </summary>
         /// <value>
         /// The must meet requirements to add member.
         /// </value>
-        [DataMember]
+        [Obsolete( "This no longer is functional. Please use GroupRequirement.MustMeetRequirementToAddMember instead." )]
+        [NotMapped]
         public bool? MustMeetRequirementsToAddMember { get; set; }
 
         /// <summary>
@@ -225,6 +194,7 @@ namespace Rock.Model
             get { return _isPublic; }
             set { _isPublic = value; }
         }
+
         private bool _isPublic = true;
 
         /// <summary>
@@ -255,6 +225,7 @@ namespace Rock.Model
         /// <value>
         /// A <see cref="Rock.Model.Group"/> representing the Group's parent group. If this Group does not have a parent, the value will be null.
         /// </value>
+        [LavaInclude]
         public virtual Group ParentGroup { get; set; }
 
         /// <summary>
@@ -285,33 +256,6 @@ namespace Rock.Model
         public virtual Rock.Model.Schedule Schedule { get; set; }
 
         /// <summary>
-        /// Gets or sets the welcome system email.
-        /// </summary>
-        /// <value>
-        /// The welcome system email.
-        /// </value>
-        [DataMember]
-        public virtual Rock.Model.SystemEmail WelcomeSystemEmail { get; set; }
-
-        /// <summary>
-        /// Gets or sets the exit system email.
-        /// </summary>
-        /// <value>
-        /// The exit system email.
-        /// </value>
-        [DataMember]
-        public virtual Rock.Model.SystemEmail ExitSystemEmail { get; set; }
-
-        /// <summary>
-        /// Gets or sets the data view to sync with.
-        /// </summary>
-        /// <value>
-        /// The sync data view.
-        /// </value>
-        [DataMember]
-        public virtual Rock.Model.DataView SyncDataView { get; set; }
-
-        /// <summary>
         /// Gets or sets the type of the required signature document.
         /// </summary>
         /// <value>
@@ -332,6 +276,7 @@ namespace Rock.Model
             get { return _groups ?? ( _groups = new Collection<Group>() ); }
             set { _groups = value; }
         }
+
         private ICollection<Group> _groups;
 
         /// <summary>
@@ -346,6 +291,7 @@ namespace Rock.Model
             get { return _members ?? ( _members = new Collection<GroupMember>() ); }
             set { _members = value; }
         }
+
         private ICollection<GroupMember> _members;
 
         /// <summary>
@@ -360,10 +306,11 @@ namespace Rock.Model
             get { return _groupLocations ?? ( _groupLocations = new Collection<GroupLocation>() ); }
             set { _groupLocations = value; }
         }
+
         private ICollection<GroupLocation> _groupLocations;
 
         /// <summary>
-        /// Gets or sets the group requirements.
+        /// Gets or sets the group requirements (not including GroupRequirements from the GroupType)
         /// </summary>
         /// <value>
         /// The group requirements.
@@ -374,6 +321,7 @@ namespace Rock.Model
             get { return _groupsRequirements ?? ( _groupsRequirements = new Collection<GroupRequirement>() ); }
             set { _groupsRequirements = value; }
         }
+
         private ICollection<GroupRequirement> _groupsRequirements;
 
         /// <summary>
@@ -382,12 +330,29 @@ namespace Rock.Model
         /// <value>
         /// The group member workflow triggers.
         /// </value>
+        [LavaInclude]
         public virtual ICollection<GroupMemberWorkflowTrigger> GroupMemberWorkflowTriggers
         {
             get { return _triggers ?? ( _triggers = new Collection<GroupMemberWorkflowTrigger>() ); }
             set { _triggers = value; }
         }
+
         private ICollection<GroupMemberWorkflowTrigger> _triggers;
+
+        /// <summary>
+        /// Gets or sets the group syncs.
+        /// </summary>
+        /// <value>
+        /// The group syncs.
+        /// </value>
+        [DataMember]
+        public virtual ICollection<GroupSync> GroupSyncs
+        {
+            get { return _groupSyncs ?? ( _groupSyncs = new Collection<GroupSync>() ); }
+            set { _groupSyncs = value; }
+        }
+
+        private ICollection<GroupSync> _groupSyncs;
 
         /// <summary>
         /// Gets or sets the linkages.
@@ -395,13 +360,15 @@ namespace Rock.Model
         /// <value>
         /// The linkages.
         /// </value>
+        [LavaInclude]
         public virtual ICollection<EventItemOccurrenceGroupMap> Linkages
         {
             get { return _linkages ?? ( _linkages = new Collection<EventItemOccurrenceGroupMap>() ); }
             set { _linkages = value; }
         }
+
         private ICollection<EventItemOccurrenceGroupMap> _linkages;
-        
+
         /// <summary>
         /// Gets the securable object that security permissions should be inherited from.  If block is located on a page
         /// security will be inherited from the page, otherwise it will be inherited from the site.
@@ -432,9 +399,90 @@ namespace Rock.Model
             }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether [allows interactive bulk indexing].
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if [allows interactive bulk indexing]; otherwise, <c>false</c>.
+        /// </value>
+        /// <exception cref="System.NotImplementedException"></exception>
+        [NotMapped]
+        public bool AllowsInteractiveBulkIndexing
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// A dictionary of actions that this class supports and the description of each.
+        /// </summary>
+        public override Dictionary<string, string> SupportedActions
+        {
+            get
+            {
+                if ( _supportedActions == null )
+                {
+                    _supportedActions = new Dictionary<string, string>();
+                    _supportedActions.Add( Authorization.VIEW, "The roles and/or users that have access to view." );
+                    _supportedActions.Add( Authorization.MANAGE_MEMBERS, "The roles and/or users that have access to manage the group members." );
+                    _supportedActions.Add( Authorization.EDIT, "The roles and/or users that have access to edit." );
+                    _supportedActions.Add( Authorization.ADMINISTRATE, "The roles and/or users that have access to administrate." );
+                }
+
+                return _supportedActions;
+            }
+        }
+        private Dictionary<string, string> _supportedActions;
+
+        /// <summary>
+        /// Gets or sets the history changes.
+        /// </summary>
+        /// <value>
+        /// The history changes.
+        /// </value>
+        [NotMapped]
+        private List<string> HistoryChanges { get; set; }
+
         #endregion
 
         #region Public Methods
+
+        /// <summary>
+        /// Gets any group type role limit warnings based on GroupTypeRole restrictions
+        /// </summary>
+        /// <param name="warningMessageHtml">The warning message HTML.</param>
+        /// <returns></returns>
+        public bool GetGroupTypeRoleLimitWarnings( out string warningMessageHtml )
+        {
+            var roleLimitWarnings = new StringBuilder();
+            var group = this;
+            var groupType = GroupTypeCache.Read( group.GroupTypeId );
+            if ( groupType?.Roles != null && groupType.Roles.Any() )
+            {
+                var groupMemberService = new GroupMemberService( new RockContext() );
+                foreach ( var role in groupType.Roles.Where( a => a.MinCount.HasValue || a.MaxCount.HasValue ) )
+                {
+                    int curCount = groupMemberService.Queryable().Where( m => m.GroupId == group.Id && m.GroupRoleId == role.Id && m.GroupMemberStatus == GroupMemberStatus.Active ).Count();
+
+                    if ( role.MinCount.HasValue && role.MinCount.Value > curCount )
+                    {
+                        string format = "The <strong>{1}</strong> role is currently below its minimum requirement of {2:N0} active {3}.<br/>";
+                        roleLimitWarnings.AppendFormat( format, role.Name.Pluralize().ToLower(), role.Name.ToLower(), role.MinCount, role.MinCount == 1 ? groupType.GroupMemberTerm.ToLower() : groupType.GroupMemberTerm.Pluralize().ToLower() );
+                    }
+
+                    if ( role.MaxCount.HasValue && role.MaxCount.Value < curCount )
+                    {
+                        string format = "The <strong>{1}</strong> role is currently above its maximum limit of {2:N0} active {3}.<br/>";
+                        roleLimitWarnings.AppendFormat( format, role.Name.Pluralize().ToLower(), role.Name.ToLower(), role.MaxCount, role.MaxCount == 1 ? groupType.GroupMemberTerm.ToLower() : groupType.GroupMemberTerm.Pluralize().ToLower() );
+                    }
+                }
+            }
+
+            warningMessageHtml = roleLimitWarnings.ToString();
+            return !string.IsNullOrEmpty( warningMessageHtml );
+        }
 
         /// <summary>
         /// Gets all the group member workflow triggers from the group and the group type sorted by order
@@ -462,7 +510,7 @@ namespace Rock.Model
             // If the user is not authorized for group through normal security roles, and this is a logged
             // in user trying to view or edit, check to see if they should be allowed based on their role
             // in the group.
-            if ( !authorized && person != null && ( action == Authorization.VIEW || action == Authorization.EDIT ) )
+            if ( !authorized && person != null && ( action == Authorization.VIEW || action == Authorization.MANAGE_MEMBERS || action == Authorization.EDIT ) )
             {
                 // Get the cached group type
                 var groupType = GroupTypeCache.Read( this.GroupTypeId );
@@ -488,6 +536,11 @@ namespace Rock.Model
                                     return true;
                                 }
 
+                                if ( action == Authorization.MANAGE_MEMBERS && ( role.CanEdit || role.CanManageMembers ) )
+                                {
+                                    return true;
+                                }
+
                                 if ( action == Authorization.EDIT && role.CanEdit )
                                 {
                                     return true;
@@ -502,17 +555,43 @@ namespace Rock.Model
         }
 
         /// <summary>
-        /// Returns a list of the Group Requirements for this Group along with the status ordered by GroupRequirement Name
+        /// Gets the group requirements.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <returns></returns>
+        public IQueryable<GroupRequirement> GetGroupRequirements( RockContext rockContext )
+        {
+            return new GroupRequirementService( rockContext ).Queryable().Include( a => a.GroupRequirementType ).Where( a => ( a.GroupId.HasValue && a.GroupId == this.Id ) || ( a.GroupTypeId.HasValue && a.GroupTypeId == this.GroupTypeId ) );
+        }
+
+        /// <summary>
+        /// Persons the meets group requirements.
         /// </summary>
         /// <param name="personId">The person identifier.</param>
         /// <param name="groupRoleId">The group role identifier.</param>
         /// <returns></returns>
+        [Obsolete( "Use PersonMeetsGroupRequirements(rockContext, personId, groupRoleId) instead " )]
         public IEnumerable<PersonGroupRequirementStatus> PersonMeetsGroupRequirements( int personId, int? groupRoleId )
         {
-            var result = new List<PersonGroupRequirementStatus>();
-            foreach ( var groupRequirement in this.GroupRequirements.OrderBy( a => a.GroupRequirementType.Name ) )
+            using ( var rockContext = new RockContext() )
             {
-                var requirementStatus = groupRequirement.PersonMeetsGroupRequirement( personId, groupRoleId );
+                return this.PersonMeetsGroupRequirements( rockContext, personId, groupRoleId );
+            }
+        }
+
+        /// <summary>
+        /// Persons the meets group requirements.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="personId">The person identifier.</param>
+        /// <param name="groupRoleId">The group role identifier.</param>
+        /// <returns></returns>
+        public IEnumerable<PersonGroupRequirementStatus> PersonMeetsGroupRequirements( RockContext rockContext, int personId, int? groupRoleId )
+        {
+            var result = new List<PersonGroupRequirementStatus>();
+            foreach ( var groupRequirement in this.GetGroupRequirements( rockContext ).OrderBy( a => a.GroupRequirementType.Name ) )
+            {
+                var requirementStatus = groupRequirement.PersonMeetsGroupRequirement( personId, this.Id, groupRoleId );
                 result.Add( requirementStatus );
             }
 
@@ -520,32 +599,91 @@ namespace Rock.Model
         }
 
         /// <summary>
-        /// Pres the save changes.
+        /// Method that will be called on an entity immediately before the item is saved by context
+        /// </summary>
+        /// <param name="dbContext"></param>
+        /// <param name="entry"></param>
+        public override void PreSaveChanges( Data.DbContext dbContext, DbEntityEntry entry )
+        {
+            var rockContext = (RockContext)dbContext;
+
+            HistoryChanges = new List<string>();
+
+            switch ( entry.State )
+            {
+                case System.Data.Entity.EntityState.Added:
+                    {
+                        HistoryChanges.Add( "Group Created" );
+
+                        History.EvaluateChange( HistoryChanges, "Name", string.Empty, Name );
+                        History.EvaluateChange( HistoryChanges, "Description", string.Empty, Description );
+                        History.EvaluateChange( HistoryChanges, "Group Type", (int?)null, GroupType, GroupTypeId );
+                        History.EvaluateChange( HistoryChanges, "Campus", (int?)null, Campus, CampusId );
+                        History.EvaluateChange( HistoryChanges, "Security Role", (bool?)null, IsSecurityRole );
+                        History.EvaluateChange( HistoryChanges, "Active", (bool?)null, IsActive );
+                        History.EvaluateChange( HistoryChanges, "Allow Guests", (bool?)null, AllowGuests );
+                        History.EvaluateChange( HistoryChanges, "Public", (bool?)null, IsPublic );
+                        History.EvaluateChange( HistoryChanges, "Group Capacity", (int?)null, GroupCapacity );
+
+                        break;
+                    }
+
+                case System.Data.Entity.EntityState.Modified:
+                    {
+                        History.EvaluateChange( HistoryChanges, "Name", entry.OriginalValues["Name"].ToStringSafe(), Name );
+                        History.EvaluateChange( HistoryChanges, "Description", entry.OriginalValues["Description"].ToStringSafe(), Description );
+                        History.EvaluateChange( HistoryChanges, "Group Type", entry.OriginalValues["GroupTypeId"].ToStringSafe().AsIntegerOrNull(), GroupType, GroupTypeId );
+                        History.EvaluateChange( HistoryChanges, "Campus", entry.OriginalValues["CampusId"].ToStringSafe().AsIntegerOrNull(), Campus, CampusId );
+                        History.EvaluateChange( HistoryChanges, "Security Role", entry.OriginalValues["IsSecurityRole"].ToStringSafe().AsBoolean(), IsSecurityRole );
+                        History.EvaluateChange( HistoryChanges, "Active", entry.OriginalValues["IsActive"].ToStringSafe().AsBoolean(), IsActive );
+                        History.EvaluateChange( HistoryChanges, "Allow Guests", entry.OriginalValues["AllowGuests"].ToStringSafe().AsBooleanOrNull(), AllowGuests );
+                        History.EvaluateChange( HistoryChanges, "Public", entry.OriginalValues["IsPublic"].ToStringSafe().AsBoolean(), IsPublic );
+                        History.EvaluateChange( HistoryChanges, "Group Capacity", entry.OriginalValues["GroupCapacity"].ToStringSafe().AsIntegerOrNull(), GroupCapacity );
+
+                        break;
+                    }
+
+                case System.Data.Entity.EntityState.Deleted:
+                    {
+                        HistoryChanges.Add( "Deleted" );
+
+                        // manually delete any grouprequirements of this group since it can't be cascade deleted
+                        var groupRequirementService = new GroupRequirementService( rockContext );
+                        var groupRequirements = groupRequirementService.Queryable().Where( a => a.GroupId.HasValue && a.GroupId == this.Id ).ToList();
+                        if ( groupRequirements.Any() )
+                        {
+                            groupRequirementService.DeleteRange( groupRequirements );
+                        }
+
+                        // manually set any attendance search group ids to null
+                        var attendanceService = new AttendanceService( rockContext );
+                        foreach ( var attendance in attendanceService.Queryable()
+                            .Where( a =>
+                                a.SearchResultGroupId.HasValue &&
+                                a.SearchResultGroupId.Value == this.Id ) )
+                        {
+                            attendance.SearchResultGroupId = null;
+                        }
+
+                        break;
+                    }
+            }
+
+            base.PreSaveChanges( dbContext, entry );
+        }
+
+        /// <summary>
+        /// Posts the save changes.
         /// </summary>
         /// <param name="dbContext">The database context.</param>
-        /// <param name="state">The state.</param>
-        public override void PreSaveChanges( Rock.Data.DbContext dbContext, System.Data.Entity.EntityState state )
+        public override void PostSaveChanges( Data.DbContext dbContext )
         {
-            if ( state == System.Data.Entity.EntityState.Deleted )
+            if ( HistoryChanges != null && HistoryChanges.Any() )
             {
-                // manually delete any grouprequirements of this group since it can't be cascade deleted
-                var groupRequirementService = new GroupRequirementService( dbContext as RockContext );
-                var groupRequirements = groupRequirementService.Queryable().Where( a => a.GroupId == this.Id ).ToList();
-                if ( groupRequirements.Any() )
-                {
-                    groupRequirementService.DeleteRange( groupRequirements );
-                }
-
-                // manually set any attendance search group ids to null
-                var attendanceService = new AttendanceService( dbContext as RockContext );
-                foreach ( var attendance in attendanceService.Queryable()
-                    .Where( a => 
-                        a.SearchResultGroupId.HasValue &&
-                        a.SearchResultGroupId.Value == this.Id ) )
-                {
-                    attendance.SearchResultGroupId = null;
-                }
+                HistoryService.SaveChanges( (RockContext)dbContext, typeof( Group ), Rock.SystemGuid.Category.HISTORY_GROUP_CHANGES.AsGuid(), this.Id, HistoryChanges, true, this.ModifiedByPersonAliasId );
             }
+
+            base.PostSaveChanges( dbContext );
         }
 
         /// <summary>
@@ -567,12 +705,12 @@ namespace Rock.Model
                         // validate that a campus is not required
                         var groupType = this.GroupType ?? new GroupTypeService( rockContext ).Queryable().Where( g => g.Id == this.GroupTypeId ).FirstOrDefault();
 
-                        if (groupType != null )
+                        if ( groupType != null )
                         {
-                            if (groupType.GroupsRequireCampus && this.CampusId == null )
+                            if ( groupType.GroupsRequireCampus && this.CampusId == null )
                             {
                                 errorMessage = string.Format( "{0} require a campus.", groupType.Name.Pluralize() );
-                                ValidationResults.Add( new ValidationResult( errorMessage ));
+                                ValidationResults.Add( new ValidationResult( errorMessage ) );
                                 result = false;
                             }
                         }
@@ -581,6 +719,28 @@ namespace Rock.Model
 
                 return result;
             }
+        }
+
+        /// <summary>
+        /// Get a list of all inherited Attributes that should be applied to this entity.
+        /// </summary>
+        /// <returns>A list of all inherited AttributeCache objects.</returns>
+        public override List<AttributeCache> GetInheritedAttributes( Rock.Data.RockContext rockContext )
+        {
+            var groupType = this.GroupType;
+            if ( groupType == null && this.GroupTypeId > 0 )
+            {
+                groupType = new GroupTypeService( rockContext )
+                    .Queryable().AsNoTracking()
+                    .FirstOrDefault( t => t.Id == this.GroupTypeId );
+            }
+
+            if ( groupType != null )
+            {
+                return groupType.GetInheritedAttributesForQualifier( rockContext, TypeId, "GroupTypeId" );
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -594,6 +754,110 @@ namespace Rock.Model
             return this.Name;
         }
 
+        #endregion
+
+        #region Indexing Methods
+
+        /// <summary>
+        /// Bulks the index documents.
+        /// </summary>
+        public void BulkIndexDocuments()
+        {
+            List<IndexModelBase> indexableItems = new List<IndexModelBase>();
+
+            RockContext rockContext = new RockContext();
+
+            // return people
+            var groups = new GroupService( rockContext ).Queryable().AsNoTracking()
+                                .Where( g =>
+                                     g.IsActive == true
+                                     && g.GroupType.IsIndexEnabled == true );
+
+            int recordCounter = 0;
+
+            foreach ( var group in groups )
+            {
+                var indexableGroup = GroupIndex.LoadByModel( group );
+                indexableItems.Add( indexableGroup );
+
+                recordCounter++;
+
+                if ( recordCounter > 100 )
+                {
+                    IndexContainer.IndexDocuments( indexableItems );
+                    indexableItems = new List<IndexModelBase>();
+                    recordCounter = 0;
+                }
+            }
+
+            IndexContainer.IndexDocuments( indexableItems );
+        }
+
+        /// <summary>
+        /// Indexes the document.
+        /// </summary>
+        /// <param name="id"></param>
+        public void IndexDocument( int id )
+        {
+            var groupEntity = new GroupService( new RockContext() ).Get( id );
+
+            // check that this group type is set to be indexed.
+            if ( groupEntity.GroupType.IsIndexEnabled && groupEntity.IsActive )
+            {
+                var indexItem = GroupIndex.LoadByModel( groupEntity );
+                IndexContainer.IndexDocument( indexItem );
+            }
+        }
+
+        /// <summary>
+        /// Deletes the indexed document.
+        /// </summary>
+        /// <param name="id"></param>
+        public void DeleteIndexedDocument( int id )
+        {
+            Type indexType = Type.GetType( "Rock.UniversalSearch.IndexModels.GroupIndex" );
+            IndexContainer.DeleteDocumentById( indexType, id );
+        }
+
+        /// <summary>
+        /// Deletes the indexed documents.
+        /// </summary>
+        public void DeleteIndexedDocuments()
+        {
+            IndexContainer.DeleteDocumentsByType<GroupIndex>();
+        }
+
+        /// <summary>
+        /// Indexes the name of the model.
+        /// </summary>
+        /// <returns></returns>
+        public Type IndexModelType()
+        {
+            return typeof( GroupIndex );
+        }
+
+        /// <summary>
+        /// Gets the index filter values.
+        /// </summary>
+        /// <returns></returns>
+        public ModelFieldFilterConfig GetIndexFilterConfig()
+        {
+            ModelFieldFilterConfig filterConfig = new ModelFieldFilterConfig();
+            filterConfig.FilterValues = new GroupTypeService( new RockContext() ).Queryable().AsNoTracking().Where( t => t.IsIndexEnabled ).Select( t => t.Name ).ToList();
+            filterConfig.FilterLabel = "Group Types";
+            filterConfig.FilterField = "groupTypeName";
+
+            return filterConfig;
+        }
+
+        /// <summary>
+        /// Gets the index filter field.
+        /// </summary>
+        /// <returns></returns>
+        public bool SupportsIndexFieldFiltering()
+        {
+            return true;
+        }
         #endregion
     }
 
@@ -613,9 +877,6 @@ namespace Rock.Model
             this.HasRequired( p => p.GroupType ).WithMany( p => p.Groups ).HasForeignKey( p => p.GroupTypeId ).WillCascadeOnDelete( false );
             this.HasOptional( p => p.Campus ).WithMany().HasForeignKey( p => p.CampusId ).WillCascadeOnDelete( false );
             this.HasOptional( p => p.Schedule ).WithMany().HasForeignKey( p => p.ScheduleId ).WillCascadeOnDelete( false );
-            this.HasOptional( p => p.WelcomeSystemEmail ).WithMany().HasForeignKey( p => p.WelcomeSystemEmailId ).WillCascadeOnDelete( false );
-            this.HasOptional( p => p.ExitSystemEmail ).WithMany().HasForeignKey( p => p.ExitSystemEmailId ).WillCascadeOnDelete( false );
-            this.HasOptional( p => p.SyncDataView ).WithMany().HasForeignKey( p => p.SyncDataViewId ).WillCascadeOnDelete( false );
             this.HasOptional( p => p.RequiredSignatureDocumentTemplate ).WithMany().HasForeignKey( p => p.RequiredSignatureDocumentTemplateId ).WillCascadeOnDelete( false );
         }
     }

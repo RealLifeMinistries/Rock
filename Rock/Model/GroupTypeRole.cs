@@ -15,12 +15,14 @@
 // </copyright>
 //
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity.ModelConfiguration;
 using System.Runtime.Serialization;
 
 using Rock.Data;
+using Rock.Security;
 
 namespace Rock.Model
 {
@@ -29,6 +31,7 @@ namespace Rock.Model
     /// or more <see cref="Rock.Model.GroupTypeRole">GroupRoles</see> assigned to them (for instance the leader of a group can have both a leader and member role). Examples
     /// of roles include leader, member, team leader, coach, host, etc.
     /// </summary>
+    [RockDomain( "Group" )]
     [Table( "GroupTypeRole" )]
     [DataContract]
     public partial class GroupTypeRole : Model<GroupTypeRole>, IOrdered
@@ -143,6 +146,15 @@ namespace Rock.Model
         [DataMember]
         public bool CanEdit { get; set; }
 
+        /// <summary>
+        /// Gets or sets a value indicating whether this instance can manage members.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance can manage members; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool CanManageMembers { get; set; }
+
         #endregion
 
         #region Virtual Properties
@@ -153,6 +165,7 @@ namespace Rock.Model
         /// <value>
         /// The <see cref="Rock.Model.GroupType"/> that this GroupRole belongs to.
         /// </value>
+        [LavaInclude]
         public virtual GroupType GroupType { get; set; }
 
         #endregion

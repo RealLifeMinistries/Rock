@@ -217,6 +217,51 @@ namespace Rock.Web.Cache
         public int? InheritedGroupTypeId { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether this instance is indexable.
+        /// </summary>
+        /// <value>
+        /// <c>true</c> if this instance is indexable; otherwise, <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool IsIndexEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets a flag indicating if specific groups are allowed to have their own member attributes.
+        /// </summary>
+        /// <value>
+        /// A <see cref="System.Boolean"/> value that is <c>true</c> if this specific group are allowed to have their own member attributes, otherwise <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool AllowSpecificGroupMemberAttributes { get; set; }
+
+        /// <summary>
+        /// Gets or sets a flag indicating if group requirements section is enabled for group of this type.
+        /// </summary>
+        /// <value>
+        /// A <see cref="System.Boolean"/> value that is <c>true</c> if group requirements section is enabled for group of this type, otherwise <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool EnableSpecificGroupRequirements { get; set; }
+
+        /// <summary>
+        /// Gets or sets a flag indicating if groups of this type are allowed to be sync'ed.
+        /// </summary>
+        /// <value>
+        /// A <see cref="System.Boolean"/> value that is <c>true</c> if groups of this type are allowed to be sync'ed, otherwise <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool AllowGroupSync { get; set; }
+
+        /// <summary>
+        /// Gets or sets a flag indicating if groups of this type should be allowed to have Group Member Workflows.
+        /// </summary>
+        /// <value>
+        /// A <see cref="System.Boolean"/> value that is <c>true</c> if groups of this type should be allowed to have group member workflows, otherwise <c>false</c>.
+        /// </value>
+        [DataMember]
+        public bool AllowSpecificGroupMemberWorkflows { get; set; }
+
+        /// <summary>
         /// Gets the type of the inherited group.
         /// </summary>
         /// <value>
@@ -306,6 +351,15 @@ namespace Rock.Web.Cache
         /// </value>
         [DataMember]
         public bool IgnorePersonInactivated { get; set; }
+
+        /// <summary>
+        /// Gets or sets a lava template that can be used for generating  view details for Group.
+        /// </summary>
+        /// <value>
+        /// The Group View Lava Template.
+        /// </value>
+        [DataMember]
+        public string GroupViewLavaTemplate { get; set; }
 
         /// <summary>
         /// Gets or sets the roles.
@@ -469,9 +523,13 @@ namespace Rock.Web.Cache
                 this.EnableLocationSchedules = groupType.EnableLocationSchedules;
                 this.GroupTypePurposeValueId = groupType.GroupTypePurposeValueId;
                 this.IgnorePersonInactivated = groupType.IgnorePersonInactivated;
-
+                this.IsIndexEnabled = groupType.IsIndexEnabled;
+                this.GroupViewLavaTemplate = groupType.GroupViewLavaTemplate;
                 this.locationTypeValueIDs = groupType.LocationTypes.Select( l => l.LocationTypeValueId ).ToList();
-
+                this.AllowSpecificGroupMemberAttributes = groupType.AllowSpecificGroupMemberAttributes;
+                this.EnableSpecificGroupRequirements = groupType.EnableSpecificGroupRequirements;
+                this.AllowGroupSync = groupType.AllowGroupSync;
+                this.AllowSpecificGroupMemberWorkflows = groupType.AllowSpecificGroupMemberWorkflows;
                 this.Roles = new List<GroupTypeRoleCache>();
                 groupType.Roles
                     .OrderBy( r => r.Order )
@@ -612,12 +670,45 @@ namespace Rock.Web.Cache
         }
 
         /// <summary>
+        /// Alls this instance.
+        /// </summary>
+        /// <returns></returns>
+        public static List<GroupTypeCache> All()
+        {
+            List<GroupTypeCache> groupTypes = new List<GroupTypeCache>();
+            var groupTypeIds = GetOrAddExisting( "Rock:GroupType:All", () => LoadAll() );
+            if ( groupTypeIds != null )
+            {
+                foreach ( int groupTypeId in groupTypeIds )
+                {
+                    var groupTypeCache = GroupTypeCache.Read( groupTypeId );
+                    groupTypes.Add( groupTypeCache );
+                }
+            }
+            return groupTypes;
+        }
+
+        private static List<int> LoadAll()
+        {
+            using ( var rockContext = new RockContext() )
+            {
+                return new GroupTypeService( rockContext )
+                    .Queryable().AsNoTracking()
+                    .OrderBy( c => c.Name )
+                    .Select( c => c.Id )
+                    .ToList();
+            }
+        }
+
+        /// <summary>
         /// Removes groupType from cache
         /// </summary>
         /// <param name="id"></param>
         public static void Flush( int id )
         {
             FlushCache( GroupTypeCache.CacheKey( id ) );
+
+            FlushCache( "Rock:GroupType:All" );
         }
 
         /// <summary>
@@ -719,6 +810,14 @@ namespace Rock.Web.Cache
         public bool CanEdit { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether this instance can manage members.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance can manage members; otherwise, <c>false</c>.
+        /// </value>
+        public bool CanManageMembers { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="GroupTypeRoleCache"/> class.
         /// </summary>
         /// <param name="role">The role.</param>
@@ -733,6 +832,7 @@ namespace Rock.Web.Cache
             IsLeader = role.IsLeader;
             CanView = role.CanView;
             CanEdit = role.CanEdit;
+            CanManageMembers = role.CanManageMembers;
         }
 
         /// <summary>

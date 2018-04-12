@@ -15,9 +15,11 @@
 // </copyright>
 //
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity.ModelConfiguration;
+using System.Linq;
 using System.Runtime.Serialization;
 using Newtonsoft.Json;
 using Rock.Data;
@@ -28,6 +30,7 @@ namespace Rock.Model
     /// <summary>
     /// Represents a value of an <see cref="Rock.Model.Attribute"/>. 
     /// </summary>
+    [RockDomain( "Core" )]
     [Table( "AttributeValue" )]
     [DataContract]
     [JsonConverter( typeof( Rock.Utility.AttributeValueJsonConverter ) )]
@@ -45,7 +48,7 @@ namespace Rock.Model
         [DataMember( IsRequired = true )]
         [LavaIgnore]
         public bool IsSystem { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the AttributeId of the <see cref="Rock.Model.Attribute"/> that this AttributeValue provides a value for.
         /// </summary>
@@ -55,7 +58,7 @@ namespace Rock.Model
         [Required]
         [DataMember( IsRequired = true )]
         public int AttributeId { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the Id of the entity instance that uses this AttributeValue. An <see cref="Rock.Model.Attribute"/> is a configuration setting, so each 
         /// instance of the Entity that uses the same Attribute can have a different value.  For instance a <see cref="Rock.Model.BlockType"/> has a declared attribute, and that attribute can be configured 
@@ -67,7 +70,7 @@ namespace Rock.Model
         /// </value>
         [DataMember]
         public int? EntityId { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the value
         /// </summary>
@@ -75,7 +78,18 @@ namespace Rock.Model
         /// A <see cref="System.String"/> representing the value.
         /// </value>
         [DataMember]
-        public string Value {get; set;}
+        public string Value
+        {
+            get
+            {
+                return _value ?? string.Empty;
+            }
+            set
+            {
+                _value = value;
+            }
+        }
+        string _value = string.Empty;
 
         #endregion
 
@@ -101,29 +115,26 @@ namespace Rock.Model
         public decimal? ValueAsNumeric { get; set; }
 
         /// <summary>
-        /// Gets the Value as a DateTime (Computed Column)
+        /// Gets the Value as a DateTime (maintained by SQL Trigger on AttributeValue)
         /// </summary>
         /// <remarks>
-        /// Computed Column Spec:
-        /// CASE 
-        /// -- make sure it isn't a big value or a date range, etc
-        /// WHEN LEN([value]) &lt;= 33
-        ///    THEN CASE 
-        ///            -- is it an ISO-8601
-        ///            WHEN VALUE LIKE '____-__-__T__:__:__%'
-        ///                THEN CONVERT(DATETIME, CONVERT(DATETIMEOFFSET, [value]))
-        ///            -- is it some other value SQL Date
-        ///            WHEN ISDATE([VALUE]) = 1
-        ///                THEN CONVERT(DATETIME, [VALUE])
-        ///            ELSE NULL
-        ///            END
-        /// ELSE NULL    
-        /// END
+        /// see tgrAttributeValue_InsertUpdate                                                                                    
         /// </remarks>
         [DataMember]
         [DatabaseGenerated( DatabaseGeneratedOption.Computed )]
         [LavaIgnore]
         public DateTime? ValueAsDateTime { get; private set; }
+
+        /// <summary>
+        /// Gets the value as boolean (computed column)
+        /// </summary>
+        /// <value>
+        /// The value as boolean.
+        /// </value>
+        [DataMember]
+        [DatabaseGenerated( DatabaseGeneratedOption.Computed )]
+        [LavaIgnore]
+        public bool? ValueAsBoolean { get; private set; }
 
         /// <summary>
         /// Gets a person alias guid value as a PersonId (ComputedColumn).
@@ -155,12 +166,12 @@ namespace Rock.Model
 
                 Rock.Field.IFieldType result = null;
                 Rock.Web.Cache.AttributeCache attribute = Rock.Web.Cache.AttributeCache.Read( this.AttributeId );
-                if (attribute != null)
+                if ( attribute != null )
                 {
-                  if (attribute.FieldType != null)
-                  {
-                    result = attribute.FieldType.Field;
-                  }
+                    if ( attribute.FieldType != null )
+                    {
+                        result = attribute.FieldType.Field;
+                    }
                 }
 
                 return result;
@@ -191,7 +202,7 @@ namespace Rock.Model
                 var attribute = AttributeCache.Read( this.AttributeId );
                 if ( attribute != null )
                 {
-                    return attribute.FieldType.Field.FormatValue( null, Value, attribute.QualifierValues, false);
+                    return attribute.FieldType.Field.FormatValue( null, attribute.EntityTypeId, this.EntityId, Value, attribute.QualifierValues, false );
                 }
                 return Value;
             }
@@ -217,7 +228,7 @@ namespace Rock.Model
                 {
                     return attribute.Name;
                 }
-                return Value;
+                return string.Empty;
             }
         }
 
@@ -241,11 +252,64 @@ namespace Rock.Model
                 {
                     return attribute.Key;
                 }
-                return Value;
+                return string.Empty;
             }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether attribute is grid column.
+        /// </summary>
+        /// <remarks>
+        /// Note: this property is provided specifically for Lava templates when the Attribute property is not available
+        /// as a navigable property
+        /// </remarks>
+        /// <value>
+        /// <c>true</c> if [attribute is grid column]; otherwise, <c>false</c>.
+        /// </value>
+        [LavaInclude]
+        public virtual bool AttributeIsGridColumn
+        {
+            get
+            {
+                var attribute = AttributeCache.Read( this.AttributeId );
+                if ( attribute != null )
+                {
+                    return attribute.IsGridColumn;
+                }
+                return false;
+            }
+        }
+
+
+        /// <summary>
+        /// Gets or sets the history changes.
+        /// </summary>
+        /// <value>
+        /// The history changes.
+        /// </value>
+        [NotMapped]
+        private List<string> HistoryChanges { get; set; }
+
+        /// <summary>
+        /// Gets or sets the type of the history entity.
+        /// </summary>
+        /// <value>
+        /// The type of the history entity.
+        /// </value>
+        [NotMapped]
+        private int? HistoryEntityTypeId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the history entity identifier.
+        /// </summary>
+        /// <value>
+        /// The history entity identifier.
+        /// </value>
+        [NotMapped]
+        private int? HistoryEntityId { get; set; }
+
         #endregion
+
 
         #region Public Methods
 
@@ -257,7 +321,7 @@ namespace Rock.Model
         public override void PreSaveChanges( Rock.Data.DbContext dbContext, System.Data.Entity.Infrastructure.DbEntityEntry entry )
         {
             var attributeCache = AttributeCache.Read( this.AttributeId );
-            if (attributeCache != null)
+            if ( attributeCache != null )
             {
                 // Check to see if this attribute value if for a Field or Image field type 
                 // ( we don't want BinaryFileFieldType as that type of attribute's file can be used by more than one attribute )
@@ -303,7 +367,77 @@ namespace Rock.Model
                         }
                     }
                 }
+
+                // Check to see if this attribute is for a person or group, and if so, save history
+                if ( attributeCache.EntityTypeId.HasValue &&
+                    ( attributeCache.EntityTypeId.Value == EntityTypeCache.Read( typeof( Person ) ).Id ||
+                    attributeCache.EntityTypeId.Value == EntityTypeCache.Read( typeof( Group ) ).Id ) )
+                {
+                    string oldValue = string.Empty;
+                    string newValue = string.Empty;
+
+                    HistoryEntityTypeId = attributeCache.EntityTypeId.Value;
+                    HistoryEntityId = EntityId;
+
+                    switch ( entry.State )
+                    {
+                        case System.Data.Entity.EntityState.Added:
+                            {
+                                newValue = Value;
+                                break;
+                            }
+
+                        case System.Data.Entity.EntityState.Modified:
+                            {
+                                oldValue = entry.OriginalValues["Value"].ToStringSafe();
+                                newValue = Value;
+                                break;
+                            }
+
+                        case System.Data.Entity.EntityState.Deleted:
+                            {
+                                HistoryEntityId = entry.OriginalValues["EntityId"].ToStringSafe().AsIntegerOrNull();
+                                oldValue = entry.OriginalValues["Value"].ToStringSafe();
+                                return;
+                            }
+                    }
+
+                    if ( oldValue != newValue )
+                    {
+                        oldValue = oldValue.IsNotNullOrWhitespace() ? attributeCache.FieldType.Field.FormatValue( null, oldValue, attributeCache.QualifierValues, true ) : string.Empty;
+                        newValue = newValue.IsNotNullOrWhitespace() ? attributeCache.FieldType.Field.FormatValue( null, newValue, attributeCache.QualifierValues, true ) : string.Empty;
+
+                        HistoryChanges = new List<string>();
+                        History.EvaluateChange( HistoryChanges, attributeCache.Name, oldValue, newValue );
+                    }
+                }
             }
+
+            base.PreSaveChanges( dbContext, entry );
+        }
+
+    
+
+        /// <summary>
+        /// Posts the save changes.
+        /// </summary>
+        /// <param name="dbContext">The database context.</param>
+        public override void PostSaveChanges( Data.DbContext dbContext )
+        {
+            int? historyEntityId = ( HistoryEntityId.HasValue && HistoryEntityId.Value > 0 ) ? HistoryEntityId.Value : this.EntityId;
+            if ( HistoryChanges != null && HistoryChanges.Any() && HistoryEntityTypeId.HasValue && historyEntityId.HasValue )
+            {
+                if ( HistoryEntityTypeId.Value == EntityTypeCache.Read( typeof( Person ) ).Id )
+                {
+                    HistoryService.SaveChanges( (RockContext)dbContext, typeof( Person ), Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(), historyEntityId.Value, HistoryChanges, string.Empty, typeof( Attribute ), AttributeId, true, this.ModifiedByPersonAliasId );
+                }
+                else
+                {
+                    HistoryService.SaveChanges( (RockContext)dbContext, typeof( Group ), Rock.SystemGuid.Category.HISTORY_GROUP_CHANGES.AsGuid(), historyEntityId.Value, HistoryChanges, string.Empty, typeof( Attribute ), AttributeId, true, this.ModifiedByPersonAliasId );
+                }
+            }
+
+            base.PostSaveChanges( dbContext );
         }
 
         /// <summary>

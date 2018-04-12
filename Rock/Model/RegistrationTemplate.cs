@@ -30,11 +30,11 @@ namespace Rock.Model
     /// <summary>
     /// 
     /// </summary>
+    [RockDomain( "Event" )]
     [Table( "RegistrationTemplate" )]
     [DataContract]
-    public partial class RegistrationTemplate : Model<RegistrationTemplate>, ICategorized
+    public partial class RegistrationTemplate : Model<RegistrationTemplate>, IHasActiveFlag, ICategorized
     {
-
         #region Entity Properties
 
         /// <summary>
@@ -214,6 +214,45 @@ namespace Rock.Model
         public string ReminderEmailTemplate { get; set; }
 
         /// <summary>
+        /// Gets or sets the name of the wait list transition from.
+        /// </summary>
+        /// <value>
+        /// The name of the wait list transition from.
+        /// </value>
+        [DataMember]
+        [MaxLength( 200 )]
+        public string WaitListTransitionFromName { get; set; }
+
+        /// <summary>
+        /// Gets or sets the wait list transition from email.
+        /// </summary>
+        /// <value>
+        /// The wait list transition from email.
+        /// </value>
+        [DataMember]
+        [MaxLength( 200 )]
+        public string WaitListTransitionFromEmail { get; set; }
+
+        /// <summary>
+        /// Gets or sets the wait list transition subject.
+        /// </summary>
+        /// <value>
+        /// The wait list transition subject.
+        /// </value>
+        [DataMember]
+        [MaxLength( 200 )]
+        public string WaitListTransitionSubject { get; set; }
+
+        /// <summary>
+        /// Gets or sets the wait list transition email template.
+        /// </summary>
+        /// <value>
+        /// The wait list transition email template.
+        /// </value>
+        [DataMember]
+        public string WaitListTransitionEmailTemplate { get; set; }
+
+        /// <summary>
         /// Gets or sets the set cost on instance.
         /// </summary>
         /// <value>
@@ -277,6 +316,15 @@ namespace Rock.Model
         public string RequestEntryName { get; set; }
 
         /// <summary>
+        /// Gets or sets the registration instructions.
+        /// </summary>
+        /// <value>
+        /// The registration instructions.
+        /// </value>
+        [DataMember]
+        public string RegistrationInstructions { get; set; }
+
+        /// <summary>
         /// Gets or sets the success title.
         /// </summary>
         /// <value>
@@ -333,6 +381,7 @@ namespace Rock.Model
             get { return _isActive; }
             set { _isActive = value; }
         }
+
         private bool _isActive = true;
 
         /// <summary>
@@ -347,6 +396,7 @@ namespace Rock.Model
             get { return _addPersonNote; }
             set { _addPersonNote = value; }
         }
+
         private bool _addPersonNote = true;
 
         /// <summary>
@@ -356,7 +406,7 @@ namespace Rock.Model
         ///   <c>true</c> if [allow group placement]; otherwise, <c>false</c>.
         /// </value>
         [DataMember]
-        public bool AllowGroupPlacement { get;set; }
+        public bool AllowGroupPlacement { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the payment reminder from.
@@ -427,6 +477,7 @@ namespace Rock.Model
             get { return _allowExternalRegistrationUpdates; }
             set { _allowExternalRegistrationUpdates = value; }
         }
+
         private bool _allowExternalRegistrationUpdates = true;
 
         /// <summary>
@@ -470,11 +521,12 @@ namespace Rock.Model
         #region Virtual Properties
 
         /// <summary>
-        /// Gets or sets the Page entity for the parent page.
+        /// Gets or sets the category.
         /// </summary>
         /// <value>
-        /// The <see cref="Rock.Model.Page" /> entity for the parent Page
+        /// The category.
         /// </value>
+        [LavaInclude]
         public virtual Category Category { get; set; }
 
         /// <summary>
@@ -483,6 +535,7 @@ namespace Rock.Model
         /// <value>
         /// The type of the group.
         /// </value>
+        [LavaInclude]
         public virtual GroupType GroupType { get; set; }
 
         /// <summary>
@@ -524,6 +577,7 @@ namespace Rock.Model
             get { return _discounts ?? ( _discounts = new Collection<RegistrationTemplateDiscount>() ); }
             set { _discounts = value; }
         }
+
         private ICollection<RegistrationTemplateDiscount> _discounts;
 
         /// <summary>
@@ -538,19 +592,22 @@ namespace Rock.Model
             get { return _fees ?? ( _fees = new Collection<RegistrationTemplateFee>() ); }
             set { _fees = value; }
         }
+
         private ICollection<RegistrationTemplateFee> _fees;
-        
+
         /// <summary>
         /// Gets or sets the collection of the current page's child pages.
         /// </summary>
         /// <value>
         /// Collection of child pages
         /// </value>
+        [LavaInclude]
         public virtual ICollection<RegistrationInstance> Instances
         {
             get { return _registrationInstances ?? ( _registrationInstances = new Collection<RegistrationInstance>() ); }
             set { _registrationInstances = value; }
         }
+
         private ICollection<RegistrationInstance> _registrationInstances;
 
         /// <summary>
@@ -565,7 +622,30 @@ namespace Rock.Model
             get { return _registrationTemplateForms ?? ( _registrationTemplateForms = new Collection<RegistrationTemplateForm>() ); }
             set { _registrationTemplateForms = value; }
         }
+
         private ICollection<RegistrationTemplateForm> _registrationTemplateForms;
+
+        /// <summary>
+        /// A dictionary of actions that this class supports and the description of each.
+        /// </summary>
+        public override Dictionary<string, string> SupportedActions
+        {
+            get
+            {
+                if ( _supportedActions == null )
+                {
+                    _supportedActions = new Dictionary<string, string>();
+                    _supportedActions.Add( Authorization.VIEW, "The roles and/or users that have access to view." );
+                    _supportedActions.Add( "Register", "The roles and/or users that have access to add/edit/remove registrations and registrants." );
+                    _supportedActions.Add( Authorization.EDIT, "The roles and/or users that have access to edit." );
+                    _supportedActions.Add( Authorization.ADMINISTRATE, "The roles and/or users that have access to administrate." );
+                }
+
+                return _supportedActions;
+            }
+        }
+
+        private Dictionary<string, string> _supportedActions;
 
         #endregion
 
@@ -583,7 +663,6 @@ namespace Rock.Model
         }
 
         #endregion
-
     }
 
     #region Entity Configuration
@@ -663,7 +742,6 @@ namespace Rock.Model
         All = RegistrationContact | GroupFollowers | GroupLeaders
     }
 
-
     /// <summary>
     /// How signature document should be presented to registrant
     /// </summary>
@@ -678,7 +756,6 @@ namespace Rock.Model
         /// Embed document in registration
         /// </summary>
         Embed = 1,
-
     }
 
     #endregion

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 // </copyright>
-//
+
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -301,9 +301,10 @@ namespace RockWeb.Blocks.Groups
                         document.SignatureDocumentTemplateId = group.RequiredSignatureDocumentTemplate.Id;
                         document.AppliesToPersonAliasId = personAliasId.Value;
                         document.AssignedToPersonAliasId = personAliasId.Value;
-                        document.Name = string.Format( "{0}_{1}",
+                        document.Name = string.Format(
+                            "{0}_{1}",
                             group.Name.RemoveSpecialCharacters(),
-                            ( person != null ? person.FullName.RemoveSpecialCharacters() : string.Empty ) );
+                            person != null ? person.FullName.RemoveSpecialCharacters() : string.Empty );
                         document.Status = SignatureDocumentStatus.Signed;
                         document.LastStatusDate = RockDateTime.Now;
                         documentService.Add( document );
@@ -347,7 +348,7 @@ namespace RockWeb.Blocks.Groups
 
                 // if the groupMember IsValid is false, and the UI controls didn't report any errors, it is probably because the custom rules of GroupMember didn't pass.
                 // So, make sure a message is displayed in the validation summary
-                cvGroupMember.IsValid = groupMember.IsValid;
+                cvGroupMember.IsValid = groupMember.IsValidGroupMember( rockContext );
 
                 if ( !cvGroupMember.IsValid )
                 {
@@ -485,6 +486,7 @@ namespace RockWeb.Blocks.Groups
                     groupMember.GroupRoleId = groupMember.Group.GroupType.DefaultGroupRoleId ?? 0;
                     groupMember.GroupMemberStatus = GroupMemberStatus.Active;
                     groupMember.DateTimeAdded = RockDateTime.Now;
+
                     // hide the panel drawer that show created and last modified dates
                     pdAuditDetails.Visible = false;
                 }
@@ -518,7 +520,6 @@ namespace RockWeb.Blocks.Groups
             {
                 cbIsNotified.Checked = groupMember.IsNotified;
                 cbIsNotified.Visible = true;
-                cbIsNotified.Help = "If this box is unchecked and a <a href=\"http://www.rockrms.com/Rock/BookContent/7/#servicejobsrelatingtogroups\">group leader notification job</a> is enabled then a notification will be sent to the group's leaders when this group member is saved.";
             }
             else
             {
@@ -562,7 +563,7 @@ namespace RockWeb.Blocks.Groups
 
             // user has to have EDIT Auth to the Block OR the group
             nbEditModeMessage.Text = string.Empty;
-            if ( !IsUserAuthorized( Authorization.EDIT ) && !group.IsAuthorized( Authorization.EDIT, this.CurrentPerson ) )
+            if ( !IsUserAuthorized( Authorization.EDIT ) && !group.IsAuthorized( Authorization.EDIT, this.CurrentPerson ) && !group.IsAuthorized( Authorization.MANAGE_MEMBERS, this.CurrentPerson ) )
             {
                 readOnly = true;
                 nbEditModeMessage.Text = EditModeMessage.ReadOnlyEditActionNotAllowed( Group.FriendlyTypeName );
@@ -665,7 +666,7 @@ namespace RockWeb.Blocks.Groups
             groupMember.LoadAttributes();
             phAttributes.Controls.Clear();
 
-            Rock.Attribute.Helper.AddEditControls( groupMember, phAttributes, true, string.Empty, true );
+            Rock.Attribute.Helper.AddEditControls( groupMember, phAttributes, true, string.Empty );
             if ( readOnly )
             {
                 Rock.Attribute.Helper.AddDisplayControls( groupMember, phAttributesReadOnly );
@@ -678,7 +679,7 @@ namespace RockWeb.Blocks.Groups
                 phAttributes.Visible = true;
             }
 
-            var groupHasRequirements = group.GroupRequirements.Any();
+            var groupHasRequirements = group.GetGroupRequirements( rockContext ).Any();
             pnlRequirements.Visible = groupHasRequirements;
             btnReCheckRequirements.Visible = groupHasRequirements;
 
@@ -767,17 +768,23 @@ namespace RockWeb.Blocks.Groups
                 return;
             }
 
+            var selectedGroupRoleId = ddlGroupRole.SelectedValue.AsInteger();
+            if ( groupMember != null && selectedGroupRoleId != groupMember.GroupRoleId )
+            {
+                groupMember.GroupRoleId = selectedGroupRoleId;
+            }
+
             rcwRequirements.Visible = true;
 
             IEnumerable<GroupRequirementStatus> requirementsResults;
 
             if ( groupMember.IsNewOrChangedGroupMember( rockContext ) )
             {
-                requirementsResults = groupMember.Group.PersonMeetsGroupRequirements( ppGroupMemberPerson.PersonId ?? 0, ddlGroupRole.SelectedValue.AsIntegerOrNull() );
+                requirementsResults = groupMember.Group.PersonMeetsGroupRequirements( rockContext, ppGroupMemberPerson.PersonId ?? 0, ddlGroupRole.SelectedValue.AsIntegerOrNull() );
             }
             else
             {
-                requirementsResults = groupMember.GetGroupRequirementsStatuses().ToList();
+                requirementsResults = groupMember.GetGroupRequirementsStatuses( rockContext ).ToList();
             }
 
             // only show the requirements that apply to the GroupRole (or all Roles)
@@ -833,7 +840,6 @@ namespace RockWeb.Blocks.Groups
                             : "Not calculated yet";
                     }
 
-
                     lRequirementsLabels.Text += string.Format(
                         @"<span class='label label-{1}' title='{2}'>{0}</span>
                         ",
@@ -872,10 +878,22 @@ namespace RockWeb.Blocks.Groups
         private void LoadDropDowns()
         {
             int groupId = hfGroupId.ValueAsInt();
-            Group group = new GroupService( new RockContext() ).Get( groupId );
+            RockContext rockContext = new RockContext();
+            Group group = new GroupService( rockContext ).Get( groupId );
             if ( group != null )
             {
-                ddlGroupRole.DataSource = group.GroupType.Roles.OrderBy( a => a.Order ).ToList();
+                var currentSyncdRoles = new GroupSyncService( rockContext )
+                    .Queryable()
+                    .Where( s => s.GroupId == groupId )
+                    .Select( s => s.GroupTypeRoleId )
+                    .ToList();
+
+                ddlGroupRole.DataSource = new GroupTypeRoleService( rockContext )
+                    .Queryable()
+                    .Where( r => r.GroupTypeId == group.GroupTypeId && !currentSyncdRoles.Contains( r.Id ) )
+                    .OrderBy( a => a.Order )
+                    .ToList();
+
                 ddlGroupRole.DataBind();
             }
 
@@ -1019,6 +1037,13 @@ namespace RockWeb.Blocks.Groups
                 }
             }
 
+            // Un-link any registrant records that point to this group member.
+            foreach ( var registrant in new RegistrationRegistrantService( rockContext ).Queryable()
+                .Where( r => r.GroupMemberId == groupMember.Id ) )
+            {
+                registrant.GroupMemberId = null;
+            }
+
             rockContext.WrapTransaction( () =>
             {
                 groupMemberService.Add( destGroupMember );
@@ -1092,6 +1117,5 @@ namespace RockWeb.Blocks.Groups
                 grpMoveGroupMember.Visible = false;
             }
         }
-
     }
 }

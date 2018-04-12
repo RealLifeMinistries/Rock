@@ -131,13 +131,12 @@ namespace Rock.Model
             var rockContext = (RockContext)this.Context;
             var groupLocationService = new GroupLocationService( rockContext );
 
-            Guid familyTypeGuid = Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid();
+            var familyGroupTypeId = GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY ).Id;
 
             return groupLocationService.GetMappedLocationsByGeofences( geofences )
                 .Where( l =>
                     l.Group != null &&
-                    l.Group.GroupType != null &&
-                    l.Group.GroupType.Guid.Equals( familyTypeGuid ) )
+                    l.Group.GroupTypeId == familyGroupTypeId )
                 .Select( l => l.Group );
         }
 
@@ -262,6 +261,22 @@ namespace Rock.Model
         }
 
         /// <summary>
+        /// Gets the children.
+        /// </summary>
+        /// <param name="id">The identifier.</param>
+        /// <param name="rootGroupId">The root group identifier.</param>
+        /// <param name="limitToSecurityRoleGroups">if set to <c>true</c> [limit to security role groups].</param>
+        /// <param name="groupTypeIncludedIds">The group type included ids.</param>
+        /// <param name="groupTypeExcludedIds">The group type excluded ids.</param>
+        /// <param name="includeInactiveGroups">if set to <c>true</c> [include inactive groups].</param>
+        /// <param name="limitToShowInNavigation">if set to <c>true</c> [limit to show in navigation].</param>
+        /// <returns></returns>
+        public IQueryable<Group> GetChildren( int id, int rootGroupId, bool limitToSecurityRoleGroups, List<int> groupTypeIncludedIds, List<int> groupTypeExcludedIds, bool includeInactiveGroups, bool limitToShowInNavigation )
+        {
+            return this.GetChildren( id, rootGroupId, limitToSecurityRoleGroups, groupTypeIncludedIds, groupTypeExcludedIds, includeInactiveGroups, limitToShowInNavigation, 0, false, false );
+        }
+
+        /// <summary>
         /// Gets immediate children of a group (id) or a rootGroupId. Specify 0 for both Id and rootGroupId to get top level groups limited
         /// </summary>
         /// <param name="id">The ID of the Group to get the children of (or 0 to use rootGroupId)</param>
@@ -271,8 +286,46 @@ namespace Rock.Model
         /// <param name="groupTypeExcludedIds">The group type excluded ids.</param>
         /// <param name="includeInactiveGroups">if set to <c>true</c> [include inactive groups].</param>
         /// <param name="limitToShowInNavigation">if set to <c>true</c> [limit to show in navigation].</param>
+        /// <param name="limitToPublic">if set to <c>true</c> [limit to public groups].</param>
         /// <returns></returns>
-        public IQueryable<Group> GetChildren( int id, int rootGroupId, bool limitToSecurityRoleGroups, List<int> groupTypeIncludedIds, List<int> groupTypeExcludedIds, bool includeInactiveGroups, bool limitToShowInNavigation )
+        public IQueryable<Group> GetChildren( int id, int rootGroupId, bool limitToSecurityRoleGroups, List<int> groupTypeIncludedIds, List<int> groupTypeExcludedIds, bool includeInactiveGroups, bool limitToShowInNavigation, bool limitToPublic = false )
+        {
+            return this.GetChildren( id, rootGroupId, limitToSecurityRoleGroups, groupTypeIncludedIds, groupTypeExcludedIds, includeInactiveGroups, limitToShowInNavigation, 0, false, limitToPublic );
+        }
+
+        /// <summary>
+        /// Gets the children.
+        /// </summary>
+        /// <param name="id">The identifier.</param>
+        /// <param name="rootGroupId">The root group identifier.</param>
+        /// <param name="limitToSecurityRoleGroups">if set to <c>true</c> [limit to security role groups].</param>
+        /// <param name="groupTypeIncludedIds">The group type included ids.</param>
+        /// <param name="groupTypeExcludedIds">The group type excluded ids.</param>
+        /// <param name="includeInactiveGroups">if set to <c>true</c> [include inactive groups].</param>
+        /// <param name="limitToShowInNavigation">if set to <c>true</c> [limit to show in navigation].</param>
+        /// <param name="campusId">The campus identifier.</param>
+        /// <param name="includeNoCampus">if set to <c>true</c> [include no campus].</param>
+        /// <returns></returns>
+        public IQueryable<Group> GetChildren( int id, int rootGroupId, bool limitToSecurityRoleGroups, List<int> groupTypeIncludedIds, List<int> groupTypeExcludedIds, bool includeInactiveGroups, bool limitToShowInNavigation, int campusId, bool includeNoCampus )
+        {
+            return this.GetChildren( id, rootGroupId, limitToSecurityRoleGroups, groupTypeIncludedIds, groupTypeExcludedIds, includeInactiveGroups, limitToShowInNavigation, 0, includeNoCampus, false );
+        }
+
+        /// <summary>
+        /// Gets immediate children of a group (id) or a rootGroupId. Specify 0 for both Id and rootGroupId to get top level groups limited
+        /// </summary>
+        /// <param name="id">The ID of the Group to get the children of (or 0 to use rootGroupId)</param>
+        /// <param name="rootGroupId">The root group ID</param>
+        /// <param name="limitToSecurityRoleGroups">if set to <c>true</c> [limit to security role groups].</param>
+        /// <param name="groupTypeIncludedIds">The group type included ids.</param>
+        /// <param name="groupTypeExcludedIds">The group type excluded ids.</param>
+        /// <param name="includeInactiveGroups">if set to <c>true</c> [include inactive groups].</param>
+        /// <param name="limitToShowInNavigation">if set to <c>true</c> [limit to show in navigation].</param>
+        /// <param name="campusId">if set it will filter groups based on campus</param>
+        /// <param name="includeNoCampus">if campus set and set to <c>true</c> [include groups with no campus].</param>
+        /// <param name="limitToPublic">if set to <c>true</c> [limit to public groups].</param>
+        /// <returns></returns>
+        public IQueryable<Group> GetChildren( int id, int rootGroupId, bool limitToSecurityRoleGroups, List<int> groupTypeIncludedIds, List<int> groupTypeExcludedIds, bool includeInactiveGroups, bool limitToShowInNavigation, int campusId, bool includeNoCampus, bool limitToPublic = false)
         {
             var qry = Queryable();
 
@@ -297,9 +350,26 @@ namespace Rock.Model
                 qry = qry.Where( a => a.IsActive );
             }
 
+            if ( limitToPublic )
+            {
+                qry = qry.Where( a => a.IsPublic );
+            }
+
             if ( limitToSecurityRoleGroups )
             {
                 qry = qry.Where( a => a.IsSecurityRole );
+            }
+
+            if ( campusId > 0 )
+            {
+                if ( includeNoCampus )
+                {
+                    qry = qry.Where( a => a.CampusId == campusId || a.Campus == null );
+                }
+                else
+                {
+                    qry = qry.Where( a => a.CampusId == campusId );
+                }
             }
 
             if ( groupTypeIncludedIds.Any() )
@@ -399,7 +469,21 @@ namespace Rock.Model
         /// <param name="includeWarnings">if set to <c>true</c> [include warnings].</param>
         /// <param name="includeInactive">if set to <c>true</c> [include inactive].</param>
         /// <returns></returns>
+        [Obsolete( "Use GroupMembersNotMeetingRequirements( roup, includeWarnings, includeInactive) instead" )]
         public Dictionary<GroupMember, Dictionary<PersonGroupRequirementStatus, DateTime>> GroupMembersNotMeetingRequirements( int groupId, bool includeWarnings, bool includeInactive = false )
+        {
+            var group = new GroupService( this.Context as RockContext ).Get( groupId );
+            return GroupMembersNotMeetingRequirements( group, includeWarnings, includeInactive );
+        }
+
+        /// <summary>
+        /// Groups the members not meeting requirements.
+        /// </summary>
+        /// <param name="group">The group.</param>
+        /// <param name="includeWarnings">if set to <c>true</c> [include warnings].</param>
+        /// <param name="includeInactive">if set to <c>true</c> [include inactive].</param>
+        /// <returns></returns>
+        public Dictionary<GroupMember, Dictionary<PersonGroupRequirementStatus, DateTime>> GroupMembersNotMeetingRequirements( Group group, bool includeWarnings, bool includeInactive = false )
         {
             Dictionary<GroupMember, Dictionary<PersonGroupRequirementStatus, DateTime>> results = new Dictionary<GroupMember, Dictionary<PersonGroupRequirementStatus, DateTime>>();
             
@@ -408,7 +492,7 @@ namespace Rock.Model
             var groupMemberService = new GroupMemberService( rockContext );
             var groupMemberRequirementService = new GroupMemberRequirementService( rockContext );
 
-            var qryGroupRequirements = groupRequirementService.Queryable().Where( a => a.GroupId == groupId ).ToList();
+            var qryGroupRequirements = groupRequirementService.Queryable().Where( a => ( a.GroupId.HasValue && a.GroupId == group.Id ) || ( a.GroupTypeId.HasValue && a.GroupTypeId == group.GroupTypeId ) ).ToList();
             bool hasGroupRequirements = qryGroupRequirements.Any();
             if ( !hasGroupRequirements )
             {
@@ -416,8 +500,8 @@ namespace Rock.Model
                 return new Dictionary<GroupMember, Dictionary<PersonGroupRequirementStatus, DateTime>>();
             }
 
-            var qryGroupMembers = groupMemberService.Queryable().Where( a => a.GroupId == groupId );
-            var qryGroupMemberRequirements = groupMemberRequirementService.Queryable().Where( a => a.GroupMember.GroupId == groupId );
+            var qryGroupMembers = groupMemberService.Queryable().Where( a => a.GroupId == group.Id );
+            var qryGroupMemberRequirements = groupMemberRequirementService.Queryable().Where( a => a.GroupMember.GroupId == group.Id );
 
             if ( !includeInactive )
             {
@@ -480,25 +564,25 @@ namespace Rock.Model
                     status.GroupRequirement = requirementStatus.GroupRequirement;
                     status.PersonId = groupMemberWithIssues.GroupMember.PersonId;
 
-                    DateTime occuranceDate = new DateTime();
+                    DateTime occurrenceDate = new DateTime();
 
                     if ( requirementStatus.RequirementMetDateTime == null)
                     {
                         status.MeetsGroupRequirement = MeetsGroupRequirement.NotMet;
-                        occuranceDate = requirementStatus.RequirementFailDateTime ?? currentDateTime; 
+                        occurrenceDate = requirementStatus.RequirementFailDateTime ?? currentDateTime; 
                     }
                     else if (requirementStatus.RequirementWarningDateTime.HasValue)
                     {
                         status.MeetsGroupRequirement = MeetsGroupRequirement.MeetsWithWarning;
-                        occuranceDate = requirementStatus.RequirementWarningDateTime.Value;
+                        occurrenceDate = requirementStatus.RequirementWarningDateTime.Value;
                     }
                     else
                     {
                         status.MeetsGroupRequirement = MeetsGroupRequirement.Meets;
-                        occuranceDate = requirementStatus.RequirementMetDateTime.Value;
+                        occurrenceDate = requirementStatus.RequirementMetDateTime.Value;
                     }
                     
-                    statuses.Add( status, occuranceDate );
+                    statuses.Add( status, occurrenceDate );
                 }
 
                 // also add any groupRequirements that they don't have statuses for (and therefore haven't met)
@@ -554,9 +638,6 @@ namespace Rock.Model
         public static Group SaveNewGroup( RockContext rockContext, int groupTypeId, Guid? parentGroupGuid, string groupName, List<GroupMember> groupMembers, int? campusId, bool savePersonAttributes )
         {
             var groupType = GroupTypeCache.Read( groupTypeId );
-            var familyChanges = new List<string>();
-            var familyMemberChanges = new Dictionary<Guid, List<string>>();
-            var personDemographicChanges = new Dictionary<Guid, List<string>>();
 
             if ( groupType != null )
             {
@@ -579,14 +660,8 @@ namespace Rock.Model
 
                 group.Name = groupName;
 
-                History.EvaluateChange( familyChanges, "Family", string.Empty, group.Name );
-
                 if ( isFamilyGroupType )
                 {
-                    if ( campusId.HasValue )
-                    {
-                        History.EvaluateChange( familyChanges, "Campus", string.Empty, CampusCache.Read( campusId.Value ).Name );
-                    }
                     group.CampusId = campusId;
                 }
 
@@ -608,47 +683,12 @@ namespace Rock.Model
                         person.LastName = person.LastName.FixCase();
 
                         group.Members.Add( groupMember );
+                        groupMember.Group = group;
+                    }
 
-                        var demographicChanges = new List<string>();
-                        demographicChanges.Add( "Created" );
-
-                        History.EvaluateChange( demographicChanges, "Record Type", string.Empty, person.RecordTypeValueId.HasValue ? DefinedValueCache.GetName( person.RecordTypeValueId.Value ) : string.Empty );
-                        History.EvaluateChange( demographicChanges, "Record Status", string.Empty, person.RecordStatusValueId.HasValue ? DefinedValueCache.GetName( person.RecordStatusValueId.Value ) : string.Empty );
-                        History.EvaluateChange( demographicChanges, "Record Status Reason", string.Empty, person.RecordStatusReasonValueId.HasValue ? DefinedValueCache.GetName( person.RecordStatusReasonValueId.Value ) : string.Empty );
-                        History.EvaluateChange( demographicChanges, "Connection Status", string.Empty, person.ConnectionStatusValueId.HasValue ? DefinedValueCache.GetName( person.ConnectionStatusValueId ) : string.Empty );
-                        History.EvaluateChange( demographicChanges, "Deceased", false.ToString(), ( person.IsDeceased ).ToString() );
-                        History.EvaluateChange( demographicChanges, "Title", string.Empty, person.TitleValueId.HasValue ? DefinedValueCache.GetName( person.TitleValueId ) : string.Empty );
-                        History.EvaluateChange( demographicChanges, "First Name", string.Empty, person.FirstName );
-                        History.EvaluateChange( demographicChanges, "Nick Name", string.Empty, person.NickName );
-                        History.EvaluateChange( demographicChanges, "Middle Name", string.Empty, person.MiddleName );
-                        History.EvaluateChange( demographicChanges, "Last Name", string.Empty, person.LastName );
-                        History.EvaluateChange( demographicChanges, "Suffix", string.Empty, person.SuffixValueId.HasValue ? DefinedValueCache.GetName( person.SuffixValueId ) : string.Empty );
-                        History.EvaluateChange( demographicChanges, "Birth Date", null, person.BirthDate );
-                        History.EvaluateChange( demographicChanges, "Gender", null, person.Gender );
-                        History.EvaluateChange( demographicChanges, "Marital Status", string.Empty, person.MaritalStatusValueId.HasValue ? DefinedValueCache.GetName( person.MaritalStatusValueId ) : string.Empty );
-                        History.EvaluateChange( demographicChanges, "Anniversary Date", null, person.AnniversaryDate );
-                        History.EvaluateChange( demographicChanges, "Graduation Year", null, person.GraduationYear );
-                        History.EvaluateChange( demographicChanges, "Email", string.Empty, person.Email );
-                        History.EvaluateChange( demographicChanges, "Email Active", false.ToString(), person.IsEmailActive.ToString() );
-                        History.EvaluateChange( demographicChanges, "Email Note", string.Empty, person.EmailNote );
-                        History.EvaluateChange( demographicChanges, "Email Preference", null, person.EmailPreference );
-                        History.EvaluateChange( demographicChanges, "Inactive Reason Note", string.Empty, person.InactiveReasonNote );
-                        History.EvaluateChange( demographicChanges, "System Note", string.Empty, person.SystemNote );
-
-                        personDemographicChanges.Add( person.Guid, demographicChanges );
-
-                        if ( isFamilyGroupType )
-                        {
-                            var memberChanges = new List<string>();
-
-                            string roleName = groupType.Roles
-                                .Where( r => r.Id == groupMember.GroupRoleId )
-                                .Select( r => r.Name )
-                                .FirstOrDefault();
-
-                            History.EvaluateChange( memberChanges, "Role", string.Empty, roleName );
-                            familyMemberChanges.Add( person.Guid, memberChanges );
-                        }
+                    if ( !groupMember.IsValidGroupMember(rockContext) )
+                    {
+                        throw new GroupMemberValidationException( groupMember.ValidationResults.Select( a => a.ErrorMessage ).ToList().AsDelimited( "<br />" ) );
                     }
                 }
 
@@ -679,9 +719,6 @@ namespace Rock.Model
 
                             if ( !oldValue.Equals( newValue ) )
                             {
-                                History.EvaluateChange( personDemographicChanges[person.Guid], attributeCache.Name,
-                                    attributeCache.FieldType.Field.FormatValue( null, oldValue, attributeCache.QualifierValues, false ),
-                                    attributeCache.FieldType.Field.FormatValue( null, newValue, attributeCache.QualifierValues, false ) );
                                 Rock.Attribute.Helper.SaveAttributeValue( person, attributeCache, newValue );
                             }
                         }
@@ -691,12 +728,10 @@ namespace Rock.Model
                     if ( person != null )
                     {
                         bool updateRequired = false;
-                        var changes = personDemographicChanges[person.Guid];
                         if ( groupMember.GroupRoleId == adultRoleId )
                         {
                             person.GivingGroupId = group.Id;
                             updateRequired = true;
-                            History.EvaluateChange( changes, "Giving Group", string.Empty, group.Name );
                         }
 
                         if ( updateRequired )
@@ -705,18 +740,6 @@ namespace Rock.Model
                         }
 
                         int? modifiedByPersonAliasId = person.ModifiedAuditValuesAlreadyUpdated ? person.ModifiedByPersonAliasId : ( int? ) null;
-
-                        HistoryService.SaveChanges( rockContext, typeof( Person ), Rock.SystemGuid.Category.HISTORY_PERSON_DEMOGRAPHIC_CHANGES.AsGuid(),
-                            person.Id, changes, true, modifiedByPersonAliasId );
-
-                        if ( isFamilyGroupType )
-                        {
-                            HistoryService.SaveChanges( rockContext, typeof( Person ), Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(),
-                                person.Id, familyMemberChanges[person.Guid], group.Name, typeof( Group ), group.Id, true, modifiedByPersonAliasId );
-
-                            HistoryService.SaveChanges( rockContext, typeof( Person ), Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(),
-                                person.Id, familyChanges, group.Name, typeof( Group ), group.Id, true, modifiedByPersonAliasId );
-                        }
                     }
                 }
 
@@ -758,18 +781,60 @@ namespace Rock.Model
         /// <param name="state">The state.</param>
         /// <param name="postalCode">The postal code.</param>
         /// <param name="country">The country.</param>
+        public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid,
+            string street1, string street2, string city, string state, string postalCode, string country )
+        {
+            AddNewGroupAddress( rockContext, group, locationTypeGuid, street1, street2, city, state, postalCode, country, false );
+        }
+
+        /// <summary>
+        /// Adds the new group address.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="group">The group.</param>
+        /// <param name="locationTypeGuid">The location type unique identifier.</param>
+        /// <param name="street1">The street1.</param>
+        /// <param name="street2">The street2.</param>
+        /// <param name="city">The city.</param>
+        /// <param name="state">The state.</param>
+        /// <param name="postalCode">The postal code.</param>
+        /// <param name="country">The country.</param>
         /// <param name="moveExistingToPrevious">if set to <c>true</c> [move existing to previous].</param>
         public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid,
-            string street1, string street2, string city, string state, string postalCode, string country, bool moveExistingToPrevious = false )
+            string street1, string street2, string city, string state, string postalCode, string country, bool moveExistingToPrevious )
         {
-            if ( !String.IsNullOrWhiteSpace( street1 ) ||
-                 !String.IsNullOrWhiteSpace( street2 ) ||
-                 !String.IsNullOrWhiteSpace( city ) ||
-                 !String.IsNullOrWhiteSpace( postalCode ) ||
+            var isMappedMailing = locationTypeGuid != SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_PREVIOUS; // Mapped and Mailing = true unless location type is Previous
+            AddNewGroupAddress( rockContext, group, locationTypeGuid, street1, street2, city, state, postalCode, country, moveExistingToPrevious, "", isMappedMailing, isMappedMailing );
+        }
+
+        /// <summary>
+        /// Adds the new group address.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="group">The group.</param>
+        /// <param name="locationTypeGuid">The location type unique identifier.</param>
+        /// <param name="street1">The street1.</param>
+        /// <param name="street2">The street2.</param>
+        /// <param name="city">The city.</param>
+        /// <param name="state">The state.</param>
+        /// <param name="postalCode">The postal code.</param>
+        /// <param name="country">The country.</param>
+        /// <param name="moveExistingToPrevious">if set to <c>true</c> [move existing to previous].</param>
+        /// <param name="modifiedBy">The description of the page or process that called the function.</param>
+        /// <param name="isMailingLocation">Sets the Is Mailing option on the new address.</param>
+        /// <param name="isMappedLocation">Sets the Is Mapped option on the new address.</param>
+        public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid,
+            string street1, string street2, string city, string state, string postalCode, string country, bool moveExistingToPrevious,
+            string modifiedBy, bool isMailingLocation, bool isMappedLocation )
+        {
+            if ( !string.IsNullOrWhiteSpace( street1 ) ||
+                 !string.IsNullOrWhiteSpace( street2 ) ||
+                 !string.IsNullOrWhiteSpace( city ) ||
+                 !string.IsNullOrWhiteSpace( postalCode ) ||
                  !string.IsNullOrWhiteSpace( country ) )
             {
-                var location = new LocationService( rockContext ).Get( street1, street2, city, state, postalCode, country );
-                AddNewGroupAddress( rockContext, group, locationTypeGuid, location, moveExistingToPrevious );
+                var location = new LocationService( rockContext ).Get( street1, street2, city, state, postalCode, country, group, true );
+                AddNewGroupAddress( rockContext, group, locationTypeGuid, location, moveExistingToPrevious, modifiedBy, isMailingLocation, isMappedLocation );
             }
         }
 
@@ -795,14 +860,44 @@ namespace Rock.Model
         /// <param name="group">The group.</param>
         /// <param name="locationTypeGuid">The location type unique identifier.</param>
         /// <param name="locationId">The location identifier.</param>
+        public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid, int? locationId )
+        {
+            AddNewGroupAddress( rockContext, group, locationTypeGuid, locationId, false );
+        }
+
+        /// <summary>
+        /// Adds the new group address.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="group">The group.</param>
+        /// <param name="locationTypeGuid">The location type unique identifier.</param>
+        /// <param name="locationId">The location identifier.</param>
         /// <param name="moveExistingToPrevious">if set to <c>true</c> [move existing to previous].</param>
+        public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid,
+            int? locationId, bool moveExistingToPrevious )
+        {
+            var isMappedMailing = locationTypeGuid != SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_PREVIOUS; // Mapped and Mailing = true unless location type is Previous
+            AddNewGroupAddress( rockContext, group, locationTypeGuid, locationId, moveExistingToPrevious, "", isMappedMailing, isMappedMailing );
+        }
+
+        /// <summary>
+        /// Adds the new group address.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="group">The group.</param>
+        /// <param name="locationTypeGuid">The location type unique identifier.</param>
+        /// <param name="locationId">The location identifier.</param>
+        /// <param name="moveExistingToPrevious">if set to <c>true</c> [move existing to previous].</param>
+        /// <param name="modifiedBy">The modified by.</param>
+        /// <param name="isMailingLocation">Sets the Is Mailing option on the new address.</param>
+        /// <param name="isMappedLocation">Sets the Is Mapped option on the new address.</param>
         public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid, 
-            int? locationId, bool moveExistingToPrevious = false )
+            int? locationId, bool moveExistingToPrevious, string modifiedBy, bool isMailingLocation, bool isMappedLocation )
         {
             if ( locationId.HasValue )
             {
                 var location = new LocationService( rockContext ).Get( locationId.Value );
-                AddNewGroupAddress( rockContext, group, locationTypeGuid, location, moveExistingToPrevious );
+                AddNewGroupAddress( rockContext, group, locationTypeGuid, location, moveExistingToPrevious, modifiedBy, isMailingLocation, isMappedLocation );
             }
         }
 
@@ -818,7 +913,20 @@ namespace Rock.Model
         public static void AddNewFamilyAddress( RockContext rockContext, Group family, string locationTypeGuid,
             Location location, bool moveExistingToPrevious = false )
         {
-            AddNewGroupAddress( rockContext, family, locationTypeGuid, location, moveExistingToPrevious );
+            var isMappedMailing = locationTypeGuid != SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_PREVIOUS; // Mapped and Mailing = true unless location type is Previous
+            AddNewGroupAddress( rockContext, family, locationTypeGuid, location, moveExistingToPrevious, "", isMappedMailing, isMappedMailing );
+        }
+
+        /// <summary>
+        /// Adds the new group address.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="group">The group.</param>
+        /// <param name="locationTypeGuid">The location type unique identifier.</param>
+        /// <param name="location">The location.</param>
+        public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid, Location location )
+        {
+            AddNewGroupAddress( rockContext, group, locationTypeGuid, location, false );
         }
 
         /// <summary>
@@ -829,8 +937,25 @@ namespace Rock.Model
         /// <param name="locationTypeGuid">The location type unique identifier.</param>
         /// <param name="location">The location.</param>
         /// <param name="moveExistingToPrevious">if set to <c>true</c> [move existing to previous].</param>
+        public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid, Location location, bool moveExistingToPrevious )
+        {
+            var isMappedMailing = locationTypeGuid != SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_PREVIOUS; // Mapped and Mailing = true unless location type is Previous
+            AddNewGroupAddress( rockContext, group, locationTypeGuid, location, moveExistingToPrevious, "", isMappedMailing, isMappedMailing );
+        }
+
+        /// <summary>
+        /// Adds the new group address.
+        /// </summary>
+        /// <param name="rockContext">The rock context.</param>
+        /// <param name="group">The group.</param>
+        /// <param name="locationTypeGuid">The location type unique identifier.</param>
+        /// <param name="location">The location.</param>
+        /// <param name="moveExistingToPrevious">if set to <c>true</c> [move existing to previous].</param>
+        /// <param name="modifiedBy">The description of the page or process that called the function.</param>
+        /// <param name="isMailingLocation">Sets the Is Mailing option on the new address.</param>
+        /// <param name="isMappedLocation">Sets the Is Mapped option on the new address.</param>
         public static void AddNewGroupAddress( RockContext rockContext, Group group, string locationTypeGuid,
-            Location location, bool moveExistingToPrevious = false )
+            Location location, bool moveExistingToPrevious, string modifiedBy, bool isMailingLocation, bool isMappedLocation )
         {
             if ( location != null )
             {
@@ -848,8 +973,6 @@ namespace Rock.Model
                                 gl.LocationId == location.Id )
                             .Any() )
                         {
-                            var familyChanges = new List<string>();
-
                             if ( moveExistingToPrevious )
                             {
                                 var prevLocationType = groupType.LocationTypeValues.FirstOrDefault( l => l.Guid.Equals( Rock.SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_PREVIOUS.AsGuid() ) );
@@ -860,7 +983,6 @@ namespace Rock.Model
                                             gl.GroupId == group.Id &&
                                             gl.GroupLocationTypeValueId == locationType.Id ) )
                                     {
-                                        History.EvaluateChange( familyChanges, prevLoc.Location.ToString(), prevLoc.GroupLocationTypeValue.Value, prevLocationType.Value );
                                         prevLoc.GroupLocationTypeValueId = prevLocationType.Id;
                                         prevLoc.IsMailingLocation = false;
                                         prevLoc.IsMappedLocation = false;
@@ -879,26 +1001,13 @@ namespace Rock.Model
                             {
                                 groupLocation = new GroupLocation();
                                 groupLocation.Location = location;
-                                groupLocation.IsMailingLocation = true;
-                                groupLocation.IsMappedLocation = true;
+                                groupLocation.IsMailingLocation = isMailingLocation;
+                                groupLocation.IsMappedLocation = isMappedLocation;
                                 group.GroupLocations.Add( groupLocation );
                             }
                             groupLocation.GroupLocationTypeValueId = locationType.Id;
 
-                            History.EvaluateChange( familyChanges, addressChangeField, string.Empty, groupLocation.Location.ToString() );
-                            History.EvaluateChange( familyChanges, addressChangeField + " Is Mailing", string.Empty, groupLocation.IsMailingLocation.ToString() );
-                            History.EvaluateChange( familyChanges, addressChangeField + " Is Map Location", string.Empty, groupLocation.IsMappedLocation.ToString() );
-
                             rockContext.SaveChanges();
-
-                            if ( groupType.Guid.Equals( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid() ) )
-                            {
-                                foreach ( var fm in group.Members )
-                                {
-                                    HistoryService.SaveChanges( rockContext, typeof( Person ), Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(),
-                                        fm.PersonId, familyChanges, group.Name, typeof( Group ), group.Id );
-                                }
-                            }
                         }
                     }
                 }
@@ -966,6 +1075,16 @@ namespace Rock.Model
                 .ThenBy( m => m.Person.BirthDay )
                 .Select( m => m.Person )
                 .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Gets the active members.
+        /// </summary>
+        /// <param name="group">The group.</param>
+        /// <returns></returns>
+        public static IEnumerable<GroupMember> ActiveMembers( this Group group )
+        {
+            return group.Members.Where( m => m.GroupMemberStatus == GroupMemberStatus.Active );
         }
     }
 }

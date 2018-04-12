@@ -160,7 +160,7 @@ namespace Rock.Model
 
         /// <summary>
         /// Returns the first <see cref="Rock.Model.GroupMember"/> that mathces the Id of the <see cref="Rock.Model.Group"/>,
-        /// the Id of the <see cref="Rock.Model.Person"/>, and the Id fo the <see cref="Rock.Model.GroupTypeRole"/>
+        /// the Id of the <see cref="Rock.Model.Person"/>, and the Id of the <see cref="Rock.Model.GroupTypeRole"/>
         /// </summary>
         /// <param name="groupId">An <see cref="System.Int32"/> representing the Id of the <see cref="Rock.Model.Group"/> to search by.</param>
         /// <param name="personId">An <see cref="System.Int32"/> representing the Id of the <see cref="Rock.Model.Person"/> to search by.</param>
@@ -174,6 +174,23 @@ namespace Rock.Model
         public GroupMember GetByGroupIdAndPersonIdAndGroupRoleId( int groupId, int personId, int groupRoleId, bool includeDeceased = false )
         {
             return GetByGroupIdAndPersonId( groupId, personId, includeDeceased ).Where( t => t.GroupRoleId == groupRoleId ).FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Returns the first <see cref="Rock.Model.GroupMember"/> that mathces the Id of the <see cref="Rock.Model.Group"/>,
+        /// the Id of the <see cref="Rock.Model.Person"/>, and the Id of the <see cref="Rock.Model.GroupTypeRole"/>. If a 
+        /// GroupMember cannot be found with a matching GroupTypeRole, the first GroupMember that matches the Group Id and 
+        /// Person Id will be returned (with a different role id).
+        /// </summary>
+        /// <param name="groupId">The group identifier.</param>
+        /// <param name="personId">The person identifier.</param>
+        /// <param name="groupRoleId">The group role identifier.</param>
+        /// <param name="includeDeceased">if set to <c>true</c> [include deceased].</param>
+        /// <returns></returns>
+        public GroupMember GetByGroupIdAndPersonIdAndPreferredGroupRoleId( int groupId, int personId, int groupRoleId, bool includeDeceased = false )
+        {
+            var members = GetByGroupIdAndPersonId( groupId, personId, includeDeceased ).ToList();
+            return members.Where( t => t.GroupRoleId == groupRoleId ).FirstOrDefault() ?? members.FirstOrDefault();
         }
 
         /// <summary>
@@ -195,7 +212,7 @@ namespace Rock.Model
         /// <returns>A queryable collection of <see cref="Rock.Model.GroupMember"/> entities associated with the specified <see cref="Rock.Model.Person"/></returns>
         public IQueryable<GroupMember> GetByPersonId( int personId )
         {
-            return Queryable( "Person", true ).Where(  t => t.PersonId == personId );
+            return Queryable( "Person", true ).Where( t => t.PersonId == personId );
         }
 
         /// <summary>
@@ -220,12 +237,14 @@ namespace Rock.Model
         /// <returns>An enumerable collection of <see cref="System.String"/> objects containing the first names of each person in the group.</returns>
         public IEnumerable<string> GetFirstNames( int groupId, bool includeDeceased = false )
         {
-            return GetByGroupId(groupId, includeDeceased).
-                OrderBy( m => m.GroupRole.Order ).
-                ThenBy( m => m.Person.BirthYear ).ThenBy( m => m.Person.BirthMonth ).ThenBy( m => m.Person.BirthDay ).
-                ThenBy( m => m.Person.Gender ).
-                Select( m => m.Person.NickName ).
-                ToList();
+            return GetByGroupId(groupId, includeDeceased)
+                .OrderBy( m => m.GroupRole.Order )
+                .ThenBy( m => m.Person.BirthYear )
+                .ThenBy( m => m.Person.BirthMonth )
+                .ThenBy( m => m.Person.BirthDay )
+                .ThenBy( m => m.Person.Gender )
+                .Select( m => m.Person.NickName )
+                .ToList();
         }
 
         /// <summary>
@@ -243,19 +262,20 @@ namespace Rock.Model
             var dvActive = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_ACTIVE.AsGuid() );
             if ( dvActive != null )
             {
-                return GetByGroupId( groupId, includeDeceased ).
-                    Where( m => m.Person.RecordStatusReasonValueId == dvActive.Id ).
-                    OrderBy( m => m.GroupRole.Order ).
-                    ThenBy( m => m.Person.BirthYear ).ThenBy( m => m.Person.BirthMonth ).ThenBy( m => m.Person.BirthDay ).
-                    ThenBy( m => m.Person.Gender ).
-                    Select( m => m.Person.NickName ).
-                    ToList();
+                return GetByGroupId( groupId, includeDeceased )
+                    .Where( m => m.Person.RecordStatusReasonValueId == dvActive.Id )
+                    .OrderBy( m => m.GroupRole.Order )
+                    .ThenBy( m => m.Person.BirthYear )
+                    .ThenBy( m => m.Person.BirthMonth )
+                    .ThenBy( m => m.Person.BirthDay )
+                    .ThenBy( m => m.Person.Gender )
+                    .Select( m => m.Person.NickName )
+                    .ToList();
             }
             else
             {
                 return GetFirstNames( groupId, includeDeceased );
             }
-
         }
 
         /// <summary>
@@ -311,12 +331,13 @@ namespace Rock.Model
 
                 if ( groupRole.Attributes.ContainsKey( "InverseRelationship" ) )
                 {
-                    Guid ownerRoleGuid = new Guid( Rock.SystemGuid.GroupRole.GROUPROLE_KNOWN_RELATIONSHIPS_OWNER );
+                    Guid knownRelationShipOwnerRoleGuid = new Guid( Rock.SystemGuid.GroupRole.GROUPROLE_KNOWN_RELATIONSHIPS_OWNER );
 
-                    var memberInfo = Queryable( true )
+                    // The 'owner' of the group is determined by built-in KnownRelationshipsOwner role or the role that is marked as IsLeader for the group
+                    var ownerInfo = Queryable( true )
                         .Where( m =>
                             m.GroupId == groupMember.GroupId &&
-                            m.GroupRole.Guid.Equals( ownerRoleGuid ) )
+                            ( m.GroupRole.Guid.Equals( knownRelationShipOwnerRoleGuid ) || m.GroupRole.IsLeader ) )
                         .Select( m => new 
                         {
                             PersonId = m.PersonId,
@@ -327,20 +348,21 @@ namespace Rock.Model
                     int? ownerPersonId = null;
                     int? ownerRoleId = null;
 
-                    if ( memberInfo != null )
+                    if ( ownerInfo != null )
                     {
-                        ownerPersonId = memberInfo.PersonId;
-                        ownerRoleId = memberInfo.RoleId;
+                        ownerPersonId = ownerInfo.PersonId;
+                        ownerRoleId = ownerInfo.RoleId;
                     }
 
                     if ( ownerPersonId.HasValue && ownerRoleId.HasValue )
                     {
-                        // Find related person's group
+                        // Find related person's group where the person is the Owner
+                        // NOTE: The 'owner' of the group is determined by built-in KnownRelationshipsOwner role or the role that is marked as IsLeader for the group
                         var inverseGroup = Queryable( true )
                             .Where( m =>
                                 m.PersonId == groupMember.PersonId &&
                                 m.Group.GroupTypeId == groupRole.GroupTypeId &&
-                                m.GroupRole.Guid.Equals( ownerRoleGuid ) )
+                                ( m.GroupRole.Guid.Equals( knownRelationShipOwnerRoleGuid ) || m.GroupRole.IsLeader ) )
                             .Select( m => m.Group )
                             .FirstOrDefault();
 
@@ -415,7 +437,7 @@ namespace Rock.Model
                 throw new Exception( "Specified relationshipRoleId is not a known relationships role" );
             }
 
-            var knownRelationshipGroup = groupMemberService.Queryable()
+            var knownRelationshipGroup = groupMemberService.Queryable(true)
                 .Where( m =>
                     m.PersonId == personId &&
                     m.GroupRole.Guid.Equals( ownerRole.Guid ) )
@@ -439,7 +461,7 @@ namespace Rock.Model
             }
 
             // Add relationships
-            var relationshipMember = groupMemberService.Queryable()
+            var relationshipMember = groupMemberService.Queryable(true)
                 .FirstOrDefault( m =>
                     m.GroupId == knownRelationshipGroup.Id &&
                     m.PersonId == relatedPersonId &&
@@ -456,9 +478,8 @@ namespace Rock.Model
             }
 
             var inverseGroupMember = groupMemberService.GetInverseRelationship( relationshipMember, true );
-            if ( inverseGroupMember != null )
+            if ( inverseGroupMember != null && inverseGroupMember.Id <= 0 )
             {
-                groupMemberService.Add( inverseGroupMember );
                 rockContext.SaveChanges();
             }
         }
@@ -487,7 +508,7 @@ namespace Rock.Model
            }
 
            // find the personId's "known relationship" group
-           int? knownRelationshipGroupId = groupMemberService.Queryable()
+           int? knownRelationshipGroupId = groupMemberService.Queryable(true)
                .Where( m =>
                    m.PersonId == personId &&
                    m.GroupRoleId == ownerRole.Id )
@@ -546,7 +567,7 @@ namespace Rock.Model
             }
 
             // lookup the relationship to delete
-            var relationshipMember = groupMemberService.Queryable()
+            var relationshipMember = groupMemberService.Queryable(true)
                 .FirstOrDefault( m =>
                     m.GroupId == knownRelationshipGroup.Id &&
                     m.PersonId == relatedPersonId &&
@@ -563,6 +584,55 @@ namespace Rock.Model
                 groupMemberService.Delete( relationshipMember );
                 rockContext.SaveChanges();
             }
+        }
+
+        /// <summary>
+        /// Reorders the group member group.
+        /// </summary>
+        /// <param name="items">The items.</param>
+        /// <param name="oldIndex">The old index.</param>
+        /// <param name="newIndex">The new index.</param>
+        public virtual void ReorderGroupMemberGroup( List<GroupMember> items, int oldIndex, int newIndex )
+        {
+            GroupMember movedItem = items[oldIndex];
+            if ( movedItem != null )
+            {
+                items.RemoveAt( oldIndex );
+                if ( newIndex >= items.Count )
+                {
+                    items.Add( movedItem );
+                }
+                else
+                {
+                    items.Insert( newIndex, movedItem );
+                }
+            }
+
+            SetGroupMemberGroupOrder( items );
+        }
+
+        /// <summary>
+        /// Ensures that the GroupMember.GroupOrder is set for the sortedList of GroupMembers,
+        /// and returns true if any updates to GroupMember.GroupOrder where made
+        /// </summary>
+        /// <param name="sortedItems">The sorted items.</param>
+        /// <returns></returns>
+        public virtual bool SetGroupMemberGroupOrder( List<GroupMember> sortedItems )
+        {
+            bool changesMade = false;
+            int order = 0;
+            foreach ( GroupMember item in sortedItems )
+            {
+                if ( item.GroupOrder != order )
+                {
+                    item.GroupOrder = order;
+                    changesMade = true;
+                }
+
+                order++;
+            }
+
+            return changesMade;
         }
     }
 }

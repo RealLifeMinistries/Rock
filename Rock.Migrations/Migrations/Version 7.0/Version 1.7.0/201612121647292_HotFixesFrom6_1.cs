@@ -29,11 +29,11 @@ namespace Rock.Migrations
         /// </summary>
         public override void Up()
         {
-            Sql( MigrationSQL._201612121647292_HotFixesFrom6_1 );
+            //Sql( MigrationSQL._201612121647292_HotFixesFrom6_1 );
 
             // last part of hotfix 008
             // Fix for issue #1877 to allow Benevolence workers to upload Benevolence Request Documents.
-            RockMigrationHelper.AddSecurityAuthForBinaryFileType( Rock.SystemGuid.BinaryFiletype.BENEVOLENCE_REQUEST_DOCUMENTS, 0, "Edit", true, Rock.SystemGuid.Group.GROUP_BENEVOLENCE, Model.SpecialRole.None, "620C29F0-983C-45D5-B5D9-782E7792EEE3" );
+            //RockMigrationHelper.AddSecurityAuthForBinaryFileType( Rock.SystemGuid.BinaryFiletype.BENEVOLENCE_REQUEST_DOCUMENTS, 0, "Edit", true, Rock.SystemGuid.Group.GROUP_BENEVOLENCE, Model.SpecialRole.None, "620C29F0-983C-45D5-B5D9-782E7792EEE3" );
 
         }
 

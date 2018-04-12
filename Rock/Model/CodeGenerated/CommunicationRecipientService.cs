@@ -92,10 +92,12 @@ namespace Rock.Model
             target.CommunicationId = source.CommunicationId;
             target.ForeignGuid = source.ForeignGuid;
             target.ForeignKey = source.ForeignKey;
+            target.MediumEntityTypeId = source.MediumEntityTypeId;
             target.OpenedClient = source.OpenedClient;
             target.OpenedDateTime = source.OpenedDateTime;
             target.PersonAliasId = source.PersonAliasId;
             target.ResponseCode = source.ResponseCode;
+            target.SendDateTime = source.SendDateTime;
             target.Status = source.Status;
             target.StatusNote = source.StatusNote;
             target.TransportEntityTypeName = source.TransportEntityTypeName;

@@ -26,8 +26,17 @@ namespace Rock.Web.UI.Controls
     /// A <see cref="T:System.Web.UI.WebControls.CurrencyBox"/> control with an associated label.
     /// </summary>
     [ToolboxData( "<{0}:CurrencyBox runat=server></{0}:CurrencyBox>" )]
-    public class CurrencyBox : RockTextBox
+    public class CurrencyBox : NumberBoxBase
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CurrencyBox" /> class.
+        /// </summary>
+        public CurrencyBox()
+            : base()
+        {
+            this.NumberType = ValidationDataType.Currency;
+        }
+
         /// <summary>
         /// Raises the <see cref="E:System.Web.UI.Control.Init" /> event.
         /// </summary>
@@ -42,6 +51,16 @@ namespace Rock.Web.UI.Controls
                 string symbol = globalAttributes.GetValue( "CurrencySymbol" );
                 this.PrependText = string.IsNullOrWhiteSpace( symbol ) ? "$" : symbol;
             }
+        }
+
+        /// <summary>
+        /// Renders the base control and allows a dec to show on mobile keyboards
+        /// </summary>
+        /// <param name="writer">The writer.</param>
+        public override void RenderBaseControl( HtmlTextWriter writer )
+        {
+            this.Attributes["step"] = "0.01";
+            base.RenderBaseControl( writer );
         }
     }
 }

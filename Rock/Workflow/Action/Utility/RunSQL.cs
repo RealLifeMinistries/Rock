@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.Composition;
+using System.Web;
 
 using Rock.Attribute;
 using Rock.Communication;
@@ -36,8 +37,9 @@ namespace Rock.Workflow.Action
     [Export( typeof( ActionComponent ) )]
     [ExportMetadata( "ComponentName", "SQL Run" )]
     [CodeEditorField( "SQLQuery", "The SQL query to run. <span class='tip tip-lava'></span>", Web.UI.Controls.CodeEditorMode.Sql, Web.UI.Controls.CodeEditorTheme.Rock, 400, true, "", "", 0 )]
-    [WorkflowAttribute( "Result Attribute", "An optional attribute to set to the scaler result of SQL query.", false, "", "", 1 )]
-    [BooleanField( "Continue On Error", "Should processing continue even if SQL Error occurs?", false, "", 2 )]
+    [KeyValueListField( "Parameters", "The parameters to supply to the SQL query. <span class='tip tip-lava'></span>", false, "", "Parameter", "", order: 1 )]
+    [WorkflowAttribute( "Result Attribute", "An optional attribute to set to the scaler result of SQL query.", false, "", "", 2 )]
+    [BooleanField( "Continue On Error", "Should processing continue even if SQL Error occurs?", false, "", 3 )]
     public class RunSQL : ActionComponent
     {
         /// <summary>
@@ -53,38 +55,35 @@ namespace Rock.Workflow.Action
             errorMessages = new List<string>();
 
             var query = GetAttributeValue( action, "SQLQuery" );
+            var parametersValue = GetAttributeValue( action, "Parameters" );
+            var parameterList = new Field.Types.KeyValueListFieldType().GetValuesFromString( null, parametersValue, null, false );
 
             var mergeFields = GetMergeFields( action );
             query = query.ResolveMergeFields( mergeFields );
 
+            var parameters = new Dictionary<string, object>();
+            foreach ( var p in parameterList )
+            {
+                var value = p.Value != null ? p.Value.ToString().ResolveMergeFields( mergeFields ) : null;
+
+                parameters.AddOrReplace( p.Key, value );
+            }
+
             try
             {
-                object sqlResult = DbService.ExecuteScaler( query );
+                object sqlResult = DbService.ExecuteScaler( query, System.Data.CommandType.Text, parameters );
                 action.AddLogEntry( "SQL query has been run" );
 
                 if ( sqlResult != null )
                 {
-                    Guid? attributeGuid = GetAttributeValue( action, "ResultAttribute" ).AsGuidOrNull();
-                    if ( attributeGuid.HasValue )
+                    string resultValue = sqlResult.ToString();
+                    var attribute = SetWorkflowAttributeValue( action, "ResultAttribute", resultValue );
+                    if ( attribute != null )
                     {
-                        var attribute = AttributeCache.Read( attributeGuid.Value, rockContext );
-                        if ( attribute != null )
-                        {
-                            string resultValue = sqlResult.ToString();
-
-                            if ( attribute.EntityTypeId == new Rock.Model.Workflow().TypeId )
-                            {
-                                action.Activity.Workflow.SetAttributeValue( attribute.Key, resultValue );
-                                action.AddLogEntry( string.Format( "Set '{0}' attribute to '{1}'.", attribute.Name, resultValue ) );
-                            }
-                            else if ( attribute.EntityTypeId == new Rock.Model.WorkflowActivity().TypeId )
-                            {
-                                action.Activity.SetAttributeValue( attribute.Key, resultValue );
-                                action.AddLogEntry( string.Format( "Set '{0}' attribute to '{1}'.", attribute.Name, resultValue ) );
-                            }
-                        }
+                        action.AddLogEntry( string.Format( "Set '{0}' attribute to '{1}'.", attribute.Name, resultValue ) );
                     }
                 }
+
                 return true;
             }
             catch (Exception ex)

@@ -47,7 +47,10 @@ namespace Rock.Rest.Controllers
         /// <param name="includedGroupTypeIds">The included group type ids.</param>
         /// <param name="excludedGroupTypeIds">The excluded group type ids.</param>
         /// <param name="includeInactiveGroups">if set to <c>true</c> [include inactive groups].</param>
-        /// <param name="includeCounts">if set to <c>true</c> [include counts].</param>
+        /// <param name="countsType">Type of the counts.</param>
+        /// <param name="campusId">if set it will filter groups based on campus</param>
+        /// <param name="includeNoCampus">if campus set and set to <c>true</c> [include groups with no campus].</param>
+        /// <param name="limitToPublic">if set to <c>true</c> [limit to public groups].</param>
         /// <returns></returns>
         [Authenticate, Secured]
         [System.Web.Http.Route( "api/Groups/GetChildren/{id}" )]
@@ -58,7 +61,10 @@ namespace Rock.Rest.Controllers
             string includedGroupTypeIds = "",
             string excludedGroupTypeIds = "",
             bool includeInactiveGroups = false,
-            TreeViewItem.GetCountsType countsType = TreeViewItem.GetCountsType.None )
+            TreeViewItem.GetCountsType countsType = TreeViewItem.GetCountsType.None,
+            int campusId = 0,
+            bool includeNoCampus = false,
+            bool limitToPublic  = false)
         {
             // Enable proxy creation since security is being checked and need to navigate parent authorities
             SetProxyCreation( true );
@@ -71,14 +77,14 @@ namespace Rock.Rest.Controllers
             // if specific group types are specified, show the groups regardless of ShowInNavigation
             bool limitToShowInNavigation = !includedGroupTypeIdList.Any();
 
-            var qry = groupService.GetChildren( id, rootGroupId, limitToSecurityRoleGroups, includedGroupTypeIdList, excludedGroupTypeIdList, includeInactiveGroups, limitToShowInNavigation );
+            var qry = groupService.GetChildren( id, rootGroupId, limitToSecurityRoleGroups, includedGroupTypeIdList, excludedGroupTypeIdList, includeInactiveGroups, limitToShowInNavigation, campusId, includeNoCampus, limitToPublic );
 
             List<Group> groupList = new List<Group>();
             List<TreeViewItem> groupNameList = new List<TreeViewItem>();
 
             var person = GetPerson();
 
-            foreach ( var group in qry.OrderBy( g => g.Name ) )
+            foreach ( var group in qry.OrderBy( g => g.Order ).ThenBy( g => g.Name ) )
             {
                 if ( group.IsAuthorized( Rock.Security.Authorization.VIEW, person ) )
                 {
@@ -140,7 +146,7 @@ namespace Rock.Rest.Controllers
         }
 
         /// <summary>
-        /// Gets the families.
+        /// Gets the families sorted by the person's GroupOrder (GroupMember.GroupOrder)
         /// </summary>
         /// <param name="personId">The person identifier.</param>
         /// <returns></returns>
@@ -170,6 +176,7 @@ namespace Rock.Rest.Controllers
         /// Gets the families by name search.
         /// </summary>
         /// <param name="searchString">String to use for search.</param>
+        /// <param name="maxResults">The maximum results.</param>
         /// <returns></returns>
         [Authenticate, Secured]
         [HttpGet]
@@ -546,60 +553,6 @@ namespace Rock.Rest.Controllers
             GroupService.AddNewGroupAddress( rockContext, group, locationType.Guid.ToString(), street1, street2, city, state, postalCode, country, true );
         }
 
-        /// <summary>
-        /// Puts the specified identifier.
-        /// </summary>
-        /// <param name="id">The identifier.</param>
-        /// <param name="group">The group.</param>
-        public override void Put( int id, Group group )
-        {
-            var familyGroupType = GroupTypeCache.Read( Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid() );
-            if ( familyGroupType != null && familyGroupType.Id == group.GroupTypeId )
-            {
-                SetProxyCreation( true );
-
-                var rockContext = (RockContext)Service.Context;
-                var existingGroup = Service.Get( id );
-                if ( existingGroup != null )
-                {
-                    var changes = new List<string>();
-                    string oldCampus = existingGroup.Campus != null ? existingGroup.Campus.Name : string.Empty;
-                    string newCampus = group.Campus != null ? group.Campus.Name : string.Empty;
-                    if ( group.CampusId.HasValue && string.IsNullOrWhiteSpace( newCampus ) )
-                    {
-                        var campus = CampusCache.Read( group.CampusId.Value );
-                        newCampus = campus != null ? campus.Name : string.Empty;
-                    }
-
-                    History.EvaluateChange( changes, "Campus", oldCampus, newCampus );
-
-                    if ( changes.Any() )
-                    {
-                        System.Web.HttpContext.Current.Items.Add( "CurrentPerson", GetPerson() );
-
-                        int? modifiedByPersonAliasId = group.ModifiedAuditValuesAlreadyUpdated ? group.ModifiedByPersonAliasId : (int?)null;
-
-                        foreach ( var fm in existingGroup.Members )
-                        {
-                            HistoryService.SaveChanges(
-                                rockContext,
-                                typeof( Person ),
-                                Rock.SystemGuid.Category.HISTORY_PERSON_FAMILY_CHANGES.AsGuid(),
-                                fm.PersonId,
-                                changes,
-                                existingGroup.Name,
-                                typeof( Group ),
-                                existingGroup.Id,
-                                true,
-                                modifiedByPersonAliasId );
-                        }
-                    }
-                }
-            }
-
-            base.Put( id, group );
-        }
-
         #region MapInfo methods
 
         /// <summary>
@@ -795,11 +748,26 @@ namespace Rock.Rest.Controllers
         /// <param name="groupId">The group identifier.</param>
         /// <param name="statusId">The status identifier.</param>
         /// <returns></returns>
-        /// <exception cref="System.Web.Http.HttpResponseException">
-        /// </exception>
         [Authenticate, Secured]
         [System.Web.Http.Route( "api/Groups/GetMapInfo/{groupId}/Families/{statusId}" )]
         public IQueryable<MapItem> GetFamiliesMapInfo( int groupId, int statusId )
+        {
+            return GetFamiliesMapInfo( groupId, statusId, null );
+        }
+
+        /// <summary>
+        /// Gets the families map information.
+        /// </summary>
+        /// <param name="groupId">The group identifier.</param>
+        /// <param name="statusId">The status identifier.</param>
+        /// <param name="campusIds">If specified, only show families that are associated with any of the campus ids.</param>
+        /// <returns></returns>
+        /// <exception cref="HttpResponseException">
+        /// </exception>
+        /// <exception cref="System.Web.Http.HttpResponseException"></exception>
+        [Authenticate, Secured]
+        [System.Web.Http.Route( "api/Groups/GetMapInfo/{groupId}/Families/{statusId}" )]
+        public IQueryable<MapItem> GetFamiliesMapInfo( int groupId, int statusId, string campusIds)
         {
             // Enable proxy creation since security is being checked and need to navigate parent authorities
             SetProxyCreation( true );
@@ -820,16 +788,17 @@ namespace Rock.Rest.Controllers
                         .Where( l => l.Location.GeoFence != null )
                         .Select( l => l.Location ) )
                     {
-                        var familyGuid = Rock.SystemGuid.GroupType.GROUPTYPE_FAMILY.AsGuid();
-                        var activeGuid = Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_ACTIVE.AsGuid();
+                        var familyGroupTypeId = GroupTypeCache.GetFamilyGroupType().Id;
+                        var recordStatusActiveId = DefinedValueCache.Read( Rock.SystemGuid.DefinedValue.PERSON_RECORD_STATUS_ACTIVE.AsGuid() ).Id;
+                        
                         var families = new GroupLocationService( (RockContext)Service.Context ).Queryable()
                             .Where( l =>
                                 l.IsMappedLocation &&
-                                l.Group.GroupType.Guid.Equals( familyGuid ) &&
+                                l.Group.GroupTypeId == familyGroupTypeId &&
                                 l.Location.GeoPoint.Intersects( location.GeoFence ) &&
                                 l.Group.Members.Any( m =>
-                                    m.Person.RecordStatusValue != null &&
-                                    m.Person.RecordStatusValue.Guid.Equals( activeGuid ) &&
+                                    m.Person.RecordStatusValueId.HasValue &&
+                                    m.Person.RecordStatusValueId == recordStatusActiveId &&
                                     m.Person.ConnectionStatusValueId.HasValue &&
                                     m.Person.ConnectionStatusValueId.Value == statusId ) )
                             .Select( l => new
@@ -837,15 +806,22 @@ namespace Rock.Rest.Controllers
                                 l.Location,
                                 l.Group.Id,
                                 l.Group.Name,
+                                l.Group.CampusId,
                                 MinStatus = l.Group.Members
                                     .Where( m =>
-                                        m.Person.RecordStatusValue != null &&
-                                        m.Person.RecordStatusValue.Guid.Equals( activeGuid ) &&
+                                        m.Person.RecordStatusValueId.HasValue &&
+                                        m.Person.RecordStatusValueId == recordStatusActiveId &&
                                         m.Person.ConnectionStatusValueId.HasValue )
                                     .OrderBy( m => m.Person.ConnectionStatusValue.Order )
                                     .Select( m => m.Person.ConnectionStatusValue.Id )
                                     .FirstOrDefault()
                             } );
+
+                        var campusIdList = ( campusIds ?? string.Empty ).SplitDelimitedValues().AsIntegerList();
+                        if ( campusIdList.Any() )
+                        {
+                            families = families.Where( a => a.CampusId.HasValue && campusIdList.Contains( a.CampusId.Value ) );
+                        }
 
                         foreach ( var family in families.Where( f => f.MinStatus == statusId ) )
                         {

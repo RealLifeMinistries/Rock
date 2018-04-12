@@ -33,7 +33,6 @@ using Rock.Web;
 using Rock.Web.Cache;
 using Rock.Web.UI;
 using Rock.Web.UI.Controls;
-using Microsoft.Ajax.Utilities;
 
 namespace RockWeb.Blocks.Administration
 {
@@ -106,14 +105,14 @@ namespace RockWeb.Blocks.Administration
                     int? siteId = ddlSite.SelectedValueAsInt();
                     if ( siteId.HasValue )
                     {
-                        //tbToken.Text = new PageShortLinkService( rockContext ).GetUniqueToken( siteId.Value, _minTokenLength );
+                        tbToken.Text = new PageShortLinkService( rockContext ).GetUniqueToken( siteId.Value, _minTokenLength );
                     }
                 }
 
                 SetSiteUrl();
 
                 string url = PageParameter( "url" );
-                if (url.IsNotNullOrWhitespace())
+                if ( url.IsNotNullOrWhitespace() )
                 {
                     tbUrl.Text = url;
                 }

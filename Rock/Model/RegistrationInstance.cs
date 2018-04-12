@@ -32,9 +32,10 @@ namespace Rock.Model
     /// <summary>
     /// 
     /// </summary>
+    [RockDomain( "Event" )]
     [Table( "RegistrationInstance" )]
     [DataContract]
-    public partial class RegistrationInstance : Model<RegistrationInstance>
+    public partial class RegistrationInstance : Model<RegistrationInstance>, IHasActiveFlag
     {
 
         #region Entity Properties
@@ -124,7 +125,6 @@ namespace Rock.Model
         [DataMember]
         public int? AccountId { get; set; }
 
-
         /// <summary>
         /// Gets or sets the cost (if template is configured to allow cost on instance).
         /// </summary>
@@ -203,6 +203,15 @@ namespace Rock.Model
         /// </value>
         [DataMember]
         public string AdditionalConfirmationDetails { get; set; }
+
+        /// <summary>
+        /// Gets or sets the registration instructions.
+        /// </summary>
+        /// <value>
+        /// The registration instructions.
+        /// </value>
+        [DataMember]
+        public string RegistrationInstructions { get; set; }
 
         /// <summary>
         /// Optional workflow type to launch at end of registration

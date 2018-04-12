@@ -19,7 +19,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity.ModelConfiguration;
 using System.Runtime.Serialization;
-
+using CronExpressionDescriptor;
 using Rock.Data;
 
 namespace Rock.Model
@@ -28,6 +28,7 @@ namespace Rock.Model
     /// Represents a scheduled job/routine in Rock. A job class can have multiple ServiceJob instances associated with it in the event that it has different attributes or 
     /// has multiple schedules.  For more information on how to create a job see https://github.com/SparkDevNetwork/Rock/wiki/Rock-Jobs
     /// </summary>
+    [RockDomain( "Core" )]
     [Table( "ServiceJob" )]
     [DataContract]
     public partial class ServiceJob : Model<ServiceJob>
@@ -205,11 +206,27 @@ namespace Rock.Model
         /// <value>
         /// The last status message as HTML.
         /// </value>
+        [LavaInclude]
         public string LastStatusMessageAsHtml
         {
             get
             {
                 return LastStatusMessage.ConvertCrLfToHtmlBr();
+            }
+        }
+
+        /// <summary>
+        /// Gets the cron description.
+        /// </summary>
+        /// <value>
+        /// The cron description.
+        /// </value>
+        [LavaInclude]
+        public string CronDescription
+        {
+            get
+            {
+                return ExpressionDescriptor.GetDescription( this.CronExpression, new Options { ThrowExceptionOnParseError = false } );
             }
         }
 
