@@ -148,7 +148,7 @@
                     return title + ' is ' + selectedItems
                 },
 
-                //
+                // NOTE: this is specifically for the Rock.Reporting.DataFilter.Person.InGroupFilter component
                 formatFilterForGroupFilterField: function (title, $selectedContent) {
                     var groupNames = $('.js-group-picker', $selectedContent).find('.selected-names').text();
                     var checkedRoles = $('.js-roles', $selectedContent).find(':checked').closest('label');
@@ -183,11 +183,46 @@
                     if (groupMemberStatus) {
                         result = result + ', with member status:' + groupMemberStatus;
                     }
-
-                    var dateRangeText = $('.js-slidingdaterange-text-value', $content).val()
-                    if (dateRangeText) {
-                        result = result + ', added to group in Date Range: ' + dateRangeText;
+                    
+                    var dateAddedDateRangeText = $('.js-dateadded-sliding-date-range .js-slidingdaterange-text-value', $selectedContent).val()
+                    if (dateAddedDateRangeText) {
+                      result = result + ', added to group in Date Range: ' + dateAddedDateRangeText;
                     }
+
+                    var firstAttendanceDateRangeText = $('.js-firstattendance-sliding-date-range .js-slidingdaterange-text-value', $selectedContent).val()
+                    if (firstAttendanceDateRangeText) {
+                      result = result + ', first attendance to group in Date Range: ' + firstAttendanceDateRangeText;
+                    }
+
+                    var lastAttendanceDateRangeText = $('.js-lastattendance-sliding-date-range .js-slidingdaterange-text-value', $selectedContent).val()
+                    if (lastAttendanceDateRangeText) {
+                      result = result + ', last attendance to group in Date Range: ' + lastAttendanceDateRangeText;
+                    }
+
+                    return result;
+                },
+
+                // NOTE: this is specifically for the Rock.Reporting.DataFilter.Person.HasPhoneFilter component
+                formatFilterForHasPhoneFilter: function ($content) {
+
+                    var has;
+                    if ($('.js-hasphoneoftype', $content).find(':selected').val() == "True") {
+                        has = "Has ";
+                    } else {
+                        has = "Doesn't have ";
+                    }
+
+                    var phoneType = $('.js-phonetype', $content).find(':selected').text();
+                    var sms = $('.js-hassms', $content).find(':selected').text();
+
+                    if (sms == 'Yes') {
+                        sms = ' and Has SMS Enabled';
+                    }
+                    else if (sms == 'No') {
+                        sms = " and Doesn't have SMS Enabled";
+                    }
+
+                    var result = has + phoneType + sms;
 
                     return result;
                 },

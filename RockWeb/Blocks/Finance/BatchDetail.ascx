@@ -15,6 +15,7 @@
                     <Rock:HighlightLabel ID="hlBatchId" runat="server" LabelType="Info" />
                     <Rock:HighlightLabel ID="hlStatus" runat="server" />
                     <Rock:HighlightLabel ID="hlCampus" runat="server" LabelType="Campus" />
+                    <Rock:HighlightLabel ID="hlIsAutomated" runat="server" LabelType="Warning" Text="Automated" Visible="false" ToolTip="This is an automated batch. The system will automatically set this batch to OPEN when all transactions have been downloaded." />
                 </div>
             </div>
             <Rock:PanelDrawer ID="pdAuditDetails" runat="server"></Rock:PanelDrawer>
@@ -29,8 +30,9 @@
 
                     <div class="row">
                         <div class="col-md-6">
-                            <Rock:DataTextBox ID="tbName" runat="server" Label="Title" SourceTypeName="Rock.Model.FinancialBatch, Rock" PropertyName="Name" />
-                            <Rock:RockDropDownList ID="ddlStatus" runat="server" Label="Status" Required="true"></Rock:RockDropDownList>
+                            <Rock:RockDropDownList ID="ddlBatchName" runat="server" Label="Name" Visible="false" Required="true"/>
+                            <Rock:RockTextBox ID="tbName" runat="server" Label="Name" Required="true" />
+                            <Rock:RockDropDownList ID="ddlStatus" runat="server" Label="Status" Required="true" AutoPostBack="true" OnSelectedIndexChanged="ddlStatus_SelectedIndexChanged"></Rock:RockDropDownList>
                             <Rock:DateTimePicker ID="dtpStart" runat="server" Label="Batch Start" Required="true" RequiredErrorMessage="A Batch Start Date is required" />
                             <Rock:DateTimePicker ID="dtpEnd" runat="server" Label="Batch End" />
                         </div>
@@ -43,9 +45,17 @@
                         </div>
                     </div>
 
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="attributes">
+                                <Rock:DynamicPlaceHolder ID="phAttributes" runat="server" />
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="actions">
-                        <asp:LinkButton ID="lbSave" runat="server" Text="Save" CssClass="btn btn-primary" OnClick="lbSave_Click" />
-                        <asp:LinkButton ID="lbCancel" runat="server" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="lbCancel_Click" />
+                        <asp:LinkButton ID="lbSave" runat="server" AccessKey="s" ToolTip="Alt+s" Text="Save" CssClass="btn btn-primary" OnClick="lbSave_Click" />
+                        <asp:LinkButton ID="lbCancel" runat="server" AccessKey="c" ToolTip="Alt+c" Text="Cancel" CssClass="btn btn-link" CausesValidation="false" OnClick="lbCancel_Click" />
                     </div>
                 </div>
 
@@ -54,6 +64,7 @@
                     <div class="row">
                         <div class="col-sm-6">
                             <asp:Literal ID="lDetails" runat="server" />
+                            <asp:PlaceHolder ID="phReadonlyAttributes" runat="server"></asp:PlaceHolder>
                         </div>
                         <div class="col-sm-6">
                             <div class="grid">

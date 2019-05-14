@@ -4,7 +4,6 @@
 
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head runat="server">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <title>Rock - Error</title>
 
     <link rel="stylesheet" href="<%= Page.ResolveUrl("~/Themes/Rock/Styles/bootstrap.css") %>" />
@@ -49,7 +48,7 @@
                                 <h3>We can't let you view this page...</h3>
 
                                 <p class="error-icon danger">
-                                    <i class="fa fa-lock"></i>
+                                    <i class="fa fa-lock"></i> 
                                 </p>
 
                                 <p>Unfortunately, you are not authorized to view the page you requested. Please contact
