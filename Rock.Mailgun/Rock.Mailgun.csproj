@@ -4,7 +4,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{D6B19C0D-DA5E-4F75-8001-04DED86B741F}</ProjectGuid>
+    <ProjectGuid>{681D7CE2-D156-4414-ABEC-06CB5F47ADEC}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Rock.Mailgun</RootNamespace>

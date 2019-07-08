@@ -227,8 +227,8 @@ WHERE [Message] LIKE '%<!-- prevent Gmail on iOS font size manipulation -->
     WHERE [Path] = '~/Blocks/Crm/FamilyPreRegistration.ascx'
 " );
 
-            RockMigrationHelper.AddPageRoute( "3B31B9A2-DE35-4407-8E7D-3633F93906CD", "FamilyPreRegistration", "F4EC3FCD-6410-44A9-B66B-A4BC207CA7DA" );// for Page:Family Pre-Registration
-            RockMigrationHelper.AddPageRoute( "B37D22BE-D2A8-4EFA-8B2B-2E0EFF6EDB44", "FamilyPreRegistrationSuccess", "3C39DF30-00B0-4096-B623-200A93D85CA9" );// for Page:Family Pre-Registration Success
+            //RockMigrationHelper.AddPageRoute( "3B31B9A2-DE35-4407-8E7D-3633F93906CD", "FamilyPreRegistration", "F4EC3FCD-6410-44A9-B66B-A4BC207CA7DA" );// for Page:Family Pre-Registration
+            //RockMigrationHelper.AddPageRoute( "B37D22BE-D2A8-4EFA-8B2B-2E0EFF6EDB44", "FamilyPreRegistrationSuccess", "3C39DF30-00B0-4096-B623-200A93D85CA9" );// for Page:Family Pre-Registration Success
 
         }
     }
