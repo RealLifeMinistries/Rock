@@ -35,7 +35,37 @@
                 }
             });
 
+            function PostRefresh() {
+                window.location = "javascript:__doPostBack('<%=lbRefresh.ClientID %>','')";
+            }
+
+            function GetLabelTypeSelection() {
+                var ids = '';
+                $('div.js-label-list').find('i.fa-check-square').each(function () {
+                    ids += $(this).closest('a').attr('data-label-guid') + ',';
+                });
+                if (ids == '') {
+                    bootbox.alert('Please select at least one tag');
+                    return false;
+                }
+                else {
+                    $('#<%=lbReprintSelectLabelTypes.ClientID %>').button('loading')
+                    $('#<%=hfLabelFileGuids.ClientID %>').val(ids);
+                    return true;
+                }
+            }
+
             Sys.Application.add_load(function () {
+
+                $('a.js-label-select').off('click').on('click', function () {
+                    $(this).toggleClass('active');
+                    $(this).find('i').toggleClass('fa-check-square').toggleClass('fa-square-o');
+                    var ids = '';
+                    $('div.js-label-list').find('i.fa-check-square').each(function () {
+                        ids += $(this).closest('a').attr('data-label-guid') + ',';
+                    });
+                    $('.js-label-file-guids').val(ids);
+                });
 
                 var timeoutSeconds = $('.js-refresh-timer-seconds').val();
                 timeout = window.setTimeout(refreshKiosk, timeoutSeconds * 1000);
@@ -373,7 +403,7 @@
 
                 <asp:HiddenField ID="hfSelectedPersonId" runat="server"></asp:HiddenField>
                 <asp:HiddenField ID="hfSelectedAttendanceIds" runat="server"></asp:HiddenField>
-                <asp:HiddenField ID="hfLabelFileGuids" runat="server"></asp:HiddenField>
+                <Rock:HiddenFieldWithClass ID="hfLabelFileGuids" runat="server" CssClass="js-label-file-guids" />
             </div>
 
             <div class="checkin-footer">

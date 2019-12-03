@@ -82,13 +82,22 @@ namespace RockWeb.Blocks.Event
         Order = 3 )]
 
     [LinkedPage(
+        "Registration Instance Page",
+        Key = AttributeKey.RegistrationInstancePage,
+        Description = "Determines which page the link in the final confirmation screen will take you to.",
+        Category = "",
+        IsRequired = false,
+        DefaultValue = Rock.SystemGuid.Page.REGISTRATION_INSTANCE,
+        Order = 4)]
+
+    [LinkedPage(
         "Group Viewer Page",
         Key = AttributeKey.GroupViewerPage,
         Description = "Determines which page the link in the final confirmation screen will take you to.",
         Category = "",
         IsRequired = false,
         DefaultValue = Rock.SystemGuid.Page.GROUP_VIEWER,
-        Order = 4 )]
+        Order = 5 )]
 
     [BooleanField(
         "Require Group",
@@ -97,7 +106,7 @@ namespace RockWeb.Blocks.Event
         Category = "",
         IsRequired = true,
         DefaultBooleanValue = false,
-        Order = 5 )]
+        Order = 6 )]
 
     [BooleanField(
         "Set Registration Instance Active",
@@ -106,7 +115,7 @@ namespace RockWeb.Blocks.Event
         Category = "",
         IsRequired = true,
         DefaultBooleanValue = true,
-        Order = 5 )]
+        Order = 7 )]
 
     [BooleanField(
         "Enable Calendar Events",
@@ -115,7 +124,7 @@ namespace RockWeb.Blocks.Event
         Category = "",
         IsRequired = true,
         DefaultBooleanValue = true,
-        Order = 6 )]
+        Order = 8 )]
 
     [BooleanField(
         "Allow Creating New Calendar Events",
@@ -124,7 +133,7 @@ namespace RockWeb.Blocks.Event
         Category = "",
         IsRequired = true,
         DefaultBooleanValue = false,
-        Order = 7 )]
+        Order = 9 )]
 
     [BooleanField(
         "Require Calendar Events",
@@ -133,17 +142,53 @@ namespace RockWeb.Blocks.Event
         Category = "",
         IsRequired = true,
         DefaultBooleanValue = true,
-        Order = 8 )]
+        Order = 10 )]
+
+    [BooleanField(
+        "Include Inactive Calendar Items",
+        Key = AttributeKey.IncludeInactiveCalendarItems,
+        Description = "Check this box to hide inactive calendar items.",
+        Category = "",
+        IsRequired = false,
+        DefaultBooleanValue = true,
+        Order = 11 )]
 
     [WorkflowTypeField(
         "Completion Workflow",
         Key = AttributeKey.CompletionWorkflow,
-        Description = "A workflow that will be launched when a new registration is created.",
+        Description = "A workflow that will be launched when the wizard is complete.  The following attributes will be passed to the workflow:\r\n + Group\r\n + RegistrationInstance\r\n + EventItemOccurrenceGuid",
         Category = "",
         IsRequired = false,
         DefaultValue = "",
         AllowMultiple = false,
-        Order = 9 )]
+        Order = 12 )]
+
+    [GroupTypesField(
+        "Check-In Group Types",
+        Key = AttributeKey.CheckInGroupTypes,
+        Description = "Select group types which should enable check-in.  If the selected registration template is one of these types, check-in options will be enabled for the group.",
+        Category = "",
+        IsRequired = false,
+        DefaultValue = "",
+        Order = 13 )]
+
+    [BooleanField(
+        "Display Link to Event Details Page on Confirmation Screen",
+        Key = AttributeKey.DisplayEventDetailsLink,
+        Description = "Check this box to show the link to the event details page in the wizard confirmation screen.",
+        Category = "",
+        IsRequired = false,
+        DefaultBooleanValue = false,
+        Order = 14 )]
+
+    [LinkedPage(
+        "External Event Details Page",
+        Key = AttributeKey.EventDetailsPage,
+        Description = "Determines which page the link in the final confirmation screen will take you to (if \"Display Link to Event Details ... \" is selected).",
+        Category = "",
+        IsRequired = false,
+        DefaultValue = Rock.SystemGuid.Page.EVENT_DETAILS,
+        Order = 15 )]
 
     #region Advanced Block Attribute Settings 
 
@@ -222,13 +267,18 @@ namespace RockWeb.Blocks.Event
             public const string DefaultCalendar = "DefaultCalendar";
             public const string AvailableRegistrationTemplates = "AvailableRegistrationTemplates";
             public const string RootGroup = "RootGroup";
+            public const string RegistrationInstancePage = "RegistrationInstancePage";
             public const string GroupViewerPage = "GroupViewerPage";
             public const string RequireGroup = "RequireGroup";
             public const string SetRegistrationInstanceActive = "SetRegistrationInstanceActive";
             public const string EnableCalendarEvents = "EnableCalendarEvents";
             public const string AllowCreatingNewCalendarEvents = "AllowCreatingNewCalendarEvents";
             public const string RequireCalendarEvents = "RequireCalendarEvents";
+            public const string IncludeInactiveCalendarItems = "IncludeInactiveCalendarItems";
             public const string CompletionWorkflow = "CompletionWorkflow";
+            public const string CheckInGroupTypes = "CheckInGroupTypes";
+            public const string DisplayEventDetailsLink = "DisplayEventDetailsLink";
+            public const string EventDetailsPage = "EventDetailsPage";
 
             public const string LavaInstruction_InitiateWizard = "LavaInstruction_InitiateWizard";
             public const string LavaInstruction_Registration = "LavaInstruction_Registration";
@@ -290,7 +340,7 @@ namespace RockWeb.Blocks.Event
         {
             RegistrationTemplate template;
             string json = ViewState["SelectedTemplate"] as string;
-            if (string.IsNullOrWhiteSpace( json ))
+            if ( string.IsNullOrWhiteSpace( json ) )
             {
                 template = null;
             }
@@ -342,7 +392,7 @@ namespace RockWeb.Blocks.Event
                     SaveCalendarItemState( itemsState );
 
                     eventCalendarItem.LoadAttributes();
-                    if (eventCalendarItem.Attributes.Count > 0)
+                    if ( eventCalendarItem.Attributes.Count > 0 )
                     {
                         wpAttributes.Visible = true;
                         phAttributes.Controls.Add( new LiteralControl( String.Format( "<h3>{0}</h3>", eventCalendarService.Get( eventCalendarId ).Name ) ) );
@@ -391,13 +441,13 @@ namespace RockWeb.Blocks.Event
                 else
                 {
                     Guid? rootGroupGuid = GetAttributeValue( AttributeKey.RootGroup ).AsGuidOrNull();
-                    if (rootGroupGuid != null)
+                    if ( rootGroupGuid != null )
                     {
                         var groupService = new GroupService( rockContext );
                         parentGroup = groupService.Get( rootGroupGuid.Value );
                     }
                 }
-                if ( parentGroup == null)
+                if ( parentGroup == null )
                 {
                     groupDescription += " as a new root group.";
                 }
@@ -410,6 +460,37 @@ namespace RockWeb.Blocks.Event
                         parentGroup = parentGroup.ParentGroup;
                     }
                     groupDescription += " under the parent group the \"" + parentGroupTitle + "\".";
+                }
+
+                List<int> selectedSchedules = spGroupLocationSchedule.SelectedValuesAsInt().ToList();
+                selectedSchedules.Remove(0);
+                if ( lpGroupLocation.Location != null )
+                {
+                    groupDescription += "  Location: " + lpGroupLocation.Location.Name;
+                    if ( selectedSchedules.Any() )
+                    {
+                        groupDescription += ",";
+                    }
+                    else
+                    {
+                        groupDescription += ".";
+                    }
+                }
+
+                string groupSchedules = "";
+                if ( selectedSchedules.Any() )
+                {
+                    var scheduleService = new ScheduleService( rockContext );
+
+                    foreach ( int selectedScheduleId in selectedSchedules )
+                    {
+                        if ( !string.IsNullOrWhiteSpace( groupSchedules ) )
+                        {
+                            groupSchedules += ", ";
+                        }
+                        groupSchedules += scheduleService.Get( selectedScheduleId ).Name;
+                    }
+                    groupDescription += "  Schedule(s): " + groupSchedules + ".";
                 }
 
                 var groupLiteral = new Literal() { Text = string.Format( itemTemplate, "Group", groupDescription ) };
@@ -478,14 +559,6 @@ namespace RockWeb.Blocks.Event
                 registrationInstance.MaxAttendees = maximumAttendees;
             }
 
-            //Set Completyion Workflow
-            var workFlowGuid = GetAttributeValue( AttributeKey.CompletionWorkflow ).AsGuidOrNull();
-            if ( workFlowGuid != null )
-            {
-                var workflowType = new WorkflowTypeService( rockContext ).Get( workFlowGuid.Value );
-                registrationInstance.RegistrationWorkflowTypeId = workflowType.Id;
-            }
-
             // Set Cost variables if Cost is to be determined on the instance.
             var registrationTemplateService = new RegistrationTemplateService( rockContext );
             var registrationTemplate = registrationTemplateService.Get( registrationInstance.RegistrationTemplateId );
@@ -551,12 +624,43 @@ namespace RockWeb.Blocks.Event
                     group.ParentGroupId = parentGroup.Id;
                 }
 
+                // Set group CampusId if campus is selected.
+                if ( ( ddlCampus.Enabled ) && ( !string.IsNullOrWhiteSpace( ddlCampus.SelectedValue ) ) )
+                {
+                    group.CampusId = ddlCampus.SelectedValueAsInt();
+                }
+
                 groupService.Add( group );
                 rockContext.SaveChanges();
                 result.GroupId = group.Id.ToString();
 
                 // Add GrouId to linkage.
                 linkage.GroupId = group.Id;
+
+                // Add GroupLocation and GroupLocationSchedule
+                if ( GroupTypeIsCheckinGroup( group.GroupTypeId, rockContext ) )
+                {
+                    if ( lpGroupLocation.Location != null )
+                    {
+                        var groupLocation = new GroupLocation();
+                        groupLocation.LocationId = lpGroupLocation.Location.Id;
+
+                        List<int> selectedSchedules = spGroupLocationSchedule.SelectedValuesAsInt().ToList();
+                        selectedSchedules.Remove(0);
+                        if ( selectedSchedules.Any() )
+                        {
+                            var scheduleService = new ScheduleService( rockContext );
+                            foreach ( int selectedScheduleId in selectedSchedules )
+                            {
+                                var groupLocationSchedule = scheduleService.Get( selectedScheduleId );
+                                groupLocation.Schedules.Add( groupLocationSchedule );
+                            }
+                        }
+
+                        group.GroupLocations.Add( groupLocation );
+                        rockContext.SaveChanges();
+                    }
+                }
             }
 
             if ( GetAttributeValue( AttributeKey.EnableCalendarEvents ).AsBoolean() )
@@ -599,7 +703,9 @@ namespace RockWeb.Blocks.Event
                         eventCalendarItem.CopyPropertiesFrom( calendar );
                     }
 
+                    eventItemService.Add( eventItem );
                     rockContext.SaveChanges();
+
                     foreach ( var eventCalendarItem in eventItem.EventCalendarItems )
                     {
                         eventCalendarItem.LoadAttributes();
@@ -634,7 +740,7 @@ namespace RockWeb.Blocks.Event
                     var calEvent = ScheduleICalHelper.GetCalendarEvent( iCalendarContent );
                     if ( calEvent != null && calEvent.DTStart != null )
                     {
-                        if (eventItemOccurrence.Schedule == null)
+                        if ( eventItemOccurrence.Schedule == null )
                         {
                             eventItemOccurrence.Schedule = new Schedule();
                         }
@@ -656,6 +762,8 @@ namespace RockWeb.Blocks.Event
             linkageService.Add( linkage );
             rockContext.SaveChanges();
 
+            LaunchPostWizardWorkflow( rockContext, linkage );
+
             return result;
         }
 
@@ -673,11 +781,10 @@ namespace RockWeb.Blocks.Event
             {
                 var qryRegistrationInstance = new Dictionary<string, string>();
                 qryRegistrationInstance.Add( "RegistrationInstanceId", result.RegistrationInstanceId );
-                //ToDo:  should this be in the system guid collection?
-                hlRegistrationInstance.NavigateUrl = GetPageUrl( "844dc54b-daec-47b3-a63a-712dd6d57793", qryRegistrationInstance );
+                hlRegistrationInstance.NavigateUrl = GetPageUrl( GetAttributeValue( AttributeKey.RegistrationInstancePage ), qryRegistrationInstance );
             }
 
-            if (string.IsNullOrWhiteSpace( result.GroupId ))
+            if ( string.IsNullOrWhiteSpace( result.GroupId ) )
             {
                 liGroupLink.Visible = false;
             }
@@ -688,7 +795,7 @@ namespace RockWeb.Blocks.Event
                 hlGroup.NavigateUrl = GetPageUrl( GetAttributeValue( AttributeKey.GroupViewerPage ), qryGroup );
             }
 
-            if (string.IsNullOrWhiteSpace( result.EventId ))
+            if ( string.IsNullOrWhiteSpace( result.EventId ) )
             {
                 liEventLink.Visible = false;
             }
@@ -699,7 +806,7 @@ namespace RockWeb.Blocks.Event
                 hlEventDetail.NavigateUrl = GetPageUrl( Rock.SystemGuid.Page.EVENT_DETAIL, qryEventDetail );
             }
 
-            if (string.IsNullOrWhiteSpace( result.EventOccurrenceId ))
+            if ( string.IsNullOrWhiteSpace( result.EventOccurrenceId ) )
             {
                 liEventOccurrenceLink.Visible = false;
             }
@@ -708,6 +815,18 @@ namespace RockWeb.Blocks.Event
                 var qryEventOccurrence = new Dictionary<string, string>();
                 qryEventOccurrence.Add( "EventItemOccurrenceId", result.EventOccurrenceId );
                 hlEventOccurrence.NavigateUrl = GetPageUrl( Rock.SystemGuid.Page.EVENT_OCCURRENCE, qryEventOccurrence );
+
+                bool showEventDetailsLink = GetAttributeValue( AttributeKey.DisplayEventDetailsLink ).AsBoolean();
+                if ( !showEventDetailsLink )
+                {
+                    liExternalEventLink.Visible = false;
+                }
+                else
+                {
+                    var qryExternalEventOccurrence = new Dictionary<string, string>();
+                    qryExternalEventOccurrence.Add("EventOccurrenceId", result.EventOccurrenceId);
+                    hlExternalEventDetails.NavigateUrl = GetPageUrl( GetAttributeValue( AttributeKey.EventDetailsPage ), qryExternalEventOccurrence);
+                }
             }
         }
 
@@ -729,7 +848,7 @@ namespace RockWeb.Blocks.Event
         private bool SelectedTemplateHasGroupType()
         {
             var registrationTemplate = GetSelectedTemplate();
-            if (registrationTemplate == null)
+            if ( registrationTemplate == null )
             {
                 return false;
             }
@@ -741,14 +860,14 @@ namespace RockWeb.Blocks.Event
             nbNotAuthorized.Visible = false;
             nbNotPermitted.Visible = false;
 
-            if (tbGroupName.Text == string.Empty)
+            if ( tbGroupName.Text == string.Empty )
             {
                 return true;
             }
 
             Group parentGroup = null;
             var parentGroupId = gpParentGroup.SelectedValueAsId();
-            if (parentGroupId != null)
+            if ( parentGroupId != null )
             {
                 var groupService = new GroupService( rockContext );
                 parentGroup = groupService.Get( parentGroupId.Value );
@@ -756,18 +875,18 @@ namespace RockWeb.Blocks.Event
             else
             {
                 Guid? rootGroupGuid = GetAttributeValue( AttributeKey.RootGroup ).AsGuidOrNull();
-                if (rootGroupGuid != null)
+                if ( rootGroupGuid != null )
                 {
                     var groupService = new GroupService( rockContext );
                     parentGroup = groupService.Get( rootGroupGuid.Value );
                 }
             }
 
-            if (parentGroup != null)
+            if ( parentGroup != null )
             {
                 bool isAuthorized = parentGroup.IsAuthorized( Authorization.ADMINISTRATE, CurrentPerson ) ||
                     parentGroup.IsAuthorized( Authorization.MANAGE_MEMBERS, CurrentPerson );
-                if (!isAuthorized)
+                if ( !isAuthorized )
                 {
                     nbNotAuthorized.Visible = true;
                     return false;
@@ -781,17 +900,31 @@ namespace RockWeb.Blocks.Event
                     var parentGroupType = groupTypeService.Get( parentGroup.GroupTypeId );
 
                     bool isChildPermitted = parentGroupType.ChildGroupTypes.Contains( templateGroupType );
-                    if (!isChildPermitted)
+                    if ( !isChildPermitted )
                     {
                         nbNotPermitted.Text = string.Format( "Groups of type \"{0}\" are not permitted under the parent \"{1}\".", templateGroupType.Name, parentGroup.Name );
                         nbNotPermitted.Visible = true;
                         return false;
                     }
-
                 }
             }
 
             return true;
+        }
+
+        private bool GroupTypeIsCheckinGroup(int groupTypeId, RockContext rockContext)
+        {
+            var checkInGroupGuids = GetAttributeValues(AttributeKey.CheckInGroupTypes).AsGuidList();
+            if ( !checkInGroupGuids.Any() )
+            {
+                return false;
+            }
+
+            var groupTypeService = new GroupTypeService(rockContext);
+            var checkinGroups = groupTypeService.Queryable().AsNoTracking()
+                .Where(gt => checkInGroupGuids.Contains(gt.Guid))
+                .Where(gt => gt.Id == groupTypeId);
+            return checkinGroups.Any();
         }
 
         #region Control Initialization
@@ -808,6 +941,9 @@ namespace RockWeb.Blocks.Event
             Page.Response.Cache.SetCacheability( System.Web.HttpCacheability.NoCache );
             Page.Response.Cache.SetExpires( DateTime.UtcNow.AddHours( -1 ) );
             Page.Response.Cache.SetNoStore();
+
+            // Hide inactive events if the option has been selected.
+            eipSelectedEvent.IncludeInactive = GetAttributeValue( AttributeKey.IncludeInactiveCalendarItems ).AsBoolean();
 
             Init_SetupAudienceControls();
 
@@ -856,7 +992,7 @@ namespace RockWeb.Blocks.Event
         private void Init_SetRegistrationTemplateValues( RockContext rockContext )
         {
             List<Guid> registrationTemplateGuids = new List<Guid>();
-            foreach (string selectedRegistrationTemplate in GetAttributeValues( AttributeKey.AvailableRegistrationTemplates ))
+            foreach ( string selectedRegistrationTemplate in GetAttributeValues( AttributeKey.AvailableRegistrationTemplates ) )
             {
                 Guid? registrationTemplateGuid = selectedRegistrationTemplate.AsGuidOrNull();
                 if ( registrationTemplateGuid != null )
@@ -869,7 +1005,7 @@ namespace RockWeb.Blocks.Event
             var registrationTemplateQuery = registrationTemplateService.GetByGuids( registrationTemplateGuids ).AsNoTracking();
 
             // If no registration templates were selected in the block settings, all active registration templates will be available.
-            if (registrationTemplateGuids.Count == 0)
+            if ( registrationTemplateGuids.Count == 0 )
             {
                 registrationTemplateQuery = registrationTemplateService.Queryable().AsNoTracking().Where( rt => rt.IsActive == true );
             }
@@ -893,7 +1029,7 @@ namespace RockWeb.Blocks.Event
                 divEvent.Visible = true;
                 divEventOccurrence.Visible = true;
 
-                ddlCampus.DataSource = CampusCache.All();
+                ddlCampus.DataSource = CampusCache.All().Where( c => c.IsActive == true ).ToList();
                 ddlCampus.DataBind();
                 ddlCampus.Items.Insert( 0, new ListItem( All.Text, string.Empty ) );
             }
@@ -914,7 +1050,7 @@ namespace RockWeb.Blocks.Event
         private void Init_SetDefaultAccount( RockContext rockContext )
         {
             Guid? acctGuid = GetAttributeValue( AttributeKey.DefaultAccount ).AsGuidOrNull();
-            if (acctGuid != null)
+            if ( acctGuid != null )
             {
                 var acctService = new FinancialAccountService( rockContext );
                 var acct = acctService.Get( acctGuid.Value );
@@ -925,7 +1061,7 @@ namespace RockWeb.Blocks.Event
         {
             int defaultCalendarId = -1;
             Guid? calendarGuid = GetAttributeValue( AttributeKey.DefaultCalendar ).AsGuidOrNull();
-            if (calendarGuid != null)
+            if ( calendarGuid != null )
             {
                 var calendarService = new EventCalendarService( rockContext );
                 var calendar = calendarService.Get( calendarGuid.Value );
@@ -937,10 +1073,10 @@ namespace RockWeb.Blocks.Event
                 .Queryable().AsNoTracking()
                 .OrderBy( c => c.Name ) )
             {
-                if ( calendar.IsAuthorized( Authorization.EDIT, CurrentPerson ))
+                if ( calendar.IsAuthorized( Authorization.EDIT, CurrentPerson ) )
                 {
                     ListItem liCalendar = new ListItem( calendar.Name, calendar.Id.ToString() );
-                    if (calendar.Id == defaultCalendarId)
+                    if ( calendar.Id == defaultCalendarId )
                     {
                         liCalendar.Selected = true;
                     }
@@ -953,7 +1089,7 @@ namespace RockWeb.Blocks.Event
         private void Init_SetRootGroup( RockContext rockContext )
         {
             Guid? groupGuid = GetAttributeValue( AttributeKey.RootGroup ).AsGuidOrNull();
-            if (groupGuid != null)
+            if ( groupGuid != null )
             {
                 var groupService = new GroupService( rockContext );
                 var rootGroup = groupService.Get( groupGuid.Value );
@@ -1216,7 +1352,7 @@ namespace RockWeb.Blocks.Event
                     break;
                 case ActiveWizardStep.EventOccurrence:
                     lbRegistration.Enabled = true;
-                    if (SelectedTemplateHasGroupType())
+                    if ( SelectedTemplateHasGroupType() )
                     {
                         lbGroup.Enabled = true;
                     }
@@ -1227,7 +1363,7 @@ namespace RockWeb.Blocks.Event
                     break;
                 case ActiveWizardStep.Summary:
                     lbRegistration.Enabled = true;
-                    if (SelectedTemplateHasGroupType())
+                    if ( SelectedTemplateHasGroupType() )
                     {
                         lbGroup.Enabled = true;
                     }
@@ -1443,6 +1579,11 @@ namespace RockWeb.Blocks.Event
                 if ( !registrationTemplate.GroupTypeId.HasValue )
                 {
                     tbGroupName.Text = string.Empty;
+                    pnlCheckinOptions.Visible = false;
+                }
+                else
+                {
+                    pnlCheckinOptions.Visible = GroupTypeIsCheckinGroup( registrationTemplate.GroupTypeId.Value, rockContext );
                 }
 
                 lTemplateDescription.Text = registrationTemplate.Description;
@@ -1471,7 +1612,7 @@ namespace RockWeb.Blocks.Event
 
         protected void tbRegistrationName_TextChanged( object sender, EventArgs e )
         {
-            if (SelectedTemplateHasGroupType())
+            if ( SelectedTemplateHasGroupType() )
             {
                 if ( ( tbGroupName.Text == string.Empty ) || ( tbGroupName.Text == hfPreviousName.Value ) )
                 {
@@ -1637,5 +1778,52 @@ namespace RockWeb.Blocks.Event
 
         #endregion Control Event Handlers
 
+
+        /// <summary>
+        /// Starts the workflow.
+        /// </summary>
+        /// <param name="rockContext">The workflow service.</param>
+        /// <param name="linkage">Type <see cref="T:EventItemOccurrenceGroupMap" /> created by the wizard.</param>
+        /// <param name="attributes">The attributes.</param>
+        /// <param name="workflowNameSuffix">The workflow instance name suffix (the part that is tacked onto the end fo the name to distinguish one instance from another).</param>
+        protected void LaunchPostWizardWorkflow( RockContext rockContext, EventItemOccurrenceGroupMap linkage )
+        {
+            //Set Completion Workflow
+            var workFlowGuid = GetAttributeValue( AttributeKey.CompletionWorkflow ).AsGuidOrNull();
+            if ( workFlowGuid != null )
+            {
+                var workflowService = new WorkflowService( rockContext );
+                var workflowType = WorkflowTypeCache.Get( workFlowGuid.Value );
+
+                //launch workflow if configured
+                if ( workflowType != null && ( workflowType.IsActive ?? true ) )
+                {
+                    // set workflow name
+                    string workflowName = "New " + workflowType.WorkTerm;
+                    var workflow = Workflow.Activate( workflowType, workflowName );
+
+                    // set attributes
+                    if ( linkage.Group != null )
+                    {
+                        workflow.SetAttributeValue("Group", linkage.Group.Guid);
+                    }
+
+                    if ( linkage.RegistrationInstance != null )
+                    {
+                        workflow.SetAttributeValue( "RegistrationInstance", linkage.RegistrationInstance.Guid );
+                    }
+
+                    if ( linkage.EventItemOccurrence != null )
+                    {
+                        workflow.SetAttributeValue( "EventItemOccurrenceGuid", linkage.EventItemOccurrence.Guid );
+                    }
+
+                    // launch workflow
+                    List<string> workflowErrors;
+                    workflowService.Process( workflow, out workflowErrors );
+                }
+            }
+
+        }
     }
 }

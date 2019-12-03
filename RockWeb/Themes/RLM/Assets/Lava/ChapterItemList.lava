@@ -1,0 +1,102 @@
+{% assign chapterID = PageParameter['Item'] %}
+
+{% contentchannelitem Id:'{{ chapterID }}' %}
+{% assign item = contentchannelitemItems | First %}
+{% if item  %}
+	{% capture pageTitle %}Exploring the Book of {{ item.Title }} - {{ item.WeekNumber }} | Real Life Ministries{% endcapture %}
+	{{ pageTitle | SetPageTitle }}
+
+	{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+	{% assign detailImageGuid = parent | Attribute:'BookImage','RawValue' %}
+	{% assign bookID = parent.Id %}
+	{% assign thisChapterID = item.Id %}
+	
+	{% assign audioLink = item | Attribute:'AudioURL' %}
+	{% assign notesLink = item | Attribute:'NotesURL' %}
+	<section class="section banner sub watch min show-audio">
+		<div class="inner">
+			<span class="info-section">
+				<span class="info-section-inner">
+					<span class="top-txt">Exploring the Book of</span>
+					<span class="btm-txt">{{ item.Title }}</span>
+					<span class="sml-txt">{{ item.WeekNumber }} | {{ item.StartDateTime | Date:'MMMM d, yyyy' }}</span>
+					<span class="btn white">
+						<a href="{{ audioLink }}">Download Audio</a>
+						{% if notesLink != '' %}<a href="{{ notesLink }}">Class Notes</a>{% endif %}
+					</span>
+				</span>
+			</span>
+			<span class="pjs-audio-player">
+				<audio preload="none" style="width:100%;" controls="controls"><source type="audio/mpeg" src="{{ audioLink }}"><a href="{{ audioLink }}">{{ audioLink }}</a></audio>
+			</span>
+			<span class="img"><img src="/GetImage.ashx?Guid={{ detailImageGuid }}" /></span>
+		</div><!--end .inner-->
+	</section><!--end .section-->
+{% endif %}
+{% endcontentchannelitem %}
+
+	<section class="section watch-detail social-only">
+		<div class="inner">
+			{% include '~~/Assets/Lava/SocialShare.lava' %}
+		</div><!--end .inner-->
+	</section><!--end .section-->
+	
+	<section class="section items-related">
+		<div class="inner">
+			<div class="content">
+				<h1>Other Chapters in this Book</h1>
+				<div class="items">
+
+				{% for item in Items %}
+					{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+					{% if (parent.Id == bookID && item.Id != thisChapterID) %}
+						{% assign detailImageGuid = parent | Attribute:'BookImage','RawValue' %}
+
+						<div class="item">
+							<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">
+								<span class="img"><img src="/GetImage.ashx?Guid={{ detailImageGuid }}" /></span>
+								<span class="info">
+									<span class="info-inner">
+										<span class="title">Exploring the Book of {{ item.Title }}: {{ item.WeekNumber }}</span>
+										<span class="desc">{{ item.StartDateTime | Date:'MMMM d, yyyy' }}</span>
+									</span>
+								</span>
+							</a>
+						</div><!--end .item-->
+					{% endif %}
+				{% endfor %}
+				
+				</div><!--end .items-->
+				<!--
+				<div class="items">
+				  {% assign nextPageString = Pagination.NextPage | ToString %}
+				  {% assign prevPageString = Pagination.PreviousPage | ToString %}
+
+				  {% if {{Pagination.PreviousPage == -1 }} %}
+					<div class="btn dark pull-left disabled">
+						<a href="javascript:;" class="disabled"><i class="fa fa-chevron-left"></i> Prev</a>
+					</div>
+				  {% else %}
+					<div class="btn dark pull-left">
+						<a href="{{Pagination.UrlTemplate | Replace:'PageNum', prevPageString}}">
+							<i class="fa fa-chevron-left"></i> Prev
+						</a>
+					</div>
+				  {% endif %}
+
+				  {% if {{Pagination.NextPage == -1 }} %}
+					<div class="btn dark pull-right disabled">
+						<a href="javascript:;" class="disabled">Next <i class="fa fa-chevron-right"></i></a>
+					</div>
+				  {% else %}
+					<div class="btn dark pull-right">
+						<a href="{{Pagination.UrlTemplate | Replace:'PageNum', nextPageString}}">
+							Next <i class="fa fa-chevron-right"></i>
+						</a>
+					</div>
+				  {% endif %}
+				</div>
+				-->
+			</div><!--end .content-->
+		</div><!--end .inner-->
+	</section><!--end .section-->

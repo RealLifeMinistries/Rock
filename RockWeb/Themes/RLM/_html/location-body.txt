@@ -1,0 +1,174 @@
+		<section class="section banner sub min">
+			<div class="inner">
+				<span class="info-section">
+					<span class="info-section-inner">
+						<span class="top-txt">Welcome To</span>
+						<span class="btm-txt">Post Falls Campus</span>
+						<span class="dropdown">
+							<span class="selected">Choose a Campus<i></i></span>
+							<span class="dropdown-items">
+								<ul>
+									<li><a href="/post-falls"><span>Post Falls</span></a></li>
+									<li><a href="/coeur-d-alene"><span>Coeur d'Alene</span></a></li>
+									<li><a href="/north-campus"><span>North Campus</span></a></li>
+									<li><a href="/online-campus"><span>Online Campus</span></a></li>
+								</ul>
+							</span>
+						</span>
+					</span>
+				</span>
+				<span class="img"><img src="~~/Assets/Images/header-loc.jpg" /></span>
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section info-panel">
+			<div class="inner">
+				<div class="content">
+					<p><strong>Service Times:</strong> Thur: 6:15pm, Sun: 8:00, 9:30 & 11:15am</p>
+					<p><strong>Address:</strong> <a href="https://www.google.com/maps/place/1860+N+Cecil+Rd,+Post+Falls,+ID+83854/@47.726114,-116.9038411,17z/data=!3m1!4b1!4m5!3m4!1s0x5361c3b5993384b7:0xca63a48d4b5bd1de!8m2!3d47.726114!4d-116.9016471" target="_blank">1860 N. Cecil Road, Post Falls, ID 83854</a><span class="div">|</span><a href="tel:208.777.7325">208.777.7325</a></p>
+					<div class="btn dark">
+						<a href="/new-here">New Here</a>
+						<a href="/plan-a-visit">Plan a Visit</a>
+					</div>
+					{% include '~~/Assets/Lava/SocialShare.lava' %}
+				</div><!--end .content-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section two-col">
+			<div class="inner">
+				<div class="left img">
+					<div class="img-bg" style="background:url(~~/Assets/Images/img-pastor.jpg) center top no-repeat;background-size:cover;"></div>
+					<img src="~~/Assets/Images/img-pastor.jpg">
+				</div><!--end .left-->
+				<div class="right txt">
+					<div class="main">
+						<header>
+							<h1>Jim Putman</h1>
+							<h2>Senior Pastor</h2>
+						</header>
+						<div class="content la">
+							<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue. Sed purus purus, tristique ac lectus ut, efficitur scelerisque nisl. Maecenas quis enim erat. Setd non molestie ante. Integer ac venenatis nisi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos.</p>
+							<p>Nullam id viverra nulla. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer ullamcorper ex at nisl rutrum pretium. Proin fermentum quis sapien sed aliquam. Fusce sed sagittis mauris, vel fermentum tellus.</p>
+						</div>
+						<div class="btns">
+							<div class="btn dark">
+								<a href="/post-falls/staff">View Staff</a>
+							</div>
+						</div>
+					</div>
+				</div><!--end .right-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section orange-bar">
+			<div class="inner">
+				<h1>Upcoming Events</h1>
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section featured-events">
+			<div class="items">
+				<div class="item">
+					<div class="img">
+						<a href="javascript:;"><img src="~~/Assets/Images/img-default-600x345.gif" /></a>
+					</div>
+					<div class="info">
+						<h2><a href="javascript:;">Summer Camp</a></h2>
+						<div class="excerpt">
+							Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue. Sed purus purus, tristique ac lectus ut, efficitur scelerisque nisl.
+						</div>
+						<div class="link">
+							<a href="javascript:;">More Details</a>
+						</div>
+					</div>
+				</div><!--end .item-->
+				<div class="item">
+					<div class="img">
+						<a href="javascript:;"><img src="~~/Assets/Images/event-2.jpg" /></a>
+					</div>
+					<div class="info">
+						<h2><a href="javascript:;">Baptism Class</a></h2>
+						<div class="excerpt">
+							Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue. Sed purus purus, tristique ac lectus ut, efficitur scelerisque nisl.
+						</div>
+						<div class="link">
+							<a href="javascript:;">More Details</a>
+						</div>
+					</div>
+				</div><!--end .item-->
+				<div class="item">
+					<div class="img">
+						<a href="javascript:;"><img src="~~/Assets/Images/event-3.jpg" /></a>
+					</div>
+					<div class="info">
+						<h2><a href="javascript:;">Summer Camp</a></h2>
+						<div class="excerpt">
+							Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue. Sed purus purus, tristique ac lectus ut, efficitur scelerisque nisl.
+						</div>
+						<div class="link">
+							<a href="javascript:;">More Details</a>
+						</div>
+					</div>
+				</div><!--end .item-->
+			</div><!--end .items-->
+			<div class="btn dark">
+				<a href="javascript:;">View All Events</a>
+			</div>
+		</section><!--end .section-->
+		
+		<section class="section dark-bar">
+			<div class="inner">
+				<h1>Next Steps</h1>
+				<div class="content">
+					<p>Nullam id viverra nulla. Lorem ipsum dolor sit amet, adipiscing elit. Integer ullamcorper ex.</p>
+				</div>
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section two-col-alt">
+			<div class="inner">
+				<div class="left txt">
+					<div class="mob-img"><img src="~~/Assets/Images/img-1.jpg" /></div>
+					<div class="main">
+						<header>
+							<h1>Groups</h1>
+						</header>
+						<div class="content la">
+							<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue. Sed purus purus, tristique ac lectus ut, efficitur scelerisque nisl. Nullam id viverra nulla. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer ullamcorper ex at nisl rutrum pretium. Proin fermentum quis sapien sed aliquam. Fusce sed sagittis mauris, vel fermentum.</p>
+						</div>
+						<div class="link">
+							<a href="javascript:;">More Details</a>
+						</div>
+					</div>
+				</div><!--end .left-->
+				<div class="right img">
+					<div class="img-bg" style="background:url(~~/Assets/Images/img-1.jpg) center top no-repeat;background-size:cover;"></div>
+					<img src="~~/Assets/Images/img-1.jpg">
+				</div><!--end .right-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section two-col-alt">
+			<div class="inner">
+				<div class="left img">
+					<div class="img-bg" style="background:url(~~/Assets/Images/img-2.jpg) center top no-repeat;background-size:cover;"></div>
+					<img src="~~/Assets/Images/img-2.jpg">
+				</div><!--end .left-->
+				<div class="right txt">
+					<div class="mob-img"><img src="~~/Assets/Images/img-2.jpg" /></div>
+					<div class="main">
+						<header>
+							<h1>Serve</h1>
+						</header>
+						<div class="content la">
+							<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue. Sed purus purus, tristique ac lectus ut, efficitur scelerisque nisl. Nullam id viverra nulla. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer ullamcorper ex at nisl rutrum pretium. Proin fermentum quis sapien sed aliquam. Fusce sed sagittis mauris, vel fermentum.</p>
+						</div>
+						<div class="link">
+							<a href="javascript:;">More Details</a>
+						</div>
+					</div>
+				</div><!--end .right-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		

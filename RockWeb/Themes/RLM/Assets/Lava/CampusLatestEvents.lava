@@ -1,0 +1,67 @@
+{% assign campusID = 1 %}
+{% assign campusName = 'Global' | Page:'Path' %}
+{% case campusName %}
+{% when '/post-falls' %}
+	{% assign campusID = 1 %}
+{% when '/coeur-d-alene' %}
+	{% assign campusID = 2 %}
+{% when '/north-campus' %}
+	{% assign campusID = 3 %}
+{% when '/online-campus' %}
+	{% assign campusID = 4 %}
+{% else %}
+	{% assign campusID = 1 %}
+{% endcase %}
+
+<section class="section orange-bar">
+	<div class="inner">
+		<h1>Upcoming Events</h1>
+	</div><!--end .inner-->
+</section><!--end .section-->
+
+<section class="section featured-events">
+	<div class="items">
+
+{% assign eCount = 1 %}
+{% for eventOccurrenceSummary in EventOccurrenceSummaries %}  
+	<div class="item">
+		{% if eventOccurrenceSummary.EventItem.Photo.Guid %}
+			<div class="img">
+			{% if DetailsPage != empty %}
+				<a href="{{ DetailsPage }}?EventOccurrenceId={{ eventOccurrenceSummary.EventItemOccurrence.Id }}&campusid={{ campusID }}"><img class="img-event" src="/GetImage.ashx?Guid={{ eventOccurrenceSummary.EventItem.Photo.Guid }}" /><img class="img-ph o" src="/Themes/RLM/Assets/Images/img-default-600x345.gif" /></a>
+			{% else %}
+				<img class="img-event" src="/GetImage.ashx?Guid={{ eventOccurrenceSummary.EventItem.Photo.Guid }}" /><img class="img-ph o" src="/Themes/RLM/Assets/Images/img-default-600x345.gif" />
+			{% endif %}
+			</div>
+		{% else %}
+			<div class="img">
+			{% if DetailsPage != empty %}
+				<a href="{{ DetailsPage }}?EventOccurrenceId={{ eventOccurrenceSummary.EventItemOccurrence.Id }}&campusid={{ campusID }}"><img src="/Themes/RLM/Assets/Images/img-default-600x345.gif" /></a>
+			{% else %}
+				<img src="/Themes/RLM/Assets/Images/img-default-600x345.gif" />
+			{% endif %}
+			</div>
+		{% endif %}
+		<div class="info">
+			{% if DetailsPage != empty %}
+				<h2><a href="{{ DetailsPage }}?EventOccurrenceId={{ eventOccurrenceSummary.EventItemOccurrence.Id }}&campusid={{ campusID }}">{{ eventOccurrenceSummary.Name }}</a></h2>
+			{% else %}
+				<h2>{{ eventOccurrenceSummary.Name }}</h2>
+			{% endif %}
+			<div class="excerpt">
+				{{ eventOccurrenceSummary.Summary }}
+			</div>
+			{% if DetailsPage != empty %}
+				<div class="link">
+					<a href="{{ DetailsPage }}?EventOccurrenceId={{ eventOccurrenceSummary.EventItemOccurrence.Id }}&campusid={{ campusID }}">More Details</a>
+				</div>
+			{% endif %}
+		</div>
+	</div><!--end .item-->		
+{% endfor %}
+
+	</div><!--end .items-->
+	<div class="btn dark">
+		<a href="/events?campusid={{ campusID }}">View All Events</a>
+	</div>
+</section><!--end .section-->  

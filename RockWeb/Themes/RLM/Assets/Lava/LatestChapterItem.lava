@@ -1,0 +1,22 @@
+{% assign item = Items | First %}
+{% if item  %}
+	{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+	{% assign detailImageGuid = parent | Attribute:'BookImage','RawValue' %}
+
+	<section class="section banner sub watch landing min">
+		<div class="inner">
+			<span class="info-section">
+				<span class="info-section-inner">
+					<span class="top-txt">Exploring the Book of</span>
+					<span class="btm-txt">{{ item.Title }}</span>
+					<span class="sml-txt">{{ item | Attribute:'WeekNumber' }} | {{ item.StartDateTime | Date:'MMMM d, yyyy' }}</span>
+					<span class="btn white">
+						<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">Listen</a>
+					</span>
+				</span>
+			</span>
+			<i class="chevrons"></i>
+			<span class="img"><img src="/GetImage.ashx?Guid={{ detailImageGuid }}" /></span>
+		</div><!--end .inner-->
+	</section><!--end .section-->
+{% endif %}

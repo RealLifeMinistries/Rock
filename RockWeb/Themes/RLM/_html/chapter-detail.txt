@@ -1,0 +1,87 @@
+		<section class="section banner sub watch min show-audio">
+			<div class="inner">
+				<span class="info-section">
+					<span class="info-section-inner">
+						<span class="top-txt">Exploring the Book of</span>
+						<span class="btm-txt">Mark</span>
+						<span class="sml-txt">Week 9 | March 4, 2018</span>
+						<span class="btn white">
+							<a href="javascript:;">Download</a>
+							<a href="javascript:;">Notes</a>
+						</span>
+					</span>
+				</span>
+				<span class="pjs-audio-player">
+					<audio preload="none" style="width:100%;" controls="controls"><source type="audio/mpeg" src="http://dev.plainjoe.co/media/preview.mp3"><a href="http://dev.plainjoe.co/media/preview.mp3">http://dev.plainjoe.co/media/preview.mp3</a></audio>
+				</span>
+				<span class="img"><img src="~~/Assets/Images/header-watch.jpg" /></span>
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section watch-detail social-only">
+			<div class="inner">
+				{% include '~~/Assets/Lava/SocialShare.lava' %}
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<script>
+			jQuery(document).ready(function() {
+				jQuery('.watch-detail .options li').each(function() {
+					jQuery(this).click(function() {
+						if (jQuery(this).has('i').length) {
+							if (jQuery(this).children('.sub').is(':visible')) {
+								jQuery(this).children('.sub').hide();
+							} else {
+								jQuery(this).children('.sub').show();
+							}
+						}
+					});
+				});
+			});
+		</script>
+		
+		<section class="section items-related">
+			<div class="inner">
+				<div class="content">
+					<h1>Other Chapters in this Book</h1>
+					<div class="items">
+						
+						<div class="item">
+							<a href="javascript:;">
+								<span class="img"><img src="~~/Assets/Images/watch-1.jpg" /></span>
+								<span class="info">
+									<span class="info-inner">
+										<span class="title">Experience God: Week 3</span>
+										<span class="desc">October 1, 2017</span>
+									</span>
+								</span>
+							</a>
+						</div><!--end .item-->
+						<div class="item">
+							<a href="javascript:;">
+								<span class="img"><img src="~~/Assets/Images/watch-2.jpg" /></span>
+								<span class="info">
+									<span class="info-inner">
+										<span class="title">Experience God: Week 2</span>
+										<span class="desc">September 21-24, 2017</span>
+									</span>
+								</span>
+							</a>
+						</div><!--end .item-->
+						<div class="item">
+							<a href="javascript:;">
+								<span class="img"><img src="~~/Assets/Images/watch-3.jpg" /></span>
+								<span class="info">
+									<span class="info-inner">
+										<span class="title">Experience God: Week 1</span>
+										<span class="desc">September 14-17, 2017</span>
+									</span>
+								</span>
+							</a>
+						</div><!--end .item-->
+						
+					</div><!--end .items-->
+				</div><!--end .content-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		

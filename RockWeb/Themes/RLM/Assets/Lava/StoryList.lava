@@ -1,0 +1,79 @@
+{% contentchannelitem where:'Featured == true' sort:'StartDateTime desc' %}
+{% assign item = contentchannelitemItems | First %}
+{% if item %}
+	{% assign detailImageGuid = item | Attribute:'Image','RawValue' %}
+	<section class="section banner sub story min">
+		<div class="inner">
+			<span class="info-section">
+				<span class="info-section-inner">
+					<span class="top-txt">Featured Story</span>
+					<span class="btm-txt">{{ item.Title }}</span>
+					<span class="sml-txt">
+					{% assign tagList = item | Attribute:'Tags' %}
+					{% for aTag in tagList %}
+						{% assign itemAttr = aTag | PropertyToKeyValue %}
+						<a class="inner-link" href="{{ LinkedPages.DetailPage }}?tag={{ itemAttr.Value.Value }}">{{ itemAttr.Value.Value }}</a>
+					{% endfor %}					
+					</span>
+					<span class="btn white">
+						<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">Watch</a>
+					</span>
+				</span>
+			</span>
+			<i class="chevrons"></i>
+			<span class="shadow"></span>
+			<span class="img"><img src="/GetImage.ashx?Guid={{ detailImageGuid }}" /></span>
+		</div><!--end .inner-->
+	</section><!--end .section-->
+{% endif %}
+{% endcontentchannelitem %}
+
+<section class="section stories-grid">
+	<div class="inner">
+		{% include '~~/Assets/Lava/SocialShare.lava' %}
+		<div class="content">
+			<h1>Other Stories</h1>
+			<div class="items">
+
+{% for item in Items %}
+	{% assign detailImageGuid = item | Attribute:'Image','RawValue' %}
+	{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+	<div class="item">
+		<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">
+			<span class="img">
+				{% if smlSermonImg != '' %}
+					<img class="sermon-img" src="/GetImage.ashx?Guid={{ smlSermonImg }}" alt="{{ item.Title }}" />
+				{% endif %}
+				<img class="main{% if smlSermonImg != '' %} o{% endif %}" src="/Themes/RLM/Assets/Images/img-default-453x260.gif" alt="{{ item.Title }}" />
+			</span>
+			<span class="info">
+				<span class="info-inner">
+					<span class="title">{{ item.Title }}</span>
+					<span class="desc">
+						{% assign tagList = item | Attribute:'Tags' %}
+						{% for aTag in tagList %}
+							{% assign itemAttr = aTag | PropertyToKeyValue %}
+							<span class="inner-link" data-link="{{ LinkedPages.DetailPage }}?tag={{ itemAttr.Value.Value }}">{{ itemAttr.Value.Value }}</span>
+						{% endfor %}
+					</span>
+				</span>
+			</span>
+		</a>
+	</div><!--end .item-->
+{% endfor %}						
+
+			</div><!--end .items-->
+			<div class="items">
+				{% assign nextPageString = Pagination.NextPage | ToString %}
+				{% assign prevPageString = Pagination.PreviousPage | ToString %}
+				{% if {{Pagination.NextPage == -1 }} %}
+				{% else %}
+					<div class="btn dark">
+						<a href="/all-stories">View All</a>
+					</div>			
+				{% endif %}			
+
+			</div>
+		</div><!--end .content-->
+	</div><!--end .inner-->
+</section><!--end .section-->

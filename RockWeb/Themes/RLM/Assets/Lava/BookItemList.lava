@@ -1,0 +1,47 @@
+<section class="section watch-grid">
+	<div class="inner">
+		<div class="content">
+			<h1>More Books</h1>
+			<div class="items">
+
+{% for item in Items %}
+	{% assign childItem = item.ChildItems | First | Property:'ChildContentChannelItem' %}
+	{% if childItem.Id != null %}
+		{% assign detailImageGuid = item | Attribute:'BookImage','RawValue' %}
+		{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+		<div class="item">
+			<a href="{{ LinkedPages.DetailPage }}?Item={{ childItem.Id }}">
+				<span class="img">
+					{% if smlSermonImg != '' %}
+						<img class="sermon-img" src="/GetImage.ashx?Guid={{ smlSermonImg }}" alt="{{ item.Title }}" />
+					{% endif %}
+					<img class="main{% if smlSermonImg != '' %} o{% endif %}" src="/Themes/RLM/Assets/Images/img-default-453x260.gif" alt="{{ item.Title }}" />
+				</span>
+				<span class="info">
+					<span class="info-inner">
+						<span class="title">Exploring {{ item.Title }}</span>
+						<span class="desc">{{ item.StartDateTime | Date:'MMMM d, yyyy' }} to {{ item.ExpireDateTime | Date:'MMMM d, yyyy' }}</span>
+					</span>
+				</span>
+			</a>
+		</div><!--end .item-->
+	{% endif %}
+{% endfor %}
+
+			</div><!--end .items-->
+			<!--
+			<div class="items">
+				{% assign nextPageString = Pagination.NextPage | ToString %}
+				{% assign prevPageString = Pagination.PreviousPage | ToString %}
+
+				{% if {{Pagination.NextPage == -1 }} %}
+				{% else %}
+					<div class="btn dark">
+						<a href="/all-sermons">View All</a>
+					</div>			
+				{% endif %}						  
+			</div>
+			-->
+		</div><!--end .content-->
+	</div><!--end .inner-->
+</section><!--end .section-->

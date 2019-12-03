@@ -1,0 +1,111 @@
+<section class="section watch-grid">
+	<div class="inner">
+		{% include '~~/Assets/Lava/SocialShare.lava' %}
+		<div class="content">
+			<div class="watch-campus-dropdown">
+				<div class="selected">Choose a Campus<i></i></div>
+				<div class="dropdown-items">
+					<ul>
+						<li><a href="/watch-listen"><span>All Campuses</span></a></li>
+					{% campus where:'IsActive == true' %}
+						{% for campus in campusItems %}
+							<li><a href="/watch-listen?Location={{ campus.Guid }}"><span>{{ campus.Name }}</span></a></li>
+						{% endfor %}
+					{% endcampus %}
+					</ul>
+				</div>
+			</div>
+			<h1>Past Sermons</h1>
+			<div class="items">
+
+{% assign itemNumber = 1 %}
+{% for item in Items offset:1 %}
+	{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+	{% assign detailImageGuid = item | Attribute:'Image','RawValue' %}
+	{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+	{% assign sermonStartDate = item.StartDateTime | Date:'MMMM d, yyyy' %}
+	{% assign sermonEndDate = item | Attribute:'MessageEndDate' | Date:'MMMM d, yyyy' %}
+	{% assign videoLink = item | Attribute:'VideoURL' %}
+	<div class="item">
+		<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">
+			<span class="img">
+				{% if smlSermonImg != '' %}
+					<img class="sermon-img sermon-img{{ item.Id }}" src="/GetImage.ashx?Guid={{ smlSermonImg }}" alt="{{ item.Title }}" />
+				{% else %}
+					<img style="display:none;" class="sermon-img sermon-img{{ item.Id }}" src="" alt="{{ item.Title }}" />
+				{% endif %}
+				<img class="main o" src="/Themes/RLM/Assets/Images/img-default-453x260.gif" alt="{{ item.Title }}" />
+			</span>
+			<span class="info">
+				<span class="info-inner">
+					<span class="title">{{ item.Title }}: {{ item | Attribute:'WeekNumber' }}</span>
+					<span class="desc">
+						{% if (sermonStartDate == sermonEndDate) %}
+							{{ sermonStartDate }}
+						{% else %}
+							{{ sermonStartDate }} to {{ sermonEndDate }}
+						{% endif %}
+					</span>
+				</span>
+			</span>
+		</a>
+	</div><!--end .item-->
+	
+{% endfor %}
+
+			</div><!--end .items-->
+			
+		<script>
+			jQuery(document).ready(function() {
+{% for item in Items %}
+	{% assign videoLink = item | Attribute:'VideoURL' %}
+	{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+	{% if (smlSermonImg != '') %}
+	{% else %}
+		homeVideoURL = '{{ videoLink }}';
+		if (homeVideoURL.indexOf('vimeo') >= 0){
+			var match = /vimeo.*\/(\d+)/i.exec( homeVideoURL );
+			if (match) {
+				var videoID = match[1];
+				$.ajax({
+					url: "http://vimeo.com/api/v2/video/" + videoID + ".json",
+					dataType: 'jsonp'
+				}).done(function( result ) {
+					$.each(result, function(i, field){
+						$('.sermon-img{{ item.Id }}').attr('src',field.thumbnail_large);
+						$('.sermon-img{{ item.Id }}').show();
+					});				
+				});
+			}
+			else {
+				$('.sermon-img{{ item.Id }}').attr('src','/Themes/RLM/Assets/Images/img-default-453x260.gif');
+				$('.sermon-img{{ item.Id }}').show();
+			}
+		} else if (homeVideoURL.indexOf('youtube') >= 0 || homeVideoURL.indexOf('youtu') >= 0){
+			var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+			var match = homeVideoURL.match(regExp);
+			if (match) {
+				var videoID = match[1];
+				$('.sermon-img{{ item.Id }}').attr('src','https://img.youtube.com/vi/' + videoID + '/maxresdefault.jpg');
+			}
+			else {
+				$('.sermon-img{{ item.Id }}').attr('src','/Themes/RLM/Assets/Images/img-default-453x260.gif');
+			}
+			$('.sermon-img{{ item.Id }}').show();
+		}
+	{% endif %}
+{% endfor %}
+			});
+		</script>
+
+			<div class="items">			  
+			{% if {{Pagination.NextPage == -1 }} %}
+			{% else %}
+				<div class="btn dark">
+					<a href="/all-sermons">View All</a>
+				</div>			
+			{% endif %}			
+			</div>
+		</div><!--end .content-->
+	</div><!--end .inner-->
+</section><!--end .section-->

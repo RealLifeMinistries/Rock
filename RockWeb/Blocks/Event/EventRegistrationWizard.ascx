@@ -271,6 +271,14 @@
                                     <Rock:GroupPicker ID="gpParentGroup" runat="server" Label="Parent Group" OnSelectItem="gpParentGroup_SelectItem" />
                                 </div>
                             </div>
+                            <asp:Panel ID="pnlCheckinOptions" runat="server" Visible="false" CssClass="row">
+                                <div class="col-md-6">
+                                    <Rock:LocationPicker ID="lpGroupLocation" runat="server" AllowedPickerModes="Named" Label="Location" />
+                                </div>
+                                <div class="col-md-6">
+                                    <Rock:SchedulePicker ID="spGroupLocationSchedule" runat="server" Label="Schedule" AllowMultiSelect="true" />
+                                </div>
+                            </asp:Panel>
                             <div class="row">
                                 <div class="col-md-12">
                                     <Rock:NotificationBox ID="nbNotAuthorized" runat="server" NotificationBoxType="Danger" Visible="false" Heading="Not Authorized">
@@ -303,7 +311,7 @@
                             <asp:Panel ID="pnlExistingEvent" runat="server">
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <Rock:EventItemPicker ID="eipSelectedEvent" runat="server"  Label="Event" Required="true" />
+                                        <Rock:EventItemPicker ID="eipSelectedEvent" runat="server" Label="Event" Required="true" />
                                     </div>
                                 </div>
                             </asp:Panel>
@@ -420,6 +428,7 @@
                                 <li id="liRegistrationLink" runat="server"><asp:HyperLink ID="hlRegistrationInstance" runat="server" Text="View Registration Instance" /></li>
                                 <li id="liGroupLink" runat="server"><asp:HyperLink ID="hlGroup" runat="server" Text="View Group" /></li>
                                 <li id="liEventLink" runat="server"><asp:HyperLink ID="hlEventDetail" runat="server" Text="View Event Detail" /></li>
+                                <li id="liExternalEventLink" runat="server"><asp:HyperLink ID="hlExternalEventDetails" runat="server" Text="View External Event Details" /></li>
                                 <li id="liEventOccurrenceLink" runat="server"><asp:HyperLink ID="hlEventOccurrence" runat="server" Text="View Event Occurrence" /></li>
                             </ul>
                         </div>

@@ -87,7 +87,7 @@ namespace RockWeb.Blocks.CheckIn.Manager
         Description = " Determines if reprinting labels should be allowed.",
         DefaultBooleanValue = false,
         Category = "Manager Settings",
-        Order = 21 )]
+        Order = 5 )]
 
     public partial class Person : Rock.Web.UI.RockBlock
     {
@@ -342,7 +342,7 @@ namespace RockWeb.Blocks.CheckIn.Manager
 
             var smsMessage = new RockSMSMessage();
             // NumberFormatted and NumberFormattedWithCountryCode does NOT work (this pattern is repeated in Twilio.cs)
-            smsMessage.AddRecipient( new RecipientData( "+" + phoneNumber.CountryCode + phoneNumber.Number ) );
+            smsMessage.AddRecipient( new RockSMSMessageRecipient( person, "+" + phoneNumber.CountryCode + phoneNumber.Number, null ) );
             smsMessage.FromNumber = smsFromNumber;
             smsMessage.Message = tbSmsMessage.Value;
             var errorMessages = new List<string>();
@@ -404,7 +404,7 @@ namespace RockWeb.Blocks.CheckIn.Manager
 
             var possibleLabels = ZebraPrint.GetLabelTypesForPerson( personId, attendanceIds );
 
-            if ( possibleLabels!= null && possibleLabels.Count != 0 )
+            if ( possibleLabels != null && possibleLabels.Count != 0 )
             {
                 cblLabels.DataSource = possibleLabels;
                 cblLabels.DataBind();
@@ -419,11 +419,19 @@ namespace RockWeb.Blocks.CheckIn.Manager
             cblLabels.DataBind();
 
             // Bind the printers list
-            ddlPrinter.Items.Clear();
-            ddlPrinter.DataSource = new DeviceService( rockContext )
+            var printers = new DeviceService( rockContext )
                 .GetByDeviceTypeGuid( new Guid( Rock.SystemGuid.DefinedValue.DEVICE_TYPE_PRINTER ) )
                 .OrderBy( d => d.Name )
                 .ToList();
+
+            if ( printers == null || printers.Count == 0 )
+            {
+                maNoLabelsFound.Show( "Due to browser limitations, only server based printers are supported and none are defined on this server.", ModalAlertType.Information );
+                return;
+            }
+
+            ddlPrinter.Items.Clear();
+            ddlPrinter.DataSource = printers;
             ddlPrinter.DataBind();
             ddlPrinter.Items.Insert( 0, new ListItem( None.Text, None.IdValue ) );
 
@@ -464,7 +472,7 @@ namespace RockWeb.Blocks.CheckIn.Manager
             var fileGuids = cblLabels.SelectedValues.AsGuidList();
 
             // Now, finally, re-print the labels.
-            List<string> messages = ZebraPrint.ReprintZebraLabels( fileGuids, personId, selectedAttendanceIds, this, ddlPrinter.SelectedValue );
+            List<string> messages = ZebraPrint.ReprintZebraLabels( fileGuids, personId, selectedAttendanceIds, nbReprintMessage, this.Request, ddlPrinter.SelectedValue );
             nbReprintMessage.Visible = true;
             nbReprintMessage.Text = messages.JoinStrings( "<br>" );
 

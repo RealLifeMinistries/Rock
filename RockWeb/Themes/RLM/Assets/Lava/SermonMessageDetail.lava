@@ -1,0 +1,257 @@
+{% assign messageID = PageParameter['Item'] %}
+
+{% contentchannelitem Id:'{{ messageID }}' %}
+{% assign item = contentchannelitemItems | First %}
+{% if item  %}
+	{% capture pageTitle %}{{ item.Title }} - {{ item.WeekNumber }} | Real Life Ministries{% endcapture %}
+	{{ pageTitle | SetPageTitle }}
+
+	{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+	{% assign detailImageGuid = item | Attribute:'LargeImage','RawValue' %}
+	{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+	{% assign seriesID = parent.Id %}
+	
+	{% assign videoLink = item | Attribute:'VideoURL' %}
+	{% assign audioLink = item | Attribute:'AudioURL' %}
+	{% assign noteItems = item | Attribute:'Notes' %}
+	{% assign chalkTalkLink = item | Attribute:'ChalkTalkURL' %}
+	{% assign otherResourcesLink = item | Attribute:'OtherResourcesURL' %}	
+	{% assign messageSpeaker = item | Attribute:'Speaker' %}
+	{% assign messageWeek = item | Attribute:'WeekNumber' %}
+
+	<section class="section banner sub watch detail min has-video">
+		<div class="inner">
+			<span class="info-section">
+				<span class="info-section-inner">
+					{% if videoLink != "" %}
+					<img class="play-btn" src="/Themes/RLM/Assets/Images/play-btn-lrg.png" alt="Play Video" />
+					{% endif %}
+				</span>
+			</span>
+			<span class="pjs-audio-player">
+				<span class="pjs-audio-player-inner">
+					<audio preload="none" style="width:100%;" controls="controls"><source type="audio/mpeg" src="{{ audioLink }}"><a href="{{ audioLink }}">{{ audioLink }}</a></audio>
+				</span>
+			</span>
+			<i class="chevrons"></i>
+			<span class="img">
+				{% if (detailImageGuid != '' and detailImageGuid != null) %}
+					<img id="mainVidImage" src="/GetImage.ashx?Guid={{ detailImageGuid }}" />
+				{% else %}				
+					<img id="mainVidImage" src="" />
+				{% endif %}				
+			</span>
+			
+			<span class="video-panel">
+				<span class="vidframe">				
+					<div class="url">{{ videoLink }}</div>
+				</span>
+			</span>
+			
+		</div><!--end .inner-->
+	</section><!--end .section-->
+	
+	<section class="section watch-detail">
+		<div class="inner">
+			{% include '~~/Assets/Lava/SocialShare.lava' %}
+			<div class="content">
+				<h1>{{ item.Title }}</h1>
+				<div class="options">
+					<ul>
+						{% if (videoLink != "") %}
+							<li><a class="watch-video-link" href="javascript:;">Watch</a></li>
+						{% endif %}
+						{% if (audioLink != "") %}
+							<li class="has-sub"><a href="javascript:;">Listen<i></i></a>
+								<div class="sub">
+									<ul>
+										<li><a class="listen-audio-link" href="javascript:;" data-link="{{ audioLink }}">Listen Now</a></li>
+										<li><a href="{{ audioLink }}">Download Audio</a></li>
+									</ul>
+								</div>
+							</li>
+						{% endif %}
+						{% if (noteItems != "") %}
+							{% assign noteCount = noteItems | Size %}
+							{% if (noteCount == "1") %}
+								{% for noteItem in noteItems %}
+									{% assign notekv = noteItem | PropertyToKeyValue %}
+									<li><a href="{{ notekv.Value }}" target="_blank">Notes</a></li>
+								{% endfor %}
+							{% else %}
+								<li class="has-sub"><a href="javascript:;">Notes<i></i></a>
+									<div class="sub">
+										<ul>
+											{% for noteItem in noteItems %}
+												{% assign notekv = noteItem | PropertyToKeyValue %}
+												<li><a href="{{ notekv.Value }}" target="_blank">{{ notekv.Key }}</a></li>
+											{% endfor %}
+										</ul>
+									</div>
+								</li>
+							{% endif %}
+						{% endif %}
+						{% if (chalkTalkLink != "") %}
+							<li><a href="{{ chalkTalkLink }}">Chalk Talk</a></li>
+						{% endif %}
+						{% if (otherResourcesLink != "") %}
+							<li><a href="{{ otherResourcesLink }}">Other Resources</a></li>
+						{% endif %}
+					</ul>
+				</div>
+				<h2>{{ item.WeekNumber }} | {{ item.StartDateTime | Date:'MMMM d, yyyy' }}<br />
+				Speaker: {{ item.Speaker }}</h2>
+				<div class="content-inner">
+					<p>{{ item.Content }}</p>
+				</div>
+			</div><!--end .content-->
+		</div><!--end .inner-->
+	</section><!--end .section-->
+	{% if (detailImageGuid != '') %}
+	{% else %}
+		<script>
+			jQuery(document).ready(function() {
+				homeVideoURL = '{{ videoLink }}';
+				if (homeVideoURL.indexOf('vimeo') >= 0){
+					var match = /vimeo.*\/(\d+)/i.exec( homeVideoURL );
+					if (match) {
+						var videoID = match[1];
+						$.ajax({
+							url: "http://vimeo.com/api/v2/video/" + videoID + ".json",
+							dataType: 'jsonp'
+						}).done(function( result ) {
+							$.each(result, function(i, field){
+								$('#mainVidImage').attr('src',field.thumbnail_large);
+							});				
+						});
+					}
+					// videoIframe = '<iframe width="100%" height="100%" src="https://player.vimeo.com/video/' + videoID + '?autoplay=0&title=0&byline=0&portrait=0" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>';
+				} else if (homeVideoURL.indexOf('youtube') >= 0 || homeVideoURL.indexOf('youtu') >= 0){
+					var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+					var match = homeVideoURL.match(regExp);
+					if (match) {
+						var videoID = match[1];
+						$('#mainVidImage').attr('src','https://img.youtube.com/vi/' + videoID + '/maxresdefault.jpg');
+					}
+					// videoIframe = '<iframe width="100%" height="100%" src="https://www.youtube.com/embed/' + videoID + '?rel=0&autoplay=0" frameborder="0" allowfullscreen></iframe>';
+				} else {
+					// videoIframe = '<iframe width="100%" height="100%" src="' + homeVideoURL + '" frameborder="0" allowfullscreen></iframe>';
+				}
+				// jQuery('.two-col-vid-embed .vidframe').append(videoIframe);
+			});
+		</script>
+	{% endif %}
+	
+{% endif %}
+{% endcontentchannelitem %}
+
+	<section class="section items-related">
+		<div class="inner">
+			<div class="content">
+				<h1>Other Sermon in this Series</h1>
+				<div class="items">
+
+{% for item in Items %}
+	{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+	{% assign videoLink = item | Attribute:'VideoURL' %}
+	{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+	{% if (parent.Id == seriesID)%}
+		<div class="item">
+			<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">
+				<span class="img">
+					{% if smlSermonImg != '' and smlSermonImg != null %}
+						<img class="sermon-img sermon-img{{ item.Id }}" src="/GetImage.ashx?Guid={{ smlSermonImg }}" alt="{{ item.Title }}" />
+					{% else %}
+						<img style="display:none;" class="sermon-img sermon-img{{ item.Id }}" src="" alt="{{ item.Title }}" />
+					{% endif %}
+					<img class="main o" src="/Themes/RLM/Assets/Images/img-default-453x260.gif" alt="{{ item.Title }}" />
+				</span>
+				<span class="info">
+					<span class="info-inner">
+						<span class="title">{{ item.Title }}: {{ item.WeekNumber }}</span>
+						<span class="desc">{{ item.StartDateTime | Date:'MMMM d, yyyy' }}</span>
+					</span>
+				</span>
+			</a>
+		</div><!--end .item-->
+	{% endif %}
+{% endfor %}
+				</div><!--end .items-->
+
+		<script>
+			jQuery(document).ready(function() {
+{% for item in Items %}
+	{% assign videoLink = item | Attribute:'VideoURL' %}
+	{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+	{% if (smlSermonImg != '') %}
+	{% else %}
+		homeVideoURL = '{{ videoLink }}';
+		if (homeVideoURL.indexOf('vimeo') >= 0){
+			var match = /vimeo.*\/(\d+)/i.exec( homeVideoURL );
+			if (match) {
+				var videoID = match[1];
+				$.ajax({
+					url: "http://vimeo.com/api/v2/video/" + videoID + ".json",
+					dataType: 'jsonp'
+				}).done(function( result ) {
+					$.each(result, function(i, field){
+						$('.sermon-img{{ item.Id }}').attr('src',field.thumbnail_large);
+						$('.sermon-img{{ item.Id }}').show();
+					});				
+				});
+			}
+			else {
+				$('.sermon-img{{ item.Id }}').attr('src','/Themes/RLM/Assets/Images/img-default-453x260.gif');
+				$('.sermon-img{{ item.Id }}').show();
+			}
+		} else if (homeVideoURL.indexOf('youtube') >= 0 || homeVideoURL.indexOf('youtu') >= 0){
+			var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+			var match = homeVideoURL.match(regExp);
+			if (match) {
+				var videoID = match[1];
+				$('.sermon-img{{ item.Id }}').attr('src','https://img.youtube.com/vi/' + videoID + '/maxresdefault.jpg');
+			}
+			else {
+				$('.sermon-img{{ item.Id }}').attr('src','/Themes/RLM/Assets/Images/img-default-453x260.gif');
+			}
+			$('.sermon-img{{ item.Id }}').show();
+		}
+	{% endif %}
+{% endfor %}
+			});
+		</script>
+
+
+				<!--
+				<div class="items">
+				  {% assign nextPageString = Pagination.NextPage | ToString %}
+				  {% assign prevPageString = Pagination.PreviousPage | ToString %}
+				  
+				  {% if {{Pagination.PreviousPage == -1 }} %}
+				  <div class="btn dark pull-left disabled">
+					<a href="javascript:;" class="disabled"><i class="fa fa-chevron-left"></i> Prev</a>
+				  </div>
+				  {% else %}
+				  <div class="btn dark pull-left">
+					  <a href="{{Pagination.UrlTemplate | Replace:'PageNum', prevPageString}}">
+						<i class="fa fa-chevron-left"></i> Prev
+					  </a>
+				  </div>
+				  {% endif %}
+
+				  {% if {{Pagination.NextPage == -1 }} %}
+				  <div class="btn dark pull-right disabled">
+					<a href="javascript:;" class="disabled">Next <i class="fa fa-chevron-right"></i></a>
+				  </div>
+				  {% else %}
+				  <div class="btn dark pull-right">
+					  <a href="{{Pagination.UrlTemplate | Replace:'PageNum', nextPageString}}">
+						Next <i class="fa fa-chevron-right"></i>
+					  </a>
+				  </div>
+				  {% endif %}
+				</div>
+				-->
+			</div><!--end .content-->
+		</div><!--end .inner-->
+	</section><!--end .section-->

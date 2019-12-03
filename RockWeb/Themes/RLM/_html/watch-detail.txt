@@ -1,0 +1,138 @@
+		<section class="section banner sub watch min has-video">
+			<div class="inner">
+				<span class="info-section">
+					<span class="info-section-inner">
+						<img class="play-btn" src="~~/Assets/Images/play-btn-lrg.png" alt="Play Video" />
+					</span>
+				</span>
+				<span class="pjs-audio-player">
+					<audio preload="none" style="width:100%;" controls="controls"><source type="audio/mpeg" src="http://dev.plainjoe.co/media/preview.mp3"><a href="http://dev.plainjoe.co/media/preview.mp3">http://dev.plainjoe.co/media/preview.mp3</a></audio>
+				</span>
+				<i class="chevrons"></i>
+				<span class="img"><img src="~~/Assets/Images/header-watch-detail.jpg" /></span>
+				
+				<span class="video-panel">
+					<span class="vidframe">
+						<div class="id">19276185</div>
+						<div class="type">vimeo</div>
+					</span>
+				</span>
+				
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section watch-detail">
+			<div class="inner">
+				{% include '~~/Assets/Lava/SocialShare.lava' %}
+				<div class="content">
+					<h1>Experience God</h1>
+					<div class="options">
+						<ul>
+							<li><a class="watch-video-link" href="javascript:;">Watch</a></li>
+							<li class="has-sub"><a href="javascript:;">Listen<i></i></a>
+								<div class="sub">
+									<ul>
+										<li><a class="listen-audio-link" href="javascript:;">Listen Now</a></li>
+										<li><a href="javascript:;">Download mp3</a></li>
+									</ul>
+								</div>
+							</li>
+							<li><a href="javascript:;">Notes</a></li>
+							<li><a href="javascript:;">Chalk Talk</a></li>
+						</ul>
+					</div>
+					<h2>WEEK 4 | OCTOBER 12-15, 2017<br />
+					Speaker: Jim Putman</h2>
+					<div class="content-inner">
+						<p>Nullam id viverra nulla. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer ullamcorper ex at nisl rutrum pretium. Proin fermentum quis sapien sed aliquam. Fusce sed sagittis mauris, vel fermentum tellus...</p>
+					</div>
+					<div class="mob">
+						<div class="options">
+							<ul>
+								<li><a href="javascript:;">Watch</a></li>
+								<li class="has-sub"><a href="javascript:;">Listen<i></i></a>
+									<div class="sub">
+										<ul>
+											<li><a href="javascript:;">Link 1</a></li>
+											<li><a href="javascript:;">Link 2</a></li>
+										</ul>
+									</div>
+								</li>
+								<li><a href="javascript:;">Notes</a></li>
+								<li><a href="javascript:;">Chalk Talk</a></li>
+							</ul>
+						</div>
+						<div class="social-share">
+							<div class="title">Share This Page:</div>
+							<ul>
+								<li><a href="javascript:;"><i class="fa fa-facebook"></i></a></li>
+								<li><a href="javascript:;"><i class="fa fa-twitter"></i></a></li>
+								<li><a href="javascript:;"><i class="fa fa-envelope"></i></a></li>
+							</ul>
+						</div>
+					</div>
+				</div><!--end .content-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<script>
+			jQuery(document).ready(function() {
+				jQuery('.watch-detail .options li').each(function() {
+					jQuery(this).click(function() {
+						if (jQuery(this).has('i').length) {
+							if (jQuery(this).children('.sub').is(':visible')) {
+								jQuery(this).children('.sub').hide();
+							} else {
+								jQuery(this).children('.sub').show();
+							}
+						}
+					});
+				});
+			});
+		</script>
+		
+		<section class="section items-related">
+			<div class="inner">
+				<div class="content">
+					<h1>Other Sermons in this Series</h1>
+					<div class="items">
+						
+						<div class="item">
+							<a href="javascript:;">
+								<span class="img"><img src="~~/Assets/Images/watch-1.jpg" /></span>
+								<span class="info">
+									<span class="info-inner">
+										<span class="title">Experience God: Week 3</span>
+										<span class="desc">October 1, 2017</span>
+									</span>
+								</span>
+							</a>
+						</div><!--end .item-->
+						<div class="item">
+							<a href="javascript:;">
+								<span class="img"><img src="~~/Assets/Images/watch-2.jpg" /></span>
+								<span class="info">
+									<span class="info-inner">
+										<span class="title">Experience God: Week 2</span>
+										<span class="desc">September 21-24, 2017</span>
+									</span>
+								</span>
+							</a>
+						</div><!--end .item-->
+						<div class="item">
+							<a href="javascript:;">
+								<span class="img"><img src="~~/Assets/Images/watch-3.jpg" /></span>
+								<span class="info">
+									<span class="info-inner">
+										<span class="title">Experience God: Week 1</span>
+										<span class="desc">September 14-17, 2017</span>
+									</span>
+								</span>
+							</a>
+						</div><!--end .item-->
+						
+					</div><!--end .items-->
+				</div><!--end .content-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		

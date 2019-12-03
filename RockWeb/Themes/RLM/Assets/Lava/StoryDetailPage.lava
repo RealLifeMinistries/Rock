@@ -1,0 +1,260 @@
+{% assign storyID = PageParameter['Item'] %}
+{% assign tagTerm = PageParameter['tag'] %}
+{% assign tagArray = null %}
+
+{% if (storyID != null and storyID != empty) %}
+	{% contentchannelitem Id:'{{ storyID }}' %}
+	{% assign item = contentchannelitemItems | First %}
+	{% if item %}
+		{% capture pageTitle %}{{ item.Title }}'s Story | Real Life Ministries{% endcapture %}
+		{{ pageTitle | SetPageTitle }}
+		{% assign videoURL = item | Attribute: 'VideoURL' %}
+		{% assign detailImageGuid = item | Attribute:'Image','RawValue' %}
+		{% assign tagArray = item | Attribute:'Tags' %}
+
+		{% if (videoURL != '') %}
+		<section class="section banner sub story read min has-video">
+			<div class="inner">
+				<span class="info-section">
+					<span class="info-section-inner">
+						<img class="play-btn" src="/Themes/RLM/Assets/Images/play-btn-lrg.png" alt="Play Video" />
+					</span>
+				</span>
+				<i class="chevrons"></i>
+				<span class="shadow"></span>
+				{% if (detailImageGuid != '') %}
+					<span class="img"><img id="storyImage" src="/GetImage.ashx?Guid={{ detailImageGuid }}" /></span>
+				{% else %}
+					<span class="img"><img id="storyImage" src="/Themes/RLM/Assets/Images/header-blank.gif" /></span>
+				{% endif %}
+				
+				<span class="video-panel">
+					<span class="vidframe">
+						<div class="url">{{ videoURL }}</div>
+					</span>
+				</span>
+				
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section stories-detail">
+			<div class="inner">
+				{% include '~~/Assets/Lava/SocialShare.lava' %}
+				<div class="content">
+					<h1>{{ item.Title }}</h1>
+					<h2>
+						{% for tagItem in tagArray %}
+							{% assign itemAttr = tagItem | PropertyToKeyValue %}
+							<a href="{{ LinkedPages.DetailPage }}?tag={{ itemAttr.Value.Value }}">{{ itemAttr.Value.Value }}</a>
+						{% endfor %}
+					</h2>
+				</div><!--end .content-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		{% else %}
+		
+		<section class="section banner sub short read">
+			<div class="inner">
+				<span class="info-section">
+					<span class="info-section-inner">
+						<span class="top-txt">{{ item.Title }}</span>
+						<span class="btm-txt">
+						{% for tagItem in tagArray %}
+							{% assign itemAttr = tagItem | PropertyToKeyValue %}
+							<a href="{{ LinkedPages.DetailPage }}?tag={{ itemAttr.Value.Value }}">{{ itemAttr.Value.Value }}</a>
+						{% endfor %}
+						</span>
+					</span>
+				</span>
+				<i class="chevrons"></i>
+				<span class="shadow"></span>
+				{% if (detailImageGuid != '') %}
+					<span class="img"><img id="storyImage" src="/GetImage.ashx?Guid={{ detailImageGuid }}" /></span>
+				{% else %}
+					<span class="img"><img id="storyImage" src="/Themes/RLM/Assets/Images/header-blank.gif" /></span>
+				{% endif %}
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section stories-read">
+			<div class="inner">
+				{% include '~~/Assets/Lava/SocialShare.lava' %}
+				<div class="content">
+					<h1>{{ item.Title }}</h1>
+					<div class="content-inner">
+						<div class="right">
+							<div class="txt">
+								{{ item.RightColumnText }}
+							</div>
+						</div>
+						<div class="left">
+							{{ item.Content }}
+						</div>
+					</div>
+				</div><!--end .content-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		{% endif %}
+		
+		{% if (detailImageGuid != '') %}
+		{% else %}
+			<script>
+				jQuery(document).ready(function() {
+					homeVideoURL = '{{ videoURL }}';
+					if (homeVideoURL.indexOf('vimeo') >= 0){
+						var match = /vimeo.*\/(\d+)/i.exec( homeVideoURL );
+						if (match) {
+							var videoID = match[1];
+							$.getJSON("http://vimeo.com/api/v2/video/" + videoID + ".json", function(result){
+								$.each(result, function(i, field){
+									$('#storyImage').attr('src',field.thumbnail_large);
+								});
+							});
+						}
+					} else if (homeVideoURL.indexOf('youtube') >= 0 || homeVideoURL.indexOf('youtu') >= 0){
+						var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+						var match = homeVideoURL.match(regExp);
+						if (match) {
+							var videoID = match[1];
+							$('#storyImage').attr('src','https://img.youtube.com/vi/' + videoID + '/maxresdefault.jpg');
+						}
+					}
+				});
+			</script>
+		{% endif %}
+	{% endif %}
+	{% endcontentchannelitem %}
+
+{% else %}
+	{% capture pageTitle %}{{ tagTerm }} Stories | Real Life Ministries{% endcapture %}
+	{{ pageTitle | SetPageTitle }}
+{% endif %}
+
+<section class="section items-related">
+	<div class="inner">
+		{% include '~~/Assets/Lava/SocialShare.lava' %}
+		<div class="content">
+			{% if (tagTerm != null) %}
+				<h1>{{ tagTerm }} Stories</h1>
+			{% else %}
+				<h1>Related Stories</h1>
+			{% endif %}
+			<div class="items">
+				
+{% if (storyID != null and storyID != empty) %}
+	{% assign itemCount = 1 %}
+	{% for item in Items %}
+		{% if itemCount <= 6 %}
+			{% assign includeThis = false %}
+			{% assign matchTags = item | Attribute:'Tags'| ToJSON %}
+			{% assign includeThis = false %}
+
+			{% for tagTerm in tagArray %}
+				{% assign itemAttr = tagTerm | PropertyToKeyValue %}
+				{% assign isTagMatch = matchTags | RegExMatch:itemAttr.Value.Value %}			
+				{% if isTagMatch %}
+					{% assign includeThis = true %}
+					{% break %}
+				{% endif %}		
+			{% endfor %}
+
+			{% if (item.Id == storyID) %}
+				{% assign includeThis = false %}		
+			{% endif %}
+			
+			{% if (includeThis) %}
+				{% assign tagList = item | Attribute:'Tags' %}	
+				{% assign detailImageGuid = item | Attribute:'Image','RawValue' %}
+				{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+				<div class="item">
+					<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">
+						<span class="img">
+							{% if smlSermonImg != '' %}
+								<img class="sermon-img" src="/GetImage.ashx?Guid={{ smlSermonImg }}" alt="{{ item.Title }}" />
+							{% endif %}
+							<img class="main{% if smlSermonImg != '' %} o{% endif %}" src="/Themes/RLM/Assets/Images/img-default-453x260.gif" alt="{{ item.Title }}" />
+						</span>
+						<span class="info">
+							<span class="info-inner">
+								<span class="title">{{ item.Title }}</span>					
+								<span class="desc">		
+									{% for tagItem in tagList %}
+										{% assign itemAttr = tagItem | PropertyToKeyValue %}
+										<span class="inner-link" data-link="{{ LinkedPages.DetailPage }}?tag={{ itemAttr.Value.Value }}">{{ itemAttr.Value.Value }}</span>
+									{% endfor %}
+								</span>
+							</span>
+						</span>
+					</a>
+				</div><!--end .item-->
+				{% assign itemCount = itemCount | Plus:1 %}		
+			{% endif %}
+		{% else %}
+			{% break %}
+		{% endif %}
+	{% endfor %}
+{% endif %}
+
+{% if (tagTerm != empty and tagTerm != null) %}
+	{% assign itemCount = 1 %}
+	{% for item in Items %}
+		{% if itemCount <= 6 %}
+			{% assign includeThis = false %}
+			{% assign matchTags = item | Attribute:'Tags' | ToJSON %}
+			{% assign isTagMatch = matchTags | RegExMatch:tagTerm %}			
+			{% if isTagMatch %}
+				{% assign includeThis = true %}
+			{% endif %}		
+						
+			{% if (includeThis) %}
+				{% assign tagList = item | Attribute:'Tags' %}	
+				{% assign detailImageGuid = item | Attribute:'Image','RawValue' %}
+				{% assign smlSermonImg = item | Attribute:'SmallImage','RawValue' %}
+				<div class="item">
+					<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">
+						<span class="img">
+							{% if smlSermonImg != '' %}
+								<img class="sermon-img" src="/GetImage.ashx?Guid={{ smlSermonImg }}" alt="{{ item.Title }}" />
+							{% endif %}
+							<img class="main{% if smlSermonImg != '' %} o{% endif %}" src="/Themes/RLM/Assets/Images/img-default-453x260.gif" alt="{{ item.Title }}" />
+						</span>
+						<span class="info">
+							<span class="info-inner">
+								<span class="title">{{ item.Title }}</span>					
+								<span class="desc">		
+									{% for tagItem in tagList %}
+										{% assign itemAttr = tagItem | PropertyToKeyValue %}
+										<span class="inner-link" data-link="{{ LinkedPages.DetailPage }}?tag={{ itemAttr.Value.Value }}">{{ itemAttr.Value.Value }}</span>
+									{% endfor %}
+								</span>
+							</span>
+						</span>
+					</a>
+				</div><!--end .item-->
+				{% assign itemCount = itemCount | Plus:1 %}
+			{% endif %}
+		{% else %}
+			{% break %}
+		{% endif %}
+	{% endfor %}
+{% endif %}
+
+			</div><!--end .items-->
+			<div class="items">
+				<div class="btn dark">
+				{% if tagTerm != empty and tagTerm != null and itemCount > 6 %}
+					<a href="/all-stories?tag={{ tagTerm }}">View All</a>
+				{% else %}
+					{% if storyID != null and storyID != empty and itemCount > 6 %}
+						<a href="/all-stories?Item={{ storyID }}">View All</a>
+					{% else %}
+						<a href="/all-stories">View All</a>
+					{% endif %}
+				{% endif %}				
+				</div>			
+
+			</div>
+		</div><!--end .content-->
+	</div><!--end .inner-->
+</section><!--end .section-->

@@ -1,0 +1,16 @@
+{% assign thisPageTitle = 'Global' | Page:'Title' %}
+{% assign isTagMatch = thisPageTitle | RegExMatch:'| Real Life Ministries' %}
+{% if (isTagMatch == false) %}
+	{% assign thisPageTitle = thisPageTitle | Append:' | Real Life Ministries' %}
+{% endif %}		
+
+<div class="social-share">
+	<div class="title">Share This Page:</div>
+	<div class="addthis_toolbox">
+		<div class="custom_images">
+			<a class="addthis_button_facebook" addthis:url="{{ 'Global' | Page:'Url' | Escape }}" addthis:title="{{ thisPageTitle }}"><i class="fa fa-facebook"></i></a>
+			<a class="addthis_button_twitter" addthis:url="{{ 'Global' | Page:'Url' | Escape }}" addthis:title="{{ thisPageTitle }}"><i class="fa fa-twitter"></i></a>
+			<a class="addthis_button_email" addthis:url="{{ 'Global' | Page:'Url' | Escape }}" addthis:title="{{ thisPageTitle }}"><i class="fa fa-envelope"></i></a>
+		</div>
+	</div>
+</div>

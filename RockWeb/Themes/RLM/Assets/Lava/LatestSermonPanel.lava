@@ -1,0 +1,102 @@
+{% assign item = Items | First %}
+{% if item  %}
+	{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+	{% assign detailImageGuid = item | Attribute:'LargeImage','RawValue' %}
+	{% assign vidType = item.VideoURL %}
+
+	<section class="section two-col-vid-embed">
+		<div class="inner">
+			<!--<div class="vid">
+				<div class="video">
+					<div class="vidframesss"></div>
+				</div>
+			</div>-->
+			<div class="vid">
+				<img class="play-btn" src="/Themes/RLM/Assets/Images/play-btn-lrg.png" alt="Play Video">
+				{% if (detailImageGuid != '' and detailImageGuid != null) %}				
+					<div class="img-bg" style="background:url(/GetImage.ashx?Guid={{ detailImageGuid }}) center top no-repeat;background-size:cover;"></div>
+					<img class="img-tag" src="/GetImage.ashx?Guid={{ detailImageGuid }}" />
+				{% else %}
+					<div class="img-bg" style="center top no-repeat;background-size:cover;"></div>
+					<img class="img-tag" src="" />
+				{% endif %}				
+			</div><!--end .vid-->
+			<div class="text">
+				<div class="content">
+					<div class="content-inner">
+						<h1>Latest Sermon</h1>
+						<h2>{{ item.Title }}</h2>
+						<p><strong>{{ item.WeekNumber }} | {{ item.StartDateTime | Date:'MMMM d, yyyy' }}</strong></p>
+						<!--<p>{{ item | Attributes:'Summary' }}</p>-->
+						<p>{{ item.Content }}</p>
+						<div class="btn white">
+							<a href="/watch-listen">Other Series</a>
+						</div>
+					</div>
+				</div>
+			</div><!--end .text-->
+		</div><!--end .inner-->
+	</section><!--end .section-->
+	<script>
+		jQuery(document).ready(function() {
+			homeVideoURL = '{{ vidType }}';
+
+			{% if (detailImageGuid != '') %}				
+			{% else %}
+				if (homeVideoURL.indexOf('vimeo') >= 0){
+					var match = /vimeo.*\/(\d+)/i.exec( homeVideoURL );
+					if (match) {
+						var videoID = match[1];
+						$.ajax({
+							url: "http://vimeo.com/api/v2/video/" + videoID + ".json",
+							dataType: 'jsonp'
+						}).done(function( result ) {
+							$.each(result, function(i, field){
+								$('.img-tag').attr('src',field.thumbnail_large);
+								$('.img-bg').css('background', 'url(' + field.thumbnail_large + ')');								
+							});				
+						});
+					}
+				} else if (homeVideoURL.indexOf('youtube') >= 0 || homeVideoURL.indexOf('youtu') >= 0){
+					var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+					var match = homeVideoURL.match(regExp);
+					if (match) {
+						var videoID = match[1];
+						var videoUrlSrc = "https://img.youtube.com/vi/" + videoID + "/maxresdefault.jpg";
+						$('.img-tag').attr('src',videoUrlSrc);
+						$('.img-bg').css('background', 'url(' + videoUrlSrc + ')');
+					}
+				} 
+			{% endif %}
+			
+			function playHomeVideo(thisVideo) {
+				if (homeVideoURL.indexOf('vimeo') >= 0){
+					var match = /vimeo.*\/(\d+)/i.exec( homeVideoURL );
+					if (match) {
+						var videoID = match[1];
+					}
+					videoIframe = '<div class="vidframe"><iframe width="100%" height="100%" src="https://player.vimeo.com/video/' + videoID + '?autoplay=1&title=0&byline=0&portrait=0" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe></div>';
+				} else if (homeVideoURL.indexOf('youtube') >= 0 || homeVideoURL.indexOf('youtu') >= 0){
+					var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+					var match = homeVideoURL.match(regExp);
+					if (match) {
+						var videoID = match[1];
+					}
+					videoIframe = '<div class="vidframe"><iframe width="100%" height="100%" src="https://www.youtube.com/embed/' + videoID + '?rel=0&autoplay=1" frameborder="0" allowfullscreen></iframe></div>';
+				} else {
+					videoIframe = '<div class="vidframe"><iframe width="100%" height="100%" src="' + homeVideoURL + '" frameborder="0" allowfullscreen></iframe></div>';
+				}
+				thisVideo.find('.img-tag').fadeOut(250);
+				thisVideo.find('.img-bg').fadeOut(250);
+				thisVideo.find('.play-btn').fadeOut(250);
+				
+				thisVideo.find('.vid').append(videoIframe);
+			}
+			$('.two-col-vid-embed .vid').click(function() {
+				if ($(this).find('iframe').length < 1) {
+					playHomeVideo($('.two-col-vid-embed'));
+				}
+			});
+		});
+	</script>
+{% endif %}

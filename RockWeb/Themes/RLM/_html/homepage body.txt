@@ -1,0 +1,130 @@
+		<section class="section banner home">
+			<div class="inner">
+				<span class="info-section">
+					<span class="info-section-inner">
+						<img class="overlay" src="~~/Assets/Images/banner-overlay.png" />
+						<span class="text">Ways to connect in December</span>
+						<div class="btn"><a href="javascript:;">Learn More</a></div>
+					</span>
+				</span>
+				<div class="img" style="background:url(~~/Assets/Images/banner-1.jpg) center top no-repeat;background-size:cover;"></div>	
+			</div><!--end .inner-->
+		</section><!--end .section-->
+		
+		<section class="section two-col-vid-embed">
+			<div class="inner">
+				<div class="vid">
+					<div class="video">
+						<div class="vidframe">
+							<iframe id="vimeoVid" src="https://player.vimeo.com/video/19276185?title=0&amp;byline=0&amp;portrait=0&amp;api=1&amp;player_id=vimeoVid" width="1233" height="700" frameborder="0" webkitallowfullscreen="" mozallowfullscreen="" allowfullscreen=""></iframe>
+						</div>
+					</div>
+				</div><!--end .vid-->
+				<div class="text">
+					<div class="content">
+						<div class="content-inner">
+							<h2>Weekend Experience</h2>
+							<p><strong>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue.</strong></p>
+							<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum eget elementum augue. Sed purus purus, tristique ac lectus ut, efficitur scelerisque nisl. Maecenas quis enim erat. Setd non molestie ante. Integer ac venenatis nisi.</p>
+							<div class="btn white">
+								<a href="javascript:;">Other Series</a>
+							</div>
+						</div>
+					</div>
+				</div><!--end .text-->
+			</div><!--end .inner-->
+		</section><!--end .section-->
+
+		<section class="section all-campus-panel">
+			<div class="col online">
+				<a href="javascript:;">
+					<span class="col-inner">
+						<span class="title">Online Campus</span>
+						<span class="item">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<strong>Live Service Times:</strong><br />
+								Thursdays: 6:15pm<br />
+								Sundays: 8:00am
+							</span>
+						</span>
+						<span class="item addy">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<span class="inner-link" data-link="http://somewhere.com">Online Sermons</span>
+							</span>
+						</span>
+					</span>
+				</a>
+			</div><!--end .col-->
+			<div class="col" style="background:url(~~/Assets/Images/bg-campus1.jpg) center 50% no-repeat;background-size:cover;">
+				<a href="javascript:;">
+					<span class="col-inner">
+						<span class="title">Post Falls</span>
+						<span class="item">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<strong>Service Times:</strong><br />
+								Thursdays: 6:15pm<br />
+								Sundays: 8:00am, 9:30am, 11:15pm
+							</span>
+						</span>
+						<span class="item addy">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<span class="inner-link" data-link="https://www.google.com/maps/place/1860+N+Cecil+Rd,+Post+Falls,+ID+83854/@47.726114,-116.9038358,17z/data=!3m1!4b1!4m5!3m4!1s0x5361c3b5993384b7:0xca63a48d4b5bd1de!8m2!3d47.726114!4d-116.9016471">1860 N. Cecil Road<br />
+								Post Falls, ID 83854</span>
+								(208) 777-7325
+							</span>
+						</span>
+					</span>
+				</a>
+			</div><!--end .col-->
+			<div class="col" style="background:url(~~/Assets/Images/bg-campus2.jpg) center 50% no-repeat;background-size:cover;">
+				<a href="javascript:;">
+					<span class="col-inner">
+						<span class="title">Coeur d'Alene</span>
+						<span class="item">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<strong>Service Times:</strong><br />
+								Thursdays: 6:15pm<br />
+								Sundays: 8:00am, 9:30am, 11:15pm
+							</span>
+						</span>
+						<span class="item addy">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<span class="inner-link" data-link="https://www.google.com/maps/place/610+N+4th+St,+Coeur+d'Alene,+ID+83814/@47.677875,-116.7829556,17z/data=!3m1!4b1!4m5!3m4!1s0x5361c6f4dbca87c7:0x7e2e58f01ffbf4b7!8m2!3d47.677875!4d-116.7807669">610 N. 4th St.<br />
+								Coeur d’Alene, ID 83814</span>
+								(208) 664-4238
+							</span>
+						</span>
+					</span>
+				</a>
+			</div><!--end .col-->
+			<div class="col" style="background:url(~~/Assets/Images/bg-campus3.jpg) center 50% no-repeat;background-size:cover;">
+				<a href="http://google.com">
+					<span class="col-inner">
+						<span class="title">North Campus</span>
+						<span class="item">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<strong>Service Times:</strong><br />
+								Sundays: 9:00am, 10:15am
+							</span>
+						</span>
+						<span class="item addy">
+							<span class="icon"><i></i></span>
+							<span class="txt">
+								<span class="inner-link" data-link="https://www.google.com/maps/place/5830+Blackwell+Blvd,+Spirit+Lake,+ID+83869/@47.9550966,-116.8667627,17z/data=!3m1!4b1!4m5!3m4!1s0x53618d8be9c67fc9:0xe61393a10afcfe73!8m2!3d47.9550966!4d-116.864574"><strong>Timberlake Junior High</strong><br />
+								5830 Blackwell Blvd.<br />
+								Spirit Lake, ID 83869</span>
+								(208) 536-3536
+							</span>
+						</span>
+					</span>
+				</a>
+			</div><!--end .col-->
+		</section><!--end .section-->
+		

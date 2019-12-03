@@ -1,0 +1,84 @@
+{% assign item = Items | First %}
+{% if item  %}
+	{% assign parent = item.ParentItems | First | Property:'ContentChannelItem' %}
+	{% assign detailImageGuid = item | Attribute:'LargeImage','RawValue' %}	
+	{% assign videoLink = item | Attribute:'VideoURL' %}
+	{% assign audioLink = item | Attribute:'AudioURL' %}
+	{% assign noteItems = item | Attribute:'Notes' %}
+	
+	<section class="section banner sub watch landing min">
+		<div class="inner">
+			<span class="info-section">
+				<span class="info-section-inner">
+					<span class="top-txt">Latest Sermon</span>
+					<span class="btm-txt">{{ item.Title }}</span>
+					<span class="sml-txt">{{ item | Attribute:'WeekNumber' }} | {{ item.StartDateTime | Date:'MMMM d, yyyy' }}</span>
+					<span class="btn white">
+						{% if (videoLink != '') %}
+						<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}">Watch</a>
+						{% endif %}
+						{% if (audioLink != '') %}
+						<a href="{{ LinkedPages.DetailPage }}?Item={{ item.Id }}&t=audio">Listen</a>
+						{% endif %}
+						{% if (noteItems != "") %}
+							{% assign noteCount = noteItems | Size %}
+							{% if (noteCount == "1") %}
+								{% for noteItem in noteItems %}
+									{% assign notekv = noteItem | PropertyToKeyValue %}
+									<a href="{{ notekv.Value }}" target="_blank">Notes</a>
+								{% endfor %}
+							{% else %}
+								
+									<div class="sub">
+										<ul>
+											{% for noteItem in noteItems %}
+												{% assign notekv = noteItem | PropertyToKeyValue %}
+												<li><a href="{{ notekv.Value }}" target="_blank">{{ notekv.Key }}</a></li>
+											{% endfor %}
+										</ul>
+									</div>
+								</li>
+							{% endif %}
+						{% endif %}
+						
+					</span>
+				</span>
+			</span>
+			<i class="chevrons"></i>
+			{% if (detailImageGuid != '' and detailImageGuid != null) %}
+				<span class="img"><img id="sermonImage" src="/GetImage.ashx?Guid={{ detailImageGuid }}" /></span>
+			{% else %}
+				<span class="img"><img id="sermonImage" src="" /></span>
+			{% endif %}
+		</div><!--end .inner-->
+	</section><!--end .section-->
+	{% if (detailImageGuid != '') %}
+	{% else %}
+		<script>
+			jQuery(document).ready(function() {
+				homeVideoURL = '{{ videoLink }}';
+				if (homeVideoURL.indexOf('vimeo') >= 0){
+					var match = /vimeo.*\/(\d+)/i.exec( homeVideoURL );
+					if (match) {
+						var videoID = match[1];
+						$.ajax({
+							url: "http://vimeo.com/api/v2/video/" + videoID + ".json",
+							dataType: 'jsonp'
+						}).done(function( result ) {
+							$.each(result, function(i, field){
+								$('#sermonImage').attr('src',field.thumbnail_large);
+							});				
+						});
+					}
+				} else if (homeVideoURL.indexOf('youtube') >= 0 || homeVideoURL.indexOf('youtu') >= 0){
+					var regExp = /.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=)([^#\&\?]*).*/;
+					var match = homeVideoURL.match(regExp);
+					if (match) {
+						var videoID = match[1];
+						$('#sermonImage').attr('src','https://img.youtube.com/vi/' + videoID + '/maxresdefault.jpg');
+					}
+				}
+			});
+		</script>
+	{% endif %}
+{% endif %}

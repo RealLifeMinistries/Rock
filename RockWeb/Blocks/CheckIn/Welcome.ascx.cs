@@ -174,6 +174,9 @@ namespace RockWeb.Blocks.CheckIn
 
             RockPage.AddScriptLink( "~/Scripts/CheckinClient/checkin-core.js" );
 
+            // ZebraPrint is needed for client side label re-printing.
+            RockPage.AddScriptLink( "~/Scripts/CheckinClient/ZebraPrint.js" );
+
             if ( CurrentCheckInState == null )
             {
                 NavigateToPreviousPage();
@@ -183,45 +186,11 @@ namespace RockWeb.Blocks.CheckIn
             RockPage.AddScriptLink( "~/scripts/jquery.plugin.min.js" );
             RockPage.AddScriptLink( "~/scripts/jquery.countdown.min.js" );
 
-            RegisterScript();
-
             var bodyTag = this.Page.Master.FindControl( "bodyTag" ) as HtmlGenericControl;
             if ( bodyTag != null )
             {
                 bodyTag.AddCssClass( "checkin-welcome-bg" );
             }
-
-            // For Label Reprints
-            string script = string.Format( @"
-        function GetLabelTypeSelection() {{
-            var ids = '';
-            $('div.js-label-list').find('i.fa-check-square').each( function() {{
-                ids += $(this).closest('a').attr('data-label-guid') + ',';
-            }});
-            if (ids == '') {{
-                bootbox.alert('Please select at least one tag');
-                return false;
-            }}
-            else
-            {{
-                $('#{0}').button('loading')
-                $('#{1}').val(ids);
-                return true;
-            }}
-        }}
-
-        $('a.js-label-select').click( function() {{
-            $(this).toggleClass('active');
-            $(this).find('i').toggleClass('fa-check-square').toggleClass('fa-square-o');
-            var ids = '';
-            $('div.js-label-list').find('i.fa-check-square').each( function() {{
-                ids += $(this).closest('a').attr('data-label-guid') + ',';
-            }});
-            $('#{1}').val(ids);
-        }});
-
-", lbReprintSelectLabelTypes.ClientID, hfLabelFileGuids.ClientID );
-            ScriptManager.RegisterStartupScript( pnlReprintSelectedPersonLabels, pnlReprintSelectedPersonLabels.GetType(), "SelectLabelTypes", script, true );
         }
 
         /// <summary>
@@ -328,22 +297,6 @@ namespace RockWeb.Blocks.CheckIn
         protected void HandleStartClick()
         {
             NavigateToNextPage();
-        }
-
-        /// <summary>
-        /// Registers the script.
-        /// </summary>
-        private void RegisterScript()
-        {
-            var script = new StringBuilder();
-            script.AppendFormat( @"
-
-        function PostRefresh() {{
-            window.location = ""javascript:{0}"";
-        }}
-
-", this.Page.ClientScript.GetPostBackEventReference( lbRefresh, "" ) );
-            ScriptManager.RegisterStartupScript( lbRefresh, lbRefresh.GetType(), "refresh-postback", script.ToString(), true );
         }
 
         /// <summary>
@@ -753,10 +706,13 @@ namespace RockWeb.Blocks.CheckIn
             var personId = hfSelectedPersonId.ValueAsInt();
             var selectedAttendanceIds = hfSelectedAttendanceIds.Value.SplitDelimitedValues().AsIntegerList();
 
-            List<string> messages = ZebraPrint.ReprintZebraLabels( fileGuids, personId, selectedAttendanceIds, this );
+            List<string> messages = ZebraPrint.ReprintZebraLabels( fileGuids, personId, selectedAttendanceIds, pnlReprintResults, this.Request );
 
             pnlReprintResults.Visible = true;
             pnlReprintSelectedPersonLabels.Visible = false;
+
+            hfLabelFileGuids.Value = string.Empty;
+            hfSelectedPersonId.Value = string.Empty;
 
             lReprintResultsHtml.Text = messages.JoinStrings( "<br>" );
         }
