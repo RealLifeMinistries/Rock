@@ -101,6 +101,23 @@ namespace Rock.SystemGuid
         public const string PERSON_DISC_PROFILE = "6EAC3DF8-CA81-41A5-B1CF-A8DD7BD42F8D";
 
         /// <summary>
+        /// The same site cookie setting
+        /// </summary>
+        public const string SAME_SITE_COOKIE_SETTING = "03F55022-C1E0-45F3-84E1-C2BE8C38E22B";
+
+        #region Assessment Test Related
+
+        /// <summary>
+        /// The attribute that stores the date the person took the DISC test
+        /// </summary>
+        public const string PERSON_DISC_LAST_SAVE_DATE = "990275DB-611B-4D2E-94EA-3FFA1186A5E1";
+
+        /// <summary>
+        /// The person attribute for the DISC profile
+        /// </summary>
+        public const string PERSON_DISC_PROFILE = "6EAC3DF8-CA81-41A5-B1CF-A8DD7BD42F8D";
+
+        /// <summary>
         /// The person attribute for the dominant gifts
         /// </summary>
         public const string PERSON_DOMINANT_GIFTS = "F76FC75E-B33F-42B8-B360-15BA9A1F0F9A";
@@ -337,7 +354,7 @@ namespace Rock.SystemGuid
         /// </summary>
         ///
         [RockObsolete( "1.8" )]
-        [Obsolete( "Check-in identifiers are no longer stored as a family attribute. They are stored as a PersonSearchValue.")]
+        [Obsolete( "Check-in identifiers are no longer stored as a family attribute. They are stored as a PersonSearchValue.", true )]
         public const string FAMILY_CHECKIN_IDENTIFIERS = "8F528431-A438-4488-8DC3-CA42E66C1B37";
 
         #region eRA Attributes
@@ -407,6 +424,20 @@ namespace Rock.SystemGuid
 
         #endregion
 
+        #region Communication Module
+
+        /// <summary>
+        /// Communication Entry Wizard Block configuration setting.
+        /// </summary>
+        public const string COMMUNICATION_ENTRY_WIZARD_DEFAULT_AS_BULK = "23C883A6-AD9B-4C91-BAE6-16E0076C5D67";
+
+        /// <summary>
+        /// Communication Entry Block configuration setting.
+        /// </summary>
+        public const string COMMUNICATION_ENTRY_DEFAULT_AS_BULK = "679E5FBB-AB03-4DE4-BB24-1C7CEFEACD3E";
+
+        #endregion
+
         #region Communication List (group) attributes
 
         /// <summary>
@@ -466,5 +497,24 @@ namespace Rock.SystemGuid
         public const string CONTENT_FILETYPE_WHITELIST = "B895B6D7-BA21-45C0-8913-EF47FAAD69B1";
 
         #endregion File Type Lists
+
+        #region JWT Config Attributes
+
+        /// <summary>
+        /// The defined value attribute for JWT issuer
+        /// </summary>
+        public const string DEFINED_VALUE_JWT_ISSUER = "4B89D006-0523-4C77-A46B-7ECD042FDE99";
+
+        /// <summary>
+        /// The defined value attribute for JWT audience
+        /// </summary>
+        public const string DEFINED_VALUE_JWT_AUDIENCE = "6F9D9BFB-433F-4D77-8758-FBDB2011FB27";
+
+        /// <summary>
+        /// The defined value attribute for JWT person search key
+        /// </summary>
+        public const string DEFINED_VALUE_JWT_SEARCH_KEY = "DEECB6D1-E596-4A15-B0DB-B2947B5DB784";
+
+        #endregion JWT Config Attributes
     }
 }

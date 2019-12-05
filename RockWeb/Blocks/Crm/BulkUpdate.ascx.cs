@@ -163,7 +163,7 @@ namespace RockWeb.Blocks.Crm
             pwNote.Visible = ddlNoteType.Items.Count > 0;
 
             string script = @"
-    $('a.remove-all-individuals').click(function( e ){
+    $('a.remove-all-individuals').on('click', function( e ){
         e.preventDefault();
         Rock.dialogs.confirm('Are you sure you want to remove all of the individuals from this update?', function (result) {
             if (result) {
@@ -185,15 +185,15 @@ namespace RockWeb.Blocks.Crm
     }});
 
     // Handle the click event for any label that contains a 'js-select-span' span
-    $( 'label.control-label' ).has( 'span.js-select-item').click( function() {{
+    $( 'label.control-label' ).has( 'span.js-select-item').on('click', function() {{
 
         var formGroup = $(this).closest('.form-group');
         var selectIcon = formGroup.find('span.js-select-item').children('i');
 
-        // Toggle the selection of the form group        
+        // Toggle the selection of the form group
         formGroup.toggleClass('bulk-item-selected');
         var enabled = formGroup.hasClass('bulk-item-selected');
-            
+
         // Set the selection icon to show selected
         selectIcon.toggleClass('fa-check-circle-o', enabled);
         selectIcon.toggleClass('fa-circle-o', !enabled);
@@ -225,7 +225,7 @@ namespace RockWeb.Blocks.Crm
             }}
 
         }});
-        
+
         // Update the hidden field with the client id of each selected control, (if client id ends with '_hf' as in the case of multi-select attributes, strip the ending '_hf').
         var newValue = '';
         $('div.bulk-item-selected').each(function( index ) {{
@@ -235,7 +235,7 @@ namespace RockWeb.Blocks.Crm
                 newValue += ctrlId + '|';
             }});
         }});
-        $('#{0}').val(newValue);            
+        $('#{0}').val(newValue);
 
     }});
 ", hfSelectedItems.ClientID, ddlGradePicker.ClientID, ypGraduation.ClientID );
@@ -814,7 +814,7 @@ namespace RockWeb.Blocks.Crm
                     int processedCount = 0;
                     var workers = new List<Task>();
                     DateTime lastNotified = RockDateTime.Now;
-
+                    decimal lastCompletionPercentage = 0;
                     //
                     // Validate task count.
                     //
@@ -832,7 +832,7 @@ namespace RockWeb.Blocks.Crm
                     // Wait for the browser to finish loading.
                     //
                     Task.Delay( 1000 ).Wait();
-                    HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateProgress( "0", "0" );
+                    HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateProgress( "0", totalCount.ToString( "n0" ) );
 
                     if ( individuals.Any() )
                     {
@@ -851,18 +851,23 @@ namespace RockWeb.Blocks.Crm
                         while ( workers.Any( t => !t.IsCompleted ) )
                         {
                             var timeDiff = RockDateTime.Now - lastNotified;
-                            if ( timeDiff.TotalSeconds >= 2.5 )
-                            {
-                                lock ( individuals )
-                                {
-                                    processedCount = totalCount - individuals.Count;
-                                }
 
+                            lock ( individuals )
+                            {
+                                processedCount = totalCount - individuals.Count;
+                            }
+
+                            var currentCompletionPercentage = decimal.Divide( processedCount, totalCount ) * 100;
+
+                            // Send a progress notification if significant elapsed time or work completed.
+                            if ( timeDiff.TotalSeconds >= 2.5 || currentCompletionPercentage - lastCompletionPercentage > 10 )
+                            {
                                 HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateProgress(
                                     processedCount.ToString( "n0" ),
                                     totalCount.ToString( "n0" ) );
 
                                 lastNotified = RockDateTime.Now;
+                                lastCompletionPercentage = currentCompletionPercentage;
                             }
 
                             Task.Delay( 250 ).Wait();
@@ -872,29 +877,34 @@ namespace RockWeb.Blocks.Crm
                     //
                     // Give any jQuery transitions a moment to settle.
                     //
+                    HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateProgress( totalCount.ToString( "n0" ), totalCount.ToString( "n0" ) );
+
                     Task.Delay( 600 ).Wait();
 
                     if ( workers.Any( w => w.IsFaulted ) )
                     {
                         string status = string.Join( "<br>", workers.Where( w => w.IsFaulted ).Select( w => w.Exception.InnerException.Message.EncodeHtml() ) );
 
-                        HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateStatus( status, false );
+                        HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateStatus( status, "alert-danger" );
                     }
                     else
                     {
                         string status;
+                        string alertStatus;
                         if ( _errorCount == 0 )
                         {
                             status = string.Format( "{0} {1} successfully updated.",
                                 Individuals.Count().ToString( "N0" ), ( Individuals.Count() > 1 ? "people were" : "person was" ) );
+                            alertStatus = "alert-success";
                         }
                         else
                         {
                             status = string.Format( "{0} {1} updated with {2} error(s). Please look in the exception log for more details.",
                                 Individuals.Count().ToString( "N0" ), ( Individuals.Count() > 1 ? "people were" : "person was" ), _errorCount );
+                            alertStatus = "alert-warning";
                         }
 
-                        HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateStatus( status.EncodeHtml(), true );
+                        HubContext.Clients.Client( hfConnectionId.Value ).bulkUpdateStatus( status.EncodeHtml(), alertStatus );
                     }
                 } );
 
@@ -1452,9 +1462,23 @@ namespace RockWeb.Blocks.Crm
                                         groupMember.GroupRoleId = roleId.Value;
                                         groupMember.GroupMemberStatus = status;
                                         groupMember.PersonId = id;
-                                        groupMemberService.Add( groupMember );
 
-                                        newGroupMembers.Add( groupMember );
+                                        if ( groupMember.IsValidGroupMember( context ) )
+                                        {
+
+                                            groupMemberService.Add( groupMember );
+
+                                            newGroupMembers.Add( groupMember );
+                                        }
+                                        else
+                                        {
+                                            // Validation errors will get added to the ValidationResults collection. Add those results to the log and then move on to the next person.
+                                            var validationMessage = string.Join( ",", groupMember.ValidationResults.Select( r => r.ErrorMessage ).ToArray() );
+                                            var person = new PersonService( rockContext ).GetNoTracking( groupMember.PersonId );
+                                            var ex = new GroupMemberValidationException( string.Format("Unable to add {0} to group: {1}", person, validationMessage ));
+                                            Interlocked.Increment( ref _errorCount );
+                                            ExceptionLogService.LogException( ex );
+                                        }
                                     }
 
                                     context.SaveChanges();

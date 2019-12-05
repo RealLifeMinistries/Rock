@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Entity;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -323,7 +324,96 @@ namespace Rock.Rest.Controllers
             throw new HttpResponseException( System.Net.HttpStatusCode.NotFound );
         }
 
-        #endregion
+        /// <summary>
+        /// Gets the count of interactions over several timeframes for the current or specified person.
+        /// </summary>
+        /// <param name="date">The date. Optional. This defaults to today.</param>
+        /// <param name="personId">The person identifier. Optional. This defaults to the currently authenticated person.</param>
+        /// <param name="interactionChannelId">The interaction channel identifier. Optional filter.</param>
+        /// <param name="interactionComponentId">The interaction component identifier. Optional filter.</param>
+        /// <param name="interactionChannelGuid">The interaction channel unique identifier. Optional filter.</param>
+        /// <param name="interactionComponentGuid">The interaction component unique identifier. Optional filter.</param>
+        /// <returns></returns>
+        [Authenticate, Secured]
+        [HttpGet]
+        [System.Web.Http.Route( "api/People/GetInteractionStatistics/{personId?}" )]
+        public virtual PersonInteractionStatistics InteractionStatistics( int? personId = null, [FromUri]DateTime? date = null,
+            [FromUri]int? interactionChannelId = null, [FromUri]int? interactionComponentId = null, [FromUri]Guid? interactionChannelGuid = null,
+            [FromUri]Guid? interactionComponentGuid = null )
+        {
+            var rockContext = new RockContext();
+
+            // Default to the current person if the person id was not specified
+            if ( !personId.HasValue )
+            {
+                personId = GetPerson( rockContext )?.Id;
+
+                if ( !personId.HasValue )
+                {
+                    var errorMessage = "The personId for the current user did not resolve";
+                    var errorResponse = ControllerContext.Request.CreateErrorResponse( HttpStatusCode.BadRequest, errorMessage );
+                    throw new HttpResponseException( errorResponse );
+                }
+            }
+
+            // Default the date to today if the date was not specified
+            if ( !date.HasValue )
+            {
+                date = RockDateTime.Today;
+            }
+            else
+            {
+                date = date.Value.Date;
+            }
+
+            // Build the initial query for interactions
+            var interactionsService = new InteractionService( rockContext );
+            var query = interactionsService.Queryable().AsNoTracking().Where( i => i.PersonAlias.PersonId == personId );
+
+            // Filter by the channel guid if set
+            if ( interactionChannelGuid.HasValue )
+            {
+                query = query.Where( i => i.InteractionComponent.Channel.Guid == interactionChannelGuid.Value );
+            }
+
+            // Filter by the channel id if set
+            if ( interactionChannelId.HasValue )
+            {
+                query = query.Where( i => i.InteractionComponent.Channel.Id == interactionChannelId.Value );
+            }
+
+            // Filter by the component guid if set
+            if ( interactionComponentGuid.HasValue )
+            {
+                query = query.Where( i => i.InteractionComponent.Guid == interactionComponentGuid.Value );
+            }
+
+            // Filter by the component id if set
+            if ( interactionComponentId.HasValue )
+            {
+                query = query.Where( i => i.InteractionComponentId == interactionComponentId.Value );
+            }
+
+            // Read the results from the database. The intent here is to make one database call to get all of the counts rather than 4 calls.
+            // https://stackoverflow.com/a/8895028
+            var personInteractionStatistics = (
+                from interaction in query
+                group interaction by 1 into interactions
+                select new PersonInteractionStatistics
+                {
+                    InteractionsAllTime = interactions.Count(),
+                    InteractionsThatDay = interactions.Count( i => DbFunctions.TruncateTime( i.InteractionDateTime ) == date.Value ),
+                    InteractionsThatYear = interactions.Count( i => i.InteractionDateTime.Year == date.Value.Year ),
+                    InteractionsThatMonth = interactions.Count( i =>
+                        i.InteractionDateTime.Month == date.Value.Month &&
+                        i.InteractionDateTime.Year == date.Value.Year )
+                }
+            ).FirstOrDefault();
+
+            return personInteractionStatistics ?? new PersonInteractionStatistics();
+        }
+
+        #endregion Get
 
         #region Post
 
@@ -432,72 +522,87 @@ namespace Rock.Rest.Controllers
         [System.Web.Http.Route( "api/People/ConfigureTextToGive/{personId}" )]
         public HttpResponseMessage ConfigureTextToGive( int personId, [FromBody]ConfigureTextToGiveArgs args )
         {
-            // Validate the person
-            var person = Service.Get( personId );
+            var personService = Service as PersonService;
+            var success = personService.ConfigureTextToGive( personId, args.ContributionFinancialAccountId, args.FinancialPersonSavedAccountId, out var errorMessage );
 
-            if ( person == null )
+            if ( !errorMessage.IsNullOrWhiteSpace() )
             {
-                return ControllerContext.Request.CreateResponse( HttpStatusCode.NotFound, "The person ID is not valid" );
+                return ControllerContext.Request.CreateResponse( HttpStatusCode.BadRequest, errorMessage );
             }
 
-            // Load the person's saved accounts
-            var rockContext = Service.Context as RockContext;
-            var savedAccountService = new FinancialPersonSavedAccountService( rockContext );
-            var personsSavedAccounts = savedAccountService.Queryable()
-                .Include( sa => sa.PersonAlias )
-                .Where( sa => sa.PersonAlias.PersonId == personId )
-                .ToList();
-
-            // Loop through each saved account. Set default to false unless the args dictate that it is the default
-            var foundDefaultAccount = false;
-
-            foreach ( var savedAccount in personsSavedAccounts )
+            if ( !success )
             {
-                if ( !foundDefaultAccount && savedAccount.Id == args.FinancialPersonSavedAccountId )
-                {
-                    savedAccount.IsDefault = true;
-                    foundDefaultAccount = true;
-                }
-                else
-                {
-                    savedAccount.IsDefault = false;
-                }
+                return ControllerContext.Request.CreateResponse( HttpStatusCode.InternalServerError, "The action was not successful but not error was specified" );
             }
 
-            // If the args specified an account to be default but it was not found, then return an error
-            if ( args.FinancialPersonSavedAccountId.HasValue && !foundDefaultAccount )
-            {
-                return ControllerContext.Request.CreateResponse( HttpStatusCode.NotFound, "The saved account ID is not valid" );
-            }
-
-            // Validate the account if it is being set
-            if ( args.ContributionFinancialAccountId.HasValue )
-            {
-                var accountService = new FinancialAccountService( rockContext );
-                var account = accountService.Get( args.ContributionFinancialAccountId.Value );
-
-                if ( account == null )
-                {
-                    return ControllerContext.Request.CreateResponse( HttpStatusCode.NotFound, "The financial account ID is not valid" );
-                }
-
-                if ( !account.IsActive )
-                {
-                    return ControllerContext.Request.CreateResponse( HttpStatusCode.BadRequest, "The financial account is not active" );
-                }
-
-                if ( account.IsPublic.HasValue && !account.IsPublic.Value )
-                {
-                    return ControllerContext.Request.CreateResponse( HttpStatusCode.BadRequest, "The financial account is not public" );
-                }
-            }
-
-            // Set the person's contribution account ID
-            person.ContributionFinancialAccountId = args.ContributionFinancialAccountId;
-
-            // Success
-            rockContext.SaveChanges();
+            Service.Context.SaveChanges();
             return ControllerContext.Request.CreateResponse( HttpStatusCode.OK );
+        }
+
+        /// <summary>
+        /// Updates the profile photo of the logged in person.
+        /// </summary>
+        /// <param name="photoBytes">The photo bytes.</param>
+        /// <param name="filename">The filename.</param>
+        /// <returns></returns>
+        [Authenticate]
+        [System.Web.Http.Route( "api/People/UpdateProfilePhoto" )]
+        [HttpPost]
+        public IHttpActionResult UpdateProfilePhoto( [NakedBody] byte[] photoBytes, string filename )
+        {
+            var personId = GetPerson()?.Id;
+
+            if ( !personId.HasValue )
+            {
+                return NotFound();
+            }
+
+            if ( photoBytes.Length == 0 || string.IsNullOrWhiteSpace( filename ) )
+            {
+                return BadRequest();
+            }
+
+            char[] illegalCharacters = new char[] { '<', '>', ':', '"', '/', '\\', '|', '?', '*' };
+
+            if ( filename.IndexOfAny( illegalCharacters ) >= 0 )
+            {
+                return BadRequest( "Invalid Filename.  Please remove any special characters (" + string.Join( " ", illegalCharacters ) + ")." );
+            }
+
+            using ( var rockContext = new Data.RockContext() )
+            {
+                BinaryFileType binaryFileType = new BinaryFileTypeService( rockContext ).Get( SystemGuid.BinaryFiletype.PERSON_IMAGE.AsGuid() );
+
+                // always create a new BinaryFile record of IsTemporary when a file is uploaded
+                var binaryFileService = new BinaryFileService( rockContext );
+                var binaryFile = new BinaryFile();
+                binaryFileService.Add( binaryFile );
+
+                binaryFile.IsTemporary = false;
+                binaryFile.BinaryFileTypeId = binaryFileType.Id;
+                binaryFile.MimeType = "octet/stream";
+                binaryFile.FileSize = photoBytes.Length;
+                binaryFile.FileName = filename;
+                binaryFile.ContentStream = new MemoryStream( photoBytes );
+
+                rockContext.SaveChanges();
+
+                var person = new Model.PersonService( rockContext ).Get( personId.Value );
+                int? oldPhotoId = person.PhotoId;
+                person.PhotoId = binaryFile.Id;
+
+                rockContext.SaveChanges();
+
+                if ( oldPhotoId.HasValue )
+                {
+                    binaryFile = binaryFileService.Get( oldPhotoId.Value );
+                    binaryFile.IsTemporary = true;
+
+                    rockContext.SaveChanges();
+                }
+
+                return Ok( $"{GlobalAttributesCache.Value( "PublicApplicationRoot" )}{person.PhotoUrl}" );
+            }
         }
 
         #endregion
@@ -579,6 +684,7 @@ namespace Rock.Rest.Controllers
                     ? Person.FormatFullNameReversed( a.LastName, a.NickName, a.SuffixValueId, a.RecordTypeValueId )
                     : Person.FormatFullName( a.NickName, a.LastName, a.SuffixValueId, a.RecordTypeValueId ),
                     IsActive = a.RecordStatusValueId.HasValue && a.RecordStatusValueId == activeRecordStatusValueId,
+                    IsDeceased = a.IsDeceased,
                     RecordStatus = a.RecordStatusValueId.HasValue ? DefinedValueCache.Get( a.RecordStatusValueId.Value ).Value : string.Empty,
                     Age = Person.GetAge( a.BirthDate ) ?? -1,
                     FormattedAge = a.FormatAge(),
@@ -686,6 +792,7 @@ namespace Rock.Rest.Controllers
                 recordTypeValueGuid = DefinedValueCache.Get( person.RecordTypeValueId.Value ).Guid;
             }
 
+            personSearchResult.IsDeceased = person.IsDeceased;
             personSearchResult.ImageHtmlTag = Person.GetPersonPhotoImageTag( person, 50, 50 );
             personSearchResult.Age = person.Age.HasValue ? person.Age.Value : -1;
             personSearchResult.ConnectionStatus = person.ConnectionStatusValueId.HasValue ? DefinedValueCache.Get( person.ConnectionStatusValueId.Value ).Value : string.Empty;
@@ -796,21 +903,6 @@ namespace Rock.Rest.Controllers
         }
 
         /// <summary>
-        /// Obsolete: Gets the search details
-        /// </summary>
-        /// <param name="personId">The person identifier.</param>
-        /// <returns></returns>
-        [Authenticate, Secured]
-        [HttpGet]
-        [System.Web.Http.Route( "api/People/GetSearchDetails/{personId}" )]
-        [RockObsolete( "1.7" )]
-        [Obsolete( "Returns incorrect results, will be removed in a future version", true )]
-        public string GetImpersonationParameterObsolete( int personId )
-        {
-            throw new NotSupportedException();
-        }
-
-        /// <summary>
         /// Creates and stores a new PersonToken for a person using the specified ExpireDateTime, UsageLimit, and Page
         /// Returns the encrypted URLEncoded Token along with the ImpersonationParameter key in the form of "rckipid={ImpersonationParameter}"
         /// </summary>
@@ -838,6 +930,30 @@ namespace Rock.Rest.Controllers
             {
                 throw new HttpResponseException( HttpStatusCode.NotFound );
             }
+        }
+
+        /// <summary>
+        /// Gets the current person's impersonation token. This is used by external apps who might have a logged in person but
+        /// need to create a impersonation token to link to the website. For instance a mobile app might have the current person
+        /// and have a cookie, but would like to link out to the website.
+        /// </summary>
+        /// <param name="expireDateTime">The expire date time.</param>
+        /// <param name="usageLimit">The usage limit.</param>
+        /// <param name="pageId">The page identifier.</param>
+        /// <returns></returns>
+        [Authenticate, Secured]
+        [HttpGet]
+        [System.Web.Http.Route( "api/People/GetCurrentPersonImpersonationToken" )]
+        public string GetCurrentPersonImpersonationToken( DateTime? expireDateTime = null, int? usageLimit = null, int? pageId = null )
+        {
+            var currentPerson = GetPerson();
+
+            if ( currentPerson == null )
+            {
+                return string.Empty;
+            }
+
+            return GetImpersonationParameter( currentPerson.Id, expireDateTime, usageLimit, pageId ).Substring( 8 );
         }
 
         /// <summary>
@@ -1073,6 +1189,14 @@ namespace Rock.Rest.Controllers
         public bool IsActive { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether this instance is deceased.
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if this instance is deceased; otherwise, <c>false</c>.
+        /// </value>
+        public bool IsDeceased { get; set; }
+
+        /// <summary>
         /// Gets or sets the image HTML tag.
         /// </summary>
         /// <value>
@@ -1178,5 +1302,43 @@ namespace Rock.Rest.Controllers
         /// the person throughout Rock
         /// </summary>
         public int? FinancialPersonSavedAccountId { get; set; }
+    }
+
+    /// <summary>
+    /// Person Interaction Statistics
+    /// </summary>
+    public class PersonInteractionStatistics
+    {
+        /// <summary>
+        /// Gets or sets the interactions all time.
+        /// </summary>
+        /// <value>
+        /// The interactions all time.
+        /// </value>
+        public int InteractionsAllTime { get; set; }
+
+        /// <summary>
+        /// Gets or sets the interactions that day.
+        /// </summary>
+        /// <value>
+        /// The interactions that day.
+        /// </value>
+        public int InteractionsThatDay { get; set; }
+
+        /// <summary>
+        /// Gets or sets the interactions that month.
+        /// </summary>
+        /// <value>
+        /// The interactions that month.
+        /// </value>
+        public int InteractionsThatMonth { get; set; }
+
+        /// <summary>
+        /// Gets or sets the interactions that year.
+        /// </summary>
+        /// <value>
+        /// The interactions that year.
+        /// </value>
+        public int InteractionsThatYear { get; set; }
     }
 }

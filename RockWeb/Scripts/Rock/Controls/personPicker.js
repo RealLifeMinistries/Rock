@@ -86,14 +86,22 @@
 
                     var searchQuery = "?" + searchParams.join("&");
 
+                    // set the timeout to 20 seconds, just in case it takes a long time to search
                     promise = $.ajax({
                         url: restUrl
                             + searchQuery
                             + "&includeDetails=" + includeDetails
                             + "&includeBusinesses=" + includeBusinesses
                             + "&includeDeceased=" + includeDeceased,
+                        timeout: 20000,
                         dataType: 'json'
                     });
+
+                    // if it takes more than 1.5 seconds for the search to complete, show a wait indicator
+                    if ($('.js-searching-notification').length == 0) {
+                        $searchResults.prepend('<i class="fa fa-refresh fa-spin margin-l-md js-searching-notification" style="display: none; opacity: .4;"></i>');
+                    }
+                    $('.js-searching-notification').delay(1500).fadeIn(800);
 
                     promise.done(function (data) {
                         $searchResults.html('');
@@ -110,6 +118,8 @@
                         if (errorCode == 401) {
                             $searchResults.html("<li class='text-danger'>Sorry, you're not authorized to search.</li>");
                         }
+
+                        $('.js-searching-notification').remove();
                     });
                 },
                 // set minLength to 0, but check that at least one field as 3 chars before fetching from REST
@@ -132,6 +142,9 @@
 
                     if (!item.IsActive && item.RecordStatus) {
                         inactiveWarning = " <small>(" + item.RecordStatus + ")</small>";
+                    }
+                    if (item.IsDeceased) {
+                        inactiveWarning = " <small class=\"text-danger\">(Deceased)</small>";
                     }
 
                     var quickSummaryInfo = "";
@@ -207,12 +220,12 @@
                 autoComplete._renderItem = autoCompleteCustomRenderItem;
             });
 
-            $pickerToggle.click(function (e) {
+            $pickerToggle.on('click', function (e) {
                 e.preventDefault();
                 $(this).toggleClass("active");
                 $pickerMenu.toggle(0, function () {
                     exports.personPickers[controlId].updateScrollbar();
-                    $searchFieldName.focus();
+                    $searchFieldName.trigger('focus');
                 });
             });
 
@@ -233,7 +246,15 @@
 
                     if (selectedPersonId == lastSelectedPersonId && e.type == 'click') {
                         // if they are clicking the same person twice in a row (and the details are done expanding), assume that's the one they want to pick
-                        $pickerSelect[0].click();
+                        var selectedText = $selectedItem.attr('data-person-name');
+
+                        setSelectedPerson(selectedPersonId, selectedText);
+
+                        // Fire the postBack for the Select button.
+                        var postBackUrl = $pickerSelect.prop('href');
+                        if (postBackUrl) {
+                            window.location = postBackUrl;
+                        }
                     } else {
 
                         // if it is already visible but isn't the same one twice, just leave it open
@@ -281,25 +302,25 @@
                 }
             }
 
-            $pickerControl.hover(
+            $pickerControl.on('mouseenter',
                 function () {
 
                     // only show the X if there is something picked
                     if (($pickerPersonId.val() || '0') !== '0') {
                         $pickerSelectNone.stop().show();
                     }
-                },
+                }).on('mouseleave',
                 function () {
                     $pickerSelectNone.fadeOut(500);
                 });
 
-            $pickerCancel.click(function () {
+            $pickerCancel.on('click', function () {
                 $pickerMenu.slideUp(function () {
                     exports.personPickers[controlId].updateScrollbar();
                 });
             });
 
-            $pickerSelectNone.click(function (e) {
+            $pickerSelectNone.on('click', function (e) {
 
                 var selectedValue = '0',
                     selectedText = defaultText;
@@ -320,7 +341,7 @@
                 $pickerMenu.slideUp();
             }
 
-            $pickerSelect.click(function () {
+            $pickerSelect.on('click', function () {
                 var $radInput = $pickerControl.find('input:checked'),
                     selectedValue = $radInput.val(),
                     selectedText = $radInput.closest('.js-picker-select-item').attr('data-person-name');

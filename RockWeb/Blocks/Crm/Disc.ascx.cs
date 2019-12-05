@@ -93,7 +93,7 @@ namespace Rockweb.Blocks.Crm
         #endregion Attribute Default Values
 
         #region Attribute Keys
-        protected static class AttributeKeys
+        private static class AttributeKeys
         {
             // Block Attributes
             public const string Instructions = "Instructions";
@@ -104,6 +104,11 @@ namespace Rockweb.Blocks.Crm
             // Other Attributes
             public const string Strengths = "Strengths";
             public const string Challenges = "Challenges";
+            public const string UnderPressure = "UnderPressure";
+            public const string Motivation = "Motivation";
+            public const string TeamContribution = "TeamContribution";
+            public const string LeadershipStyle = "LeadershipStyle";
+            public const string FollowerStyle = "FollowerStyle";
         }
 
         #endregion Attribute Keys
@@ -112,7 +117,7 @@ namespace Rockweb.Blocks.Crm
         /// <summary>
         /// A defined list of page parameter keys used by this block.
         /// </summary>
-        protected static class PageParameterKey
+        private static class PageParameterKey
         {
             /// <summary>
             /// The assessment identifier
@@ -120,7 +125,7 @@ namespace Rockweb.Blocks.Crm
             public const string AssessmentId = "AssessmentId";
 
             /// <summary>
-            /// The ULR encoded key for a person
+            /// The URL encoded key for a person
             /// </summary>
             public const string Person = "Person";
         }
@@ -215,7 +220,8 @@ namespace Rockweb.Blocks.Crm
             {
                 try
                 {
-                    _targetPerson = new PersonService( new RockContext() ).GetByUrlEncodedKey( personKey );
+                    var personService = new PersonService( new RockContext() );
+                    _targetPerson = personService.GetByPersonActionIdentifier( personKey, "Assessment" ) ?? personService.GetByUrlEncodedKey( personKey );
                     _isQuerystringPersonKey = true;
                 }
                 catch ( Exception )
@@ -644,6 +650,10 @@ namespace Rockweb.Blocks.Crm
             {
                 lPrintTip.Visible = true;
             }
+            else
+            {
+                pnlAdditionalInformation.Visible = true;
+            }
 
             lHeading.Text = string.Format( "<div class='disc-heading'><h1>{0}</h1><h4>Personality Type: {1}</h4></div>", _targetPerson.FullName, savedScores.PersonalityType );
 
@@ -672,6 +682,12 @@ namespace Rockweb.Blocks.Crm
                 lDescription.Text = personalityValue.Description;
                 lStrengths.Text = personalityValue.GetAttributeValue( AttributeKeys.Strengths );
                 lChallenges.Text = personalityValue.GetAttributeValue( AttributeKeys.Challenges );
+
+                lUnderPressure.Text = personalityValue.GetAttributeValue( AttributeKeys.UnderPressure );
+                lMotivation.Text = personalityValue.GetAttributeValue( AttributeKeys.Motivation );
+                lTeamContribution.Text = personalityValue.GetAttributeValue( AttributeKeys.TeamContribution );
+                lLeadershipStyle.Text = personalityValue.GetAttributeValue( AttributeKeys.LeadershipStyle );
+                lFollowerStyle.Text = personalityValue.GetAttributeValue( AttributeKeys.FollowerStyle );
             }
         }
 

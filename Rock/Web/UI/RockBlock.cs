@@ -209,10 +209,9 @@ namespace Rock.Web.UI
                     int properties = 0;
                     foreach ( var attribute in this.GetType().GetCustomAttributes( typeof( ContextAwareAttribute ), true ) )
                     {
-                        var contextAttribute = (ContextAwareAttribute)attribute;
-                        var entityType = contextAttribute.EntityType;
+                        var contextAttribute = ( ContextAwareAttribute ) attribute;
 
-                        if ( contextAttribute.EntityType == null )
+                        if ( !contextAttribute.Contexts.Any() )
                         {
                             // If the entity type was not specified in the attribute, look for a property that defines it
                             string propertyKeyName = string.Format( "ContextEntityType{0}", properties > 0 ? properties.ToString() : string.Empty );
@@ -221,20 +220,19 @@ namespace Rock.Web.UI
                             Guid guid = Guid.Empty;
                             if ( Guid.TryParse( GetAttributeValue( propertyKeyName ), out guid ) )
                             {
-                                entityType = EntityTypeCache.Get( guid );
+                                _contextTypesRequired.Add( EntityTypeCache.Get( guid ) );
                             }
-                        }
-
-                        if ( entityType != null && !_contextTypesRequired.Any( e => e.Guid.Equals( entityType.Guid ) ) )
-                        {
-                            _contextTypesRequired.Add( entityType );
                         }
                         else
                         {
-                            if ( !contextAttribute.IsConfigurable )
+                            foreach ( var context in contextAttribute.Contexts )
                             {
-                                // block support any ContextType of any entityType, and it isn't configurable in BlockPropties, so load all the ones that RockPage knows about
-                                _contextTypesRequired = RockPage.GetContextEntityTypes();
+                                var entityType = context.EntityType;
+
+                                if ( entityType != null && !_contextTypesRequired.Any( e => e.Guid.Equals( entityType.Guid ) ) )
+                                {
+                                    _contextTypesRequired.Add( entityType );
+                                }
                             }
                         }
                     }
@@ -396,7 +394,7 @@ namespace Rock.Web.UI
         /// <param name="value">The <see cref="System.Object"/> to cache.</param>
         /// <param name="cacheItemPolicy">Optional <see cref="System.Runtime.Caching.CacheItemPolicy"/>, defaults to null</param>
         [RockObsolete( "1.8" )]
-        [Obsolete( "AddCacheItem no longer supports a CacheItemPolicy, specify a number of seconds or absolute datetime instead.")]
+        [Obsolete( "AddCacheItem no longer supports a CacheItemPolicy, specify a number of seconds or absolute datetime instead.", true )]
         protected virtual void AddCacheItem( string key, object value, CacheItemPolicy cacheItemPolicy )
         {
             AddCacheItem( key, value, TimeSpan.MaxValue );
@@ -428,7 +426,7 @@ namespace Rock.Web.UI
         /// <param name="key">A <see cref="System.String"/> representing the key name for the item that will be flushed. This value
         /// defaults to an empty string.</param>
         [RockObsolete( "1.8" )]
-        [Obsolete("Use RemoveCacheItem( string key ) instead.")]
+        [Obsolete("Use RemoveCacheItem( string key ) instead.", true )]
         protected virtual void FlushCacheItem( string key = "" )
         {
             RemoveCacheItem( key );
@@ -441,7 +439,7 @@ namespace Rock.Web.UI
         /// </summary>
         /// <param name="blockId">An <see cref="System.Int32"/> representing the block item that will be flushed.</param>
         [RockObsolete( "1.8" )]
-        [Obsolete( "Method is no longer supported.")]
+        [Obsolete( "Method is no longer supported.", true )]
         protected virtual void FlushSharedBlock( int blockId )
         {
         }

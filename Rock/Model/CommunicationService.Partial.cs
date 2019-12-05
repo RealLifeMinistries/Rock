@@ -28,75 +28,6 @@ namespace Rock.Model
     /// </summary>
     public partial class CommunicationService
     {
-
-        /// <summary>
-        /// Creates the email communication.
-        /// </summary>
-        /// <param name="recipientEmails">The recipient emails.</param>
-        /// <param name="fromName">From name.</param>
-        /// <param name="fromAddress">From address.</param>
-        /// <param name="replyTo">The reply to.</param>
-        /// <param name="subject">The subject.</param>
-        /// <param name="htmlMessage">The HTML message.</param>
-        /// <param name="textMessage">The text message.</param>
-        /// <param name="bulkCommunication">if set to <c>true</c> [bulk communication].</param>
-        /// <param name="recipientStatus">The recipient status.</param>
-        /// <param name="senderPersonAliasId">The sender person alias identifier.</param>
-        /// <returns></returns>
-        [RockObsolete( "1.7" )]
-        [Obsolete( "Use method without textMessage argument", true )]
-        public Communication CreateEmailCommunication
-        (
-            List<string> recipientEmails,
-            string fromName,
-            string fromAddress,
-            string replyTo,
-            string subject,
-            string htmlMessage,
-            string textMessage,
-            bool bulkCommunication,
-            CommunicationRecipientStatus recipientStatus = CommunicationRecipientStatus.Delivered,
-            int? senderPersonAliasId = null )
-        {
-            return CreateEmailCommunication( recipientEmails, fromName, fromAddress, replyTo, subject, htmlMessage, bulkCommunication, recipientStatus, senderPersonAliasId );
-        }
-
-        /// <summary>
-        /// Creates the email communication.
-        /// </summary>
-        /// <param name="recipientEmails">The recipient emails.</param>
-        /// <param name="fromName">From name.</param>
-        /// <param name="fromAddress">From address.</param>
-        /// <param name="replyTo">The reply to.</param>
-        /// <param name="subject">The subject.</param>
-        /// <param name="message">The message.</param>
-        /// <param name="bulkCommunication">if set to <c>true</c> [bulk communication].</param>
-        /// <param name="recipientStatus">The recipient status.</param>
-        /// <param name="senderPersonAliasId">The sender person alias identifier.</param>
-        /// <returns></returns>
-        [RockObsolete( "1.7" )]
-        [Obsolete( "Use method with send date time argument", true )]
-        public Communication CreateEmailCommunication
-        (
-            List<string> recipientEmails,
-            string fromName,
-            string fromAddress,
-            string replyTo,
-            string subject,
-            string message,
-            bool bulkCommunication,
-            CommunicationRecipientStatus recipientStatus = CommunicationRecipientStatus.Delivered,
-            int? senderPersonAliasId = null )
-        {
-            DateTime? sendDateTime = null;
-            if ( recipientStatus == CommunicationRecipientStatus.Delivered )
-            {
-                sendDateTime = RockDateTime.Now;
-            }
-
-            return CreateEmailCommunication( recipientEmails, fromName, fromAddress, replyTo, subject, message, bulkCommunication, sendDateTime, recipientStatus, senderPersonAliasId );
-        }
-
         /// <summary>
         /// Creates the email communication 
         /// </summary>
@@ -162,15 +93,27 @@ namespace Rock.Model
             CommunicationRecipientStatus recipientStatus = CommunicationRecipientStatus.Delivered,
             int? senderPersonAliasId = null )
         {
-            var recipientPersonIds = recipients.Select( a => a.PersonId ).ToList();
+            var recipientsWithPersonIds = recipients.Where( a => a.PersonId.HasValue ).Select( a => a.PersonId ).ToList();
+            var recipientEmailsUnknownPersons = recipients.Where( a => a.PersonId == null ).Select( a => a.EmailAddress );
 
             var recipientPersonList = new PersonService( ( RockContext ) Context )
                 .Queryable()
-                .Where( p => recipientPersonIds.Contains( p.Id ) )
+                .Where( p => recipientsWithPersonIds.Contains( p.Id ) )
                 .ToList();
 
+            if ( !recipientPersonList.Any() && recipientEmailsUnknownPersons.Any( a => a != null ) )
+            {
+                // For backwards compatibility, if no PersonIds where specified, but there are recipients that are only specified by EmailAddress, take a guess at the personIds by looking for matching email addresses
+                recipientPersonList = new PersonService( ( RockContext ) Context )
+                .Queryable()
+                .Where( p => recipientEmailsUnknownPersons.Contains( p.Email ) )
+                .ToList();
+            }
+
             if ( !recipientPersonList.Any() )
+            {
                 return null;
+            }
 
             var communication = new Communication
             {
@@ -178,6 +121,7 @@ namespace Rock.Model
                 Status = CommunicationStatus.Approved,
                 SenderPersonAliasId = senderPersonAliasId
             };
+
             communication.FromName = fromName.TrimForMaxLength( communication, "FromName" );
             communication.FromEmail = fromAddress.TrimForMaxLength( communication, "FromEmail" );
             communication.ReplyToEmail = replyTo.TrimForMaxLength( communication, "ReplyToEmail" );
@@ -211,7 +155,7 @@ namespace Rock.Model
         /// <summary>
         /// Creates an SMS communication with a CommunicationRecipient and adds it to the context.
         /// </summary>
-        /// <param name="fromPerson">From person. If null the name for the communication will be From: unknown person.</param>
+        /// <param name="fromPerson">the Sender for the communication (For the communication.SenderPersonAlias). If null the name for the communication will be From: unknown person.</param>
         /// <param name="toPersonAliasId">To person alias identifier. If null the CommunicationRecipient is not created</param>
         /// <param name="message">The message.</param>
         /// <param name="fromPhone">From phone.</param>
@@ -231,7 +175,10 @@ namespace Rock.Model
             var communication = new Rock.Model.Communication();
             communication.Name = communicationName;
             communication.CommunicationType = CommunicationType.SMS;
+
+            // NOTE: if this communication was created from a mobile device, fromPerson should never be null since a Nameless Person record should have been created if a regular person record wasn't found
             communication.SenderPersonAliasId = fromPerson?.PrimaryAliasId;
+
             communication.IsBulkCommunication = false;
             communication.Status = CommunicationStatus.Approved;
             communication.SMSMessage = message;

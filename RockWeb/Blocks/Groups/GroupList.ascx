@@ -2,7 +2,7 @@
 
 <asp:UpdatePanel ID="upnlGroupList" runat="server">
     <ContentTemplate>
-        
+
         <div class="panel panel-block">
             <div class="panel-heading">
                 <h1 class="panel-title"><i runat="server" id="iIcon"></i> <asp:Literal ID="lTitle" runat="server" Text="Group List" /></h1>
@@ -51,6 +51,7 @@
                 </div>
                 <div class="row">
                     <div class="col-md-4">
+                        <Rock:GroupPicker ID="gpGroup" runat="server" Label="Group" OnSelectItem="gpGroup_SelectedIndexChanged" ValidationGroup="GroupName"/>
                         <Rock:RockDropDownList ID="ddlGroup" runat="server" Label="Group" DataTextField="Name" DataValueField="Id" ValidationGroup="GroupName" EnhanceForLongLists="true" OnSelectedIndexChanged="ddlGroup_SelectedIndexChanged" AutoPostBack="true" />
                         <Rock:RockDropDownList ID="ddlGroupRole" runat="server" Label="Role" DataTextField="Name" DataValueField="Id" ValidationGroup="GroupName" EnhanceForLongLists="false" AutoPostBack="false" />
                     </div>
@@ -65,7 +66,7 @@
 
             Sys.Application.add_load(function () {
                 // delete/archive prompt
-                $('table.js-grid-group-list a.grid-delete-button').click(function (e) {
+                $('table.js-grid-group-list a.grid-delete-button').on('click', function (e) {
                     var $btn = $(this);
                     var $row = $btn.closest('tr');
                     var actionName = 'delete';

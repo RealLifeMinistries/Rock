@@ -525,6 +525,11 @@ namespace RockWeb.Blocks.Groups
             groupType.EnableSpecificGroupRequirements = cbEnableSpecificGroupReq.Checked;
             groupType.AllowSpecificGroupMemberWorkflows = cbAllowSpecificGrpMemWorkFlows.Checked;
             groupType.GroupStatusDefinedTypeId = ddlGroupStatusDefinedType.SelectedValueAsInt();
+            groupType.EnableInactiveReason = cbEnableInactiveReason.Checked;
+            groupType.RequiresInactiveReason = cbRequireInactiveReason.Checked;
+
+            // RSVP
+            groupType.EnableRSVP = cbGroupRSVPEnabled.Checked;
 
             // Scheduling
             groupType.IsSchedulingEnabled = cbSchedulingEnabled.Checked;
@@ -589,6 +594,8 @@ namespace RockWeb.Blocks.Groups
                 }
             }
 
+            avcEditAttributes.GetEditValues( groupType );
+
             if ( !groupType.IsValid )
             {
                 cvGroupType.IsValid = groupType.IsValid;
@@ -606,6 +613,8 @@ namespace RockWeb.Blocks.Groups
                     groupRequirementsToInsert.ForEach( a => a.GroupTypeId = groupType.Id );
                     groupRequirementService.AddRange( groupRequirementsToInsert );
                 }
+
+                groupType.SaveAttributeValues( rockContext );
 
                 /* Save Attributes */
                 string qualifierValue = groupType.Id.ToString();
@@ -795,6 +804,11 @@ namespace RockWeb.Blocks.Groups
             tbDescription.ReadOnly = groupType.IsSystem;
             tbDescription.Text = groupType.Description;
 
+            groupType.LoadAttributes();
+            avcEditAttributes.ShowCategoryLabel = false;
+            avcEditAttributes.ExcludedAttributes = groupType.Attributes.Where( a => !a.Value.IsAuthorized( Rock.Security.Authorization.EDIT, this.CurrentPerson ) ).Select( a => a.Value ).ToArray();
+            avcEditAttributes.AddEditControls( groupType );
+
             tbGroupTerm.ReadOnly = groupType.IsSystem;
             tbGroupTerm.Text = groupType.GroupTerm;
 
@@ -875,6 +889,9 @@ namespace RockWeb.Blocks.Groups
             cbGroupAttendanceRequiresSchedule.Checked = groupType.GroupAttendanceRequiresSchedule;
             cbGroupAttendanceRequiresLocation.Checked = groupType.GroupAttendanceRequiresLocation;
 
+            // RSVP
+            cbGroupRSVPEnabled.Checked = ( groupType.EnableRSVP == true );
+
             // Scheduling
             cbSchedulingEnabled.Checked = groupType.IsSchedulingEnabled;
 
@@ -897,6 +914,10 @@ namespace RockWeb.Blocks.Groups
             cbEnableSpecificGroupReq.Checked = groupType.EnableSpecificGroupRequirements;
             cbAllowSpecificGrpMemWorkFlows.Checked = groupType.AllowSpecificGroupMemberWorkflows;
             cbEnableGroupHistory.Checked = groupType.EnableGroupHistory;
+
+            cbEnableInactiveReason.Checked = groupType.EnableInactiveReason;
+            cbRequireInactiveReason.Enabled = groupType.EnableInactiveReason;
+            cbRequireInactiveReason.Checked = groupType.RequiresInactiveReason;
 
             GroupTypeRolesState = new List<GroupTypeRole>();
             foreach ( var role in groupType.Roles )
@@ -975,6 +996,13 @@ namespace RockWeb.Blocks.Groups
             DescriptionList descriptionList = new DescriptionList();
             descriptionList.Add( string.Empty, string.Empty );
             lblMainDetails.Text = descriptionList.Html;
+
+            groupType.LoadAttributes();
+            avcDisplayAttributes.ExcludedAttributes = groupType.Attributes.Where( a => !a.Value.IsAuthorized( Rock.Security.Authorization.VIEW, this.CurrentPerson ) ).Select( a => a.Value ).ToArray();
+
+            // Don't show the Categories, since they will probably be 'Start of Registration' or 'End of Registration';
+            avcDisplayAttributes.ShowCategoryLabel = false;
+            avcDisplayAttributes.AddDisplayControls( groupType );
         }
 
         /// <summary>
@@ -1955,7 +1983,18 @@ namespace RockWeb.Blocks.Groups
 
             if ( GroupTypeAttributesState.Any( a => a.Guid.Equals( attribute.Guid ) ) )
             {
-                attribute.Order = GroupTypeAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault().Order;
+                // get the non-editable stuff from the state and put it back into the object...
+                var attributeState = GroupTypeAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault();
+                if ( attributeState != null )
+                {
+                    attribute.Order = attributeState.Order;
+                    attribute.CreatedDateTime = attributeState.CreatedDateTime;
+                    attribute.CreatedByPersonAliasId = attributeState.CreatedByPersonAliasId;
+                    attribute.ForeignGuid = attributeState.ForeignGuid;
+                    attribute.ForeignId = attributeState.ForeignId;
+                    attribute.ForeignKey = attributeState.ForeignKey;
+                }
+
                 GroupTypeAttributesState.RemoveEntity( attribute.Guid );
             }
             else
@@ -2114,7 +2153,18 @@ namespace RockWeb.Blocks.Groups
 
             if ( GroupAttributesState.Any( a => a.Guid.Equals( attribute.Guid ) ) )
             {
-                attribute.Order = GroupAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault().Order;
+                // get the non-editable stuff from the state and put it back into the object...
+                var attributeState = GroupAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault();
+                if ( attributeState != null )
+                {
+                    attribute.Order = attributeState.Order;
+                    attribute.CreatedDateTime = attributeState.CreatedDateTime;
+                    attribute.CreatedByPersonAliasId = attributeState.CreatedByPersonAliasId;
+                    attribute.ForeignGuid = attributeState.ForeignGuid;
+                    attribute.ForeignId = attributeState.ForeignId;
+                    attribute.ForeignKey = attributeState.ForeignKey;
+                }
+
                 GroupAttributesState.RemoveEntity( attribute.Guid );
             }
             else
@@ -2267,7 +2317,18 @@ namespace RockWeb.Blocks.Groups
 
             if ( GroupMemberAttributesState.Any( a => a.Guid.Equals( attribute.Guid ) ) )
             {
-                attribute.Order = GroupMemberAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault().Order;
+                // get the non-editable stuff from the state and put it back into the object...
+                var attributeState = GroupMemberAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault();
+                if ( attributeState != null )
+                {
+                    attribute.Order = attributeState.Order;
+                    attribute.CreatedDateTime = attributeState.CreatedDateTime;
+                    attribute.CreatedByPersonAliasId = attributeState.CreatedByPersonAliasId;
+                    attribute.ForeignGuid = attributeState.ForeignGuid;
+                    attribute.ForeignId = attributeState.ForeignId;
+                    attribute.ForeignKey = attributeState.ForeignKey;
+                }
+
                 GroupMemberAttributesState.RemoveEntity( attribute.Guid );
             }
             else
@@ -2868,5 +2929,10 @@ namespace RockWeb.Blocks.Groups
         }
 
         #endregion
+
+        protected void cbEnableInactiveReason_CheckedChanged( object sender, EventArgs e )
+        {
+            cbRequireInactiveReason.Enabled = cbEnableInactiveReason.Checked;
+        }
     }
 }

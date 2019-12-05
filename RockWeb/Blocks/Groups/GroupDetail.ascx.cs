@@ -58,16 +58,24 @@ namespace RockWeb.Blocks.Groups
     [BooleanField( "Prevent Selecting Inactive Campus", "Should inactive campuses be excluded from the campus field when editing a group?.", false, "", 14 )]
     [LinkedPage( "Group History Page", "The page to display group history.", false, "", "", 15 )]
 
-
     [LinkedPage( "Group Scheduler Page",
         Key = "GroupSchedulerPage",
         Description ="The page to schedule this group.",
         IsRequired = false,
         DefaultValue = "1815D8C6-7C4A-4C05-A810-CF23BA937477,D0F198E2-6111-4EC1-8D1D-55AC10E28D04",
-        Order = 16)]
+        Order = 16 )]
 
-    [BooleanField( "Enable Group Tags", "If enabled, the tags will be shown.", true, "", 17 )]
-    public partial class GroupDetail : RockBlock, IDetailBlock
+    [LinkedPage("Group RSVP List Page",
+        Key = "GroupRSVPPage",
+        Description = "The page to manage RSVPs for this group.",
+        IsRequired = false,
+        DefaultValue = Rock.SystemGuid.Page.GROUP_RSVP_LIST,
+        Order = 17 )]
+
+    [BooleanField( "Enable Group Tags", "If enabled, the tags will be shown.", true, "", 18 )]
+
+    [ContextAware( typeof(Group) )]
+    public partial class GroupDetail : ContextEntityBlock, IDetailBlock
     {
         #region Constants
 
@@ -273,6 +281,18 @@ namespace RockWeb.Blocks.Groups
             // this event gets fired after block settings are updated. it's nice to repaint the screen if these settings would alter it
             this.BlockUpdated += Block_BlockUpdated;
             this.AddConfigurationUpdateTrigger( upnlGroupDetail );
+
+            // Add all of the badges for Group to the badge list control
+            var badgeCaches = BadgeCache.All( typeof( Group ) );
+
+            if ( badgeCaches.Any() )
+            {
+                blBadgeList.BadgeTypes.AddRange( badgeCaches );
+            }
+            else
+            {
+                divBadgeContainer.Visible = false;
+            }
         }
 
         /// <summary>
@@ -673,38 +693,32 @@ namespace RockWeb.Blocks.Groups
 
                 groupLocation.CopyPropertiesFrom( groupLocationState );
 
+                // Update Group Location Schedules
                 var existingSchedules = groupLocation.Schedules.Select( s => s.Guid ).ToList();
                 var existingGroupLocationConfigs = groupLocation.GroupLocationScheduleConfigs.Select( g => g );
-
-                var addedSchedules = new List<int>();
 
                 foreach ( var scheduleState in groupLocationState.Schedules.Where( s => !existingSchedules.Contains( s.Guid ) ).ToList() )
                 {
                     var schedule = scheduleService.Get( scheduleState.Guid );
                     if ( schedule != null )
                     {
-                        addedSchedules.Add( schedule.Id );
                         groupLocation.Schedules.Add( schedule );
                     }
                 }
 
-
-                // Select group configs with min, desired or max values 
+                // Get existing configurations with modified capacity values.
                 var modifiedScheduleConfigs = groupLocationState.GroupLocationScheduleConfigs
                     .Where( s => groupLocation.GroupLocationScheduleConfigs
                         .Where( exs => ( exs.ScheduleId == s.ScheduleId )
                             && exs.GroupLocationId == s.GroupLocationId
                             && ( exs.MinimumCapacity != s.MinimumCapacity
                             || exs.DesiredCapacity != s.DesiredCapacity
-                            || exs.MaximumCapacity != s.MaximumCapacity ) ).Any() );
+                            || exs.MaximumCapacity != s.MaximumCapacity ) ).Any() )
+                    .ToList();
 
-                // Handles case where group location schedules exisited without group location schedule configs
-                var newGroupLocationScheduleConfigs = existingGroupLocationConfigs.Count() > 0 
-                    ? groupLocationState.GroupLocationScheduleConfigs
-                    .Where( s => addedSchedules.Contains( s.ScheduleId ) ).ToList()
-                    : groupLocationState.GroupLocationScheduleConfigs;
+                // Add new scheduling configurations.
+                var newGroupLocationScheduleConfigs = groupLocationState.GroupLocationScheduleConfigs.Where( s => s.GroupLocationId == 0 ).ToList();
 
-                // Add scheduling configs
                 foreach ( var addedGroupLocationScheduleConfigs in newGroupLocationScheduleConfigs )
                 {
                     groupLocation.GroupLocationScheduleConfigs.Add(
@@ -782,6 +796,10 @@ namespace RockWeb.Blocks.Groups
             group.IsSecurityRole = cbIsSecurityRole.Checked;
             group.IsActive = cbIsActive.Checked;
             group.IsPublic = cbIsPublic.Checked;
+
+            // Don't save inactive properties if the group is active.
+            group.InactiveReasonValueId = cbIsActive.Checked ? null : ddlInactiveReason.SelectedValueAsInt();
+            group.InactiveReasonNote = cbIsActive.Checked ? null : tbInactiveNote.Text;
 
             group.SchedulingMustMeetRequirements = cbSchedulingMustMeetRequirements.Checked;
             group.AttendanceRecordRequiredForCheckIn = ddlAttendanceRecordRequiredForCheckIn.SelectedValueAsEnum<AttendanceRecordRequiredForCheckIn>();
@@ -1512,15 +1530,34 @@ namespace RockWeb.Blocks.Groups
             cbIsPublic.Checked = group.IsPublic;
 
             var rockContext = new RockContext();
-
             var groupService = new GroupService( rockContext );
             var attributeService = new AttributeService( rockContext );
+
+            if ( group.GroupType != null && group.GroupType.EnableInactiveReason )
+            {
+                ddlInactiveReason.Visible = true;
+                ddlInactiveReason.Items.Add( new ListItem() );
+                ddlInactiveReason.Required = group.GroupType.RequiresInactiveReason;
+
+                foreach ( var reason in new GroupTypeService( rockContext ).GetInactiveReasonsForGroupType( group.GroupTypeId ).Select(r => new { Text = r.Value, Value = r.Id } ) )
+                {
+                    ddlInactiveReason.Items.Add( new ListItem( reason.Text, reason.Value.ToString() ) );
+                }
+
+                ddlInactiveReason.SelectedValue = group.InactiveReasonValueId.ToString();
+
+                tbInactiveNote.Visible = true;
+                tbInactiveNote.Text = group.InactiveReasonNote;
+
+            }
+
+            // The inactivate child groups checkbox should only be visible if there are children to inactivate. js on the page will consume this.
+            hfHasChildGroups.Value = groupService.GetAllDescendentGroupIds( group.Id, false ).Any() ? "true" : "false";
 
             LoadDropDowns( rockContext );
 
             ddlSignatureDocumentTemplate.SetValue( group.RequiredSignatureDocumentTemplateId );
             gpParentGroup.SetValue( group.ParentGroup ?? groupService.Get( group.ParentGroupId ?? 0 ) );
-
 
             // Hide sync and requirements panel if no admin access
             bool canAdministrate = group.IsAuthorized( Authorization.ADMINISTRATE, CurrentPerson );
@@ -1834,7 +1871,7 @@ namespace RockWeb.Blocks.Groups
         /// <param name="group">The group.</param>
         private void ShowReadonlyDetails( Group group )
         {
-            btnDelete.Visible = !group.IsSystem;
+            btnDelete.Visible = btnDelete.Visible && !group.IsSystem;
             btnArchive.Visible = false;
 
             var rockContext = new RockContext();
@@ -1931,6 +1968,17 @@ namespace RockWeb.Blocks.Groups
             else
             {
                 hlMap.Visible = false;
+            }
+
+            string groupRSVPUrl = LinkedPageUrl( "GroupRSVPPage", pageParams );
+            if ( groupRSVPUrl.IsNotNullOrWhiteSpace() )
+            {
+                hlGroupRSVP.Visible = ( groupType != null ) && ( groupType.EnableRSVP == true );
+                hlGroupRSVP.NavigateUrl = groupRSVPUrl;
+            }
+            else
+            {
+                hlGroupRSVP.Visible = false;
             }
 
             string groupSchedulerUrl = LinkedPageUrl( "GroupSchedulerPage", pageParams );
@@ -3341,7 +3389,18 @@ namespace RockWeb.Blocks.Groups
 
             if ( GroupMemberAttributesState.Any( a => a.Guid.Equals( attribute.Guid ) ) )
             {
-                attribute.Order = GroupMemberAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault().Order;
+                // get the non-editable stuff from the state and put it back into the object...
+                var attributeState = GroupMemberAttributesState.Where( a => a.Guid.Equals( attribute.Guid ) ).FirstOrDefault();
+                if ( attributeState != null )
+                {
+                    attribute.Order = attributeState.Order;
+                    attribute.CreatedDateTime = attributeState.CreatedDateTime;
+                    attribute.CreatedByPersonAliasId = attributeState.CreatedByPersonAliasId;
+                    attribute.ForeignGuid = attributeState.ForeignGuid;
+                    attribute.ForeignId = attributeState.ForeignId;
+                    attribute.ForeignKey = attributeState.ForeignKey;
+                }
+
                 GroupMemberAttributesState.RemoveEntity( attribute.Guid );
             }
             else
@@ -3361,7 +3420,8 @@ namespace RockWeb.Blocks.Groups
         /// </summary>
         private void BindGroupMemberAttributesInheritedGrid()
         {
-            if ( CurrentGroupTypeCache != null )
+            // Don't make the Group Member Attributes PanelWidget visible if it's already hidden (due to permissions)
+            if ( CurrentGroupTypeCache != null && wpGroupMemberAttributes.Visible )
             {
                 wpGroupMemberAttributes.Visible = GroupMemberAttributesInheritedState.Any() || GroupMemberAttributesState.Any() || CurrentGroupTypeCache.AllowSpecificGroupMemberAttributes;
                 rcwGroupMemberAttributes.Visible = GroupMemberAttributesInheritedState.Any() || GroupMemberAttributesState.Any() || CurrentGroupTypeCache.AllowSpecificGroupMemberAttributes;

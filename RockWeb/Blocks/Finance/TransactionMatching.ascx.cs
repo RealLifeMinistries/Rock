@@ -96,7 +96,7 @@ namespace RockWeb.Blocks.Finance
         /// <summary>
         /// Keys to use for Block Attributes
         /// </summary>
-        protected static class AttributeKey
+        private static class AttributeKey
         {
             public const string Accounts = "Accounts";
             public const string AddFamilyLink = "AddFamilyLink";
@@ -181,7 +181,7 @@ namespace RockWeb.Blocks.Finance
             RockPage.AddScriptLink( "~/Scripts/jquery.fluidbox.min.js" );
 
             string script = string.Format( @"
-    $('.transaction-image-thumbnail').click( function() {{
+    $('.transaction-image-thumbnail').on('click', function() {{
         var $primaryHyperlink = $('.transaction-image a');
         var $primaryImg = $('.transaction-image a img');
         var primarySrc = $primaryHyperlink.attr('href');
@@ -958,6 +958,8 @@ namespace RockWeb.Blocks.Finance
             cpAccounts.SelectedCampusId = ( this.GetUserPreference( keyPrefix + "account-campus" ) ?? string.Empty ).AsIntegerOrNull();
 
             mdAccountsPersonalFilter.Show();
+
+            cbFilterAccountsByBatchsCampus.Visible = cpAccounts.Visible;
         }
 
         /// <summary>
@@ -1341,8 +1343,11 @@ namespace RockWeb.Blocks.Finance
                 var spouse = person.GetSpouse( rockContext );
                 lSpouseName.Text = spouse != null ? string.Format( "<p><strong>Spouse: </strong>{0}</p>", spouse.FullName ) : string.Empty;
 
-                var campus = person.GetCampus();
-                lCampus.Text = campus != null ? string.Format( "<p><strong>Campus: </strong>{0}</p>", campus.Name ) : string.Empty;
+                if ( CampusCache.All( false ).Count > 1 )
+                {
+                    var campus = person.GetCampus();
+                    lCampus.Text = campus != null ? string.Format( "<p><strong>Campus: </strong>{0}</p>", campus.Name ) : string.Empty;
+                }
 
                 var previousDefinedValue = DefinedValueCache.Get( Rock.SystemGuid.DefinedValue.GROUP_LOCATION_TYPE_PREVIOUS );
                 var addresses = person.GetFamilies().SelectMany( a => a.GroupLocations ).OrderBy( l => l.GroupLocationTypeValue.Order ).ToList();
@@ -1364,7 +1369,7 @@ namespace RockWeb.Blocks.Finance
                     rptrAddresses.DataBind();
                     btnMoreAddress.Visible = false;
                 }
-                
+
             }
         }
 

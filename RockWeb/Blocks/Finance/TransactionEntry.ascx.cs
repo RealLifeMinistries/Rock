@@ -2601,6 +2601,12 @@ TransactionAccountDetails: [
             bool givingAsBusiness = GetAttributeValue( "EnableBusinessGiving" ).AsBoolean() && !tglGiveAsOption.Checked;
             Person person = GetPerson( !givingAsBusiness );
 
+            // Add contact person if giving as a business and current person is unknow
+            if ( person == null && givingAsBusiness )
+            {
+                person = GetBusinessContact();
+            }
+
             if ( person == null )
             {
                 errorMessage = "There was a problem creating the person information";
@@ -2790,6 +2796,8 @@ TransactionAccountDetails: [
                 changeSummary.AppendLine();
             }
 
+            scheduledTransaction.Summary = changeSummary.ToString();
+
             var transactionService = new FinancialScheduledTransactionService( rockContext );
             transactionService.Add( scheduledTransaction );
             rockContext.SaveChanges();
@@ -2897,7 +2905,7 @@ TransactionAccountDetails: [
                 History.EvaluateChange( batchChanges, "Status", null, batch.Status );
                 History.EvaluateChange( batchChanges, "Start Date/Time", null, batch.BatchStartDateTime );
                 History.EvaluateChange( batchChanges, "End Date/Time", null, batch.BatchEndDateTime );
-            }            
+            }
 
             transaction.LoadAttributes( rockContext );
 
@@ -2918,7 +2926,7 @@ TransactionAccountDetails: [
             {
                 rockContext.SaveChanges();
             }
-            
+
             transaction.BatchId = batch.Id;
 
             // use the financialTransactionService to add the transaction instead of batch.Transactions to avoid lazy-loading the transactions already associated with the batch
@@ -3155,7 +3163,7 @@ TransactionAccountDetails: [
         }});
 
         // Disable the submit button as soon as it's clicked to prevent double-clicking
-        $('a[id$=""btnNext""]').click(function() {{
+        $('a[id$=""btnNext""]').on('click', function() {{
             $(this).unbind('click');
             if (typeof (Page_ClientValidate) == 'function') {{
                 if (Page_IsValid) {{
@@ -3164,7 +3172,7 @@ TransactionAccountDetails: [
             }}
             if (Page_IsValid) {{
 			    $(this).addClass('disabled');
-			    $(this).click(function () {{
+			    $(this).on('click', function () {{
 				    return false;
 			    }});
             }}
