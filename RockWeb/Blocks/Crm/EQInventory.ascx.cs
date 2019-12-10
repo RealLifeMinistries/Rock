@@ -244,7 +244,7 @@ namespace Rockweb.Blocks.Crm
         #endregion Attribute Default values
 
         #region Attribute Keys
-        private static class AttributeKeys
+        protected static class AttributeKeys
         {
             public const string NumberofQuestions = "NumberofQuestions";
             public const string Instructions = "Instructions";
@@ -260,7 +260,7 @@ namespace Rockweb.Blocks.Crm
         /// <summary>
         /// A defined list of page parameter keys used by this block.
         /// </summary>
-        private static class PageParameterKey
+        protected static class PageParameterKey
         {
             /// <summary>
             /// The assessment identifier
@@ -385,8 +385,7 @@ namespace Rockweb.Blocks.Crm
             {
                 try
                 {
-                    var personService = new PersonService( new RockContext() );
-                    _targetPerson = personService.GetByPersonActionIdentifier( personKey, "Assessment" ) ?? personService.GetByUrlEncodedKey( personKey );
+                    _targetPerson = new PersonService( new RockContext() ).GetByUrlEncodedKey( personKey );
                     _isQuerystringPersonKey = true;
                 }
                 catch ( Exception )

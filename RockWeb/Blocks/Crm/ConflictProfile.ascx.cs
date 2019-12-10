@@ -69,7 +69,7 @@ namespace Rockweb.Blocks.Crm
         Key = AttributeKeys.SetPageIcon,
         Description = "The css class name to use for the heading icon.",
         IsRequired = false,
-        DefaultValue = "fa fa-handshake",
+        DefaultValue = "fa fa-gift",
         Order = 3 )]
 
     [IntegerField(
@@ -186,7 +186,7 @@ namespace Rockweb.Blocks.Crm
         #endregion AttributeDefaultValues
 
         #region Attribute Keys
-        private static class AttributeKeys
+        protected static class AttributeKeys
         {
             public const string NumberOfQuestions = "NumberofQuestions";
             public const string Instructions = "Instructions";
@@ -220,7 +220,7 @@ namespace Rockweb.Blocks.Crm
         /// <summary>
         /// A defined list of page parameter keys used by this block.
         /// </summary>
-        private static class PageParameterKey
+        protected static class PageParameterKey
         {
             /// <summary>
             /// The assessment identifier
@@ -313,8 +313,7 @@ namespace Rockweb.Blocks.Crm
             {
                 try
                 {
-                    var personService = new PersonService( new RockContext() );
-                    _targetPerson = personService.GetByPersonActionIdentifier( personKey, "Assessment" ) ?? personService.GetByUrlEncodedKey( personKey );
+                    _targetPerson = new PersonService( new RockContext() ).GetByUrlEncodedKey( personKey );
                     _isQuerystringPersonKey = true;
                 }
                 catch ( Exception )
